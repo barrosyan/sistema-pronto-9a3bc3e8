@@ -1,21 +1,50 @@
 import { ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { NavLink } from './NavLink';
-import { Merge, BarChart3, Users, TrendingUp, Calendar, Sparkles } from 'lucide-react';
+import { Merge, BarChart3, Users, TrendingUp, Calendar, Sparkles, LogOut } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from './ui/button';
+import { toast } from 'sonner';
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 export const Layout = ({ children }: LayoutProps) => {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast.error("Erro ao fazer logout");
+    } else {
+      toast.success("Logout realizado com sucesso!");
+      navigate("/auth");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="container mx-auto px-4 py-4">
-          <h1 className="text-3xl font-bold text-foreground">Sistema Pronto</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Gestão Inteligente de Campanhas e Leads
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Sistema Pronto</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Gestão Inteligente de Campanhas e Leads
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="flex items-center gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              Sair
+            </Button>
+          </div>
         </div>
       </header>
 
