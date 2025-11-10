@@ -12,6 +12,7 @@ import Leads from "./pages/Leads";
 import Analytics from "./pages/Analytics";
 import Merge from "./pages/Merge";
 import ContentGeneration from "./pages/ContentGeneration";
+import ComparisonDashboard from "./pages/ComparisonDashboard";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/events" element={<ProtectedRoute><Layout><Events /></Layout></ProtectedRoute>} />
           <Route path="/leads" element={<ProtectedRoute><Layout><Leads /></Layout></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><Layout><Analytics /></Layout></ProtectedRoute>} />
+          <Route path="/comparison" element={<ProtectedRoute><Layout><ComparisonDashboard /></Layout></ProtectedRoute>} />
           <Route path="/merge" element={<ProtectedRoute><Layout><Merge /></Layout></ProtectedRoute>} />
           <Route path="/content-generation" element={<ProtectedRoute><Layout><ContentGeneration /></Layout></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
