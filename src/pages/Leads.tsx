@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Upload, Search, Filter, Users, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -25,6 +26,7 @@ const Leads = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [inputData, setInputData] = useState('');
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -146,6 +148,29 @@ const Leads = () => {
               Campanha, LinkedIn, Nome, Cargo, Empresa, Data Resposta Negativa, Data Repasse, Status, Observações, Teve FU? Porque?
             </code>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Dados Adicionais de Leads</CardTitle>
+          <CardDescription>
+            Cole aqui dados de leads para processar junto com o upload de arquivos (opcional)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Textarea
+            placeholder="Cole aqui dados de leads adicionais, observações ou informações complementares..."
+            value={inputData}
+            onChange={(e) => setInputData(e.target.value)}
+            rows={6}
+            className="font-mono text-sm"
+          />
+          {inputData && (
+            <p className="text-sm text-muted-foreground mt-2">
+              {inputData.split('\n').length} linhas de dados inseridas
+            </p>
+          )}
         </CardContent>
       </Card>
 

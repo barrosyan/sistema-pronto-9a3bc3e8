@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Upload, Plus, TrendingUp, FileSpreadsheet } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { parseExcelSheets } from '@/utils/excelSheetParser';
 import { useCampaignData } from '@/hooks/useCampaignData';
@@ -13,6 +14,7 @@ const Campaigns = () => {
   const navigate = useNavigate();
   const { campaignMetrics, addCampaignMetrics, addPositiveLeads, addNegativeLeads, setCampaignMetrics, setPositiveLeads, setNegativeLeads, loadFromDatabase } = useCampaignData();
   const [isLoading, setIsLoading] = useState(false);
+  const [inputData, setInputData] = useState('');
 
   useEffect(() => {
     loadFromDatabase();
@@ -274,6 +276,29 @@ const Campaigns = () => {
           </Button>
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Dados Adicionais de Entrada</CardTitle>
+          <CardDescription>
+            Cole aqui dados adicionais para processar junto com o upload de arquivos (opcional)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Textarea
+            placeholder="Cole aqui dados de campanhas, métricas ou observações adicionais..."
+            value={inputData}
+            onChange={(e) => setInputData(e.target.value)}
+            rows={6}
+            className="font-mono text-sm"
+          />
+          {inputData && (
+            <p className="text-sm text-muted-foreground mt-2">
+              {inputData.split('\n').length} linhas de dados inseridas
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {campaignsList.length === 0 && !isLoading ? (
         <Card>

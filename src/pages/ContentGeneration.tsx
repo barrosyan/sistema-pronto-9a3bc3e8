@@ -21,6 +21,7 @@ const ContentGeneration = () => {
   const [audience, setAudience] = useState('');
   const [topic, setTopic] = useState('');
   const [tone, setTone] = useState('professional');
+  const [references, setReferences] = useState('');
   const [generatedContent, setGeneratedContent] = useState('');
   
   // Form state for image generation
@@ -44,7 +45,7 @@ const ContentGeneration = () => {
       };
 
       const { data, error } = await supabase.functions.invoke('generate-marketing-content', {
-        body: { platform, audience, topic, tone, campaignData }
+        body: { platform, audience, topic, tone, references, campaignData }
       });
 
       if (error) throw error;
@@ -193,6 +194,20 @@ const ContentGeneration = () => {
                       <SelectItem value="persuasive">Persuasivo</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="references">Referências para Criação</Label>
+                  <Textarea
+                    id="references"
+                    placeholder="Cole aqui links, textos ou materiais de referência para enriquecer o conteúdo..."
+                    value={references}
+                    onChange={(e) => setReferences(e.target.value)}
+                    rows={4}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Adicione links, exemplos ou informações que devem ser consideradas na criação do conteúdo
+                  </p>
                 </div>
 
                 <Button 
