@@ -171,11 +171,17 @@ const Events = () => {
                     <SelectValue placeholder="Selecione a primeira campanha" />
                   </SelectTrigger>
                   <SelectContent>
-                    {campaignsList.map(c => (
-                      <SelectItem key={c.name} value={c.name}>
-                        {c.name} ({c.profile})
+                    {campaignsList.length > 0 ? (
+                      campaignsList.map(c => (
+                        <SelectItem key={c.name} value={c.name}>
+                          {c.name} ({c.profile})
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-campaigns" disabled>
+                        Nenhuma campanha disponível
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -187,11 +193,17 @@ const Events = () => {
                     <SelectValue placeholder="Selecione a segunda campanha" />
                   </SelectTrigger>
                   <SelectContent>
-                    {campaignsList.map(c => (
-                      <SelectItem key={c.name} value={c.name}>
-                        {c.name} ({c.profile})
+                    {campaignsList.length > 0 ? (
+                      campaignsList.map(c => (
+                        <SelectItem key={c.name} value={c.name}>
+                          {c.name} ({c.profile})
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-campaigns" disabled>
+                        Nenhuma campanha disponível
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -219,11 +231,17 @@ const Events = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Leads Recorrentes</SelectItem>
-              {eventAnalysis.map(event => (
-                <SelectItem key={event.eventName} value={event.eventName}>
-                  {event.eventName} ({event.totalLeads} leads)
+              {eventAnalysis.length > 0 ? (
+                eventAnalysis.map(event => (
+                  <SelectItem key={event.eventName} value={event.eventName}>
+                    {event.eventName} ({event.totalLeads} leads)
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="no-events" disabled>
+                  Nenhum evento disponível
                 </SelectItem>
-              ))}
+              )}
             </SelectContent>
           </Select>
 
