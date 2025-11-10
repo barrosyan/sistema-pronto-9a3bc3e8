@@ -1,63 +1,300 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { CampaignMetrics, Lead } from '@/types/campaign';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface CampaignDataStore {
   campaignMetrics: CampaignMetrics[];
   positiveLeads: Lead[];
   negativeLeads: Lead[];
+  isLoading: boolean;
   
-  setCampaignMetrics: (metrics: CampaignMetrics[]) => void;
-  setPositiveLeads: (leads: Lead[]) => void;
-  setNegativeLeads: (leads: Lead[]) => void;
-  addPositiveLead: (lead: Lead) => void;
-  addNegativeLead: (lead: Lead) => void;
-  updateLead: (id: string, updates: Partial<Lead>) => void;
+  loadFromDatabase: () => Promise<void>;
+  setCampaignMetrics: (metrics: CampaignMetrics[]) => Promise<void>;
+  setPositiveLeads: (leads: Lead[]) => Promise<void>;
+  setNegativeLeads: (leads: Lead[]) => Promise<void>;
+  addPositiveLead: (lead: Lead) => Promise<void>;
+  addNegativeLead: (lead: Lead) => Promise<void>;
+  updateLead: (id: string, updates: Partial<Lead>) => Promise<void>;
   getAllLeads: () => Lead[];
-  reset: () => void;
+  reset: () => Promise<void>;
 }
 
-export const useCampaignData = create<CampaignDataStore>()(
-  persist(
-    (set, get) => ({
-      campaignMetrics: [],
-      positiveLeads: [],
-      negativeLeads: [],
+export const useCampaignData = create<CampaignDataStore>((set, get) => ({
+  campaignMetrics: [],
+  positiveLeads: [],
+  negativeLeads: [],
+  isLoading: false,
+  
+  loadFromDatabase: async () => {
+    set({ isLoading: true });
+    try {
+      // Load campaign metrics
+      const { data: metricsData, error: metricsError } = await supabase
+        .from('campaign_metrics')
+        .select('*');
       
-      setCampaignMetrics: (metrics) => set({ campaignMetrics: metrics }),
-      setPositiveLeads: (leads) => set({ positiveLeads: leads }),
-      setNegativeLeads: (leads) => set({ negativeLeads: leads }),
+      if (metricsError) throw metricsError;
       
-      addPositiveLead: (lead) => set((state) => ({
-        positiveLeads: [...state.positiveLeads, lead]
-      })),
+      // Load leads
+      const { data: leadsData, error: leadsError } = await supabase
+        .from('leads')
+        .select('*');
       
-      addNegativeLead: (lead) => set((state) => ({
-        negativeLeads: [...state.negativeLeads, lead]
-      })),
+      if (leadsError) throw leadsError;
       
-      updateLead: (id, updates) => set((state) => ({
-        positiveLeads: state.positiveLeads.map(lead => 
-          lead.id === id ? { ...lead, ...updates } : lead
-        ),
-        negativeLeads: state.negativeLeads.map(lead => 
-          lead.id === id ? { ...lead, ...updates } : lead
-        )
-      })),
+      // Transform database data to app format
+      const metrics: CampaignMetrics[] = metricsData?.map(m => ({
+        campaignName: m.campaign_name,
+        eventType: m.event_type,
+        profileName: m.profile_name,
+        totalCount: m.total_count,
+        dailyData: m.daily_data as Record<string, number>
+      })) || [];
       
-      getAllLeads: () => {
-        const state = get();
-        return [...state.positiveLeads, ...state.negativeLeads];
-      },
+      const leads: Lead[] = leadsData?.map(l => ({
+        id: l.id,
+        campaign: l.campaign,
+        linkedin: l.linkedin || '',
+        name: l.name,
+        position: l.position || '',
+        company: l.company || '',
+        status: l.status as Lead['status'],
+        positiveResponseDate: l.positive_response_date,
+        transferDate: l.transfer_date,
+        statusDetails: l.status_details,
+        comments: l.comments,
+        followUp1Date: l.follow_up_1_date,
+        followUp1Comments: l.follow_up_1_comments,
+        followUp2Date: l.follow_up_2_date,
+        followUp2Comments: l.follow_up_2_comments,
+        followUp3Date: l.follow_up_3_date,
+        followUp3Comments: l.follow_up_3_comments,
+        followUp4Date: l.follow_up_4_date,
+        followUp4Comments: l.follow_up_4_comments,
+        observations: l.observations,
+        meetingScheduleDate: l.meeting_schedule_date,
+        meetingDate: l.meeting_date,
+        proposalDate: l.proposal_date,
+        proposalValue: l.proposal_value,
+        saleDate: l.sale_date,
+        saleValue: l.sale_value,
+        profile: l.profile,
+        classification: l.classification,
+        attendedWebinar: l.attended_webinar,
+        whatsapp: l.whatsapp,
+        standDay: l.stand_day,
+        pavilion: l.pavilion,
+        stand: l.stand,
+        negativeResponseDate: l.negative_response_date,
+        hadFollowUp: l.had_follow_up,
+        followUpReason: l.follow_up_reason
+      })) || [];
       
-      reset: () => set({
+      set({
+        campaignMetrics: metrics,
+        positiveLeads: leads.filter(l => l.status === 'positive'),
+        negativeLeads: leads.filter(l => l.status === 'negative')
+      });
+    } catch (error) {
+      console.error('Error loading data from database:', error);
+      toast.error('Erro ao carregar dados do banco');
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  
+  setCampaignMetrics: async (metrics) => {
+    set({ campaignMetrics: metrics });
+    
+    try {
+      // Delete existing metrics
+      await supabase.from('campaign_metrics').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      // Insert new metrics
+      const dbMetrics = metrics.map(m => ({
+        campaign_name: m.campaignName,
+        event_type: m.eventType,
+        profile_name: m.profileName,
+        total_count: m.totalCount,
+        daily_data: m.dailyData
+      }));
+      
+      const { error } = await supabase.from('campaign_metrics').insert(dbMetrics);
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving campaign metrics:', error);
+      toast.error('Erro ao salvar métricas no banco');
+    }
+  },
+  
+  setPositiveLeads: async (leads) => {
+    set({ positiveLeads: leads });
+    
+    try {
+      // Delete existing positive leads
+      await supabase.from('leads').delete().eq('status', 'positive');
+      
+      // Insert new leads
+      if (leads.length > 0) {
+        const dbLeads = leads.map(l => ({
+          campaign: l.campaign,
+          linkedin: l.linkedin,
+          name: l.name,
+          position: l.position,
+          company: l.company,
+          status: l.status,
+          positive_response_date: l.positiveResponseDate,
+          transfer_date: l.transferDate,
+          status_details: l.statusDetails,
+          comments: l.comments,
+          follow_up_1_date: l.followUp1Date,
+          follow_up_1_comments: l.followUp1Comments,
+          follow_up_2_date: l.followUp2Date,
+          follow_up_2_comments: l.followUp2Comments,
+          follow_up_3_date: l.followUp3Date,
+          follow_up_3_comments: l.followUp3Comments,
+          follow_up_4_date: l.followUp4Date,
+          follow_up_4_comments: l.followUp4Comments,
+          observations: l.observations,
+          meeting_schedule_date: l.meetingScheduleDate,
+          meeting_date: l.meetingDate,
+          proposal_date: l.proposalDate,
+          proposal_value: l.proposalValue,
+          sale_date: l.saleDate,
+          sale_value: l.saleValue,
+          profile: l.profile,
+          classification: l.classification,
+          attended_webinar: l.attendedWebinar,
+          whatsapp: l.whatsapp,
+          stand_day: l.standDay,
+          pavilion: l.pavilion,
+          stand: l.stand
+        }));
+        
+        const { error } = await supabase.from('leads').insert(dbLeads);
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error saving positive leads:', error);
+      toast.error('Erro ao salvar leads positivos no banco');
+    }
+  },
+  
+  setNegativeLeads: async (leads) => {
+    set({ negativeLeads: leads });
+    
+    try {
+      // Delete existing negative leads
+      await supabase.from('leads').delete().eq('status', 'negative');
+      
+      // Insert new leads
+      if (leads.length > 0) {
+        const dbLeads = leads.map(l => ({
+          campaign: l.campaign,
+          linkedin: l.linkedin,
+          name: l.name,
+          position: l.position,
+          company: l.company,
+          status: l.status,
+          negative_response_date: l.negativeResponseDate,
+          transfer_date: l.transferDate,
+          status_details: l.statusDetails,
+          observations: l.observations,
+          had_follow_up: l.hadFollowUp,
+          follow_up_reason: l.followUpReason
+        }));
+        
+        const { error } = await supabase.from('leads').insert(dbLeads);
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error saving negative leads:', error);
+      toast.error('Erro ao salvar leads negativos no banco');
+    }
+  },
+  
+  addPositiveLead: async (lead) => {
+    set((state) => ({ positiveLeads: [...state.positiveLeads, lead] }));
+    
+    try {
+      const { error } = await supabase.from('leads').insert({
+        campaign: lead.campaign,
+        linkedin: lead.linkedin,
+        name: lead.name,
+        position: lead.position,
+        company: lead.company,
+        status: 'positive',
+        // ... rest of positive lead fields
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error adding positive lead:', error);
+      toast.error('Erro ao adicionar lead positivo');
+    }
+  },
+  
+  addNegativeLead: async (lead) => {
+    set((state) => ({ negativeLeads: [...state.negativeLeads, lead] }));
+    
+    try {
+      const { error } = await supabase.from('leads').insert({
+        campaign: lead.campaign,
+        linkedin: lead.linkedin,
+        name: lead.name,
+        position: lead.position,
+        company: lead.company,
+        status: 'negative',
+        // ... rest of negative lead fields
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error adding negative lead:', error);
+      toast.error('Erro ao adicionar lead negativo');
+    }
+  },
+  
+  updateLead: async (id, updates) => {
+    set((state) => ({
+      positiveLeads: state.positiveLeads.map(lead => 
+        lead.id === id ? { ...lead, ...updates } : lead
+      ),
+      negativeLeads: state.negativeLeads.map(lead => 
+        lead.id === id ? { ...lead, ...updates } : lead
+      )
+    }));
+    
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update(updates)
+        .eq('id', id);
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating lead:', error);
+      toast.error('Erro ao atualizar lead');
+    }
+  },
+  
+  getAllLeads: () => {
+    const state = get();
+    return [...state.positiveLeads, ...state.negativeLeads];
+  },
+  
+  reset: async () => {
+    try {
+      await supabase.from('campaign_metrics').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('leads').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      set({
         campaignMetrics: [],
         positiveLeads: [],
         negativeLeads: []
-      })
-    }),
-    {
-      name: 'campaign-data-storage',
+      });
+    } catch (error) {
+      console.error('Error resetting data:', error);
+      toast.error('Erro ao limpar dados');
     }
-  )
-);
+  }
+}));
