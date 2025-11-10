@@ -7,6 +7,17 @@ export interface ExcelSheetData {
   negativeLeads: Lead[];
 }
 
+// Função para normalizar e validar strings
+function normalizeAndValidate(value: any): string {
+  if (!value || typeof value !== 'string') return '';
+  return value.trim();
+}
+
+// Função para verificar se uma string é válida (não vazia após trim)
+function isValidString(value: string): boolean {
+  return value.length > 0;
+}
+
 export async function parseExcelSheets(file: File | string): Promise<ExcelSheetData> {
   let workbook: XLSX.WorkBook;
 
@@ -35,6 +46,15 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
     const data = XLSX.utils.sheet_to_json(sheet) as any[];
     
     data.forEach(row => {
+      const campaignName = normalizeAndValidate(row['Campaign Name']);
+      const eventType = normalizeAndValidate(row['Event Type']);
+      const profileName = normalizeAndValidate(row['Profile Name']);
+      
+      // Skip rows with empty required fields
+      if (!isValidString(campaignName) || !isValidString(eventType) || !isValidString(profileName)) {
+        return;
+      }
+      
       const dailyData: Record<string, number> = {};
       
       Object.keys(row).forEach(key => {
@@ -44,9 +64,9 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
       });
       
       campaignMetrics.push({
-        campaignName: row['Campaign Name'] || '',
-        eventType: row['Event Type'] || '',
-        profileName: row['Profile Name'] || '',
+        campaignName,
+        eventType,
+        profileName,
         totalCount: Number(row['Total Count']) || 0,
         dailyData,
       });
@@ -63,13 +83,21 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
     const data = XLSX.utils.sheet_to_json(sheet) as any[];
     
     data.forEach((row, index) => {
+      const campaign = normalizeAndValidate(row['Campanha']);
+      const name = normalizeAndValidate(row['Nome']);
+      
+      // Skip rows with empty required fields
+      if (!isValidString(campaign) || !isValidString(name)) {
+        return;
+      }
+      
       positiveLeads.push({
-        id: `positive-${index}`,
-        campaign: row['Campanha'] || '',
-        linkedin: row['LinkedIn'] || '',
-        name: row['Nome'] || '',
-        position: row['Cargo'] || '',
-        company: row['Empresa'] || '',
+        id: `positive-${index}-${Date.now()}`,
+        campaign,
+        linkedin: normalizeAndValidate(row['LinkedIn']),
+        name,
+        position: normalizeAndValidate(row['Cargo']),
+        company: normalizeAndValidate(row['Empresa']),
         status: 'positive',
         positiveResponseDate: row['Data Resposta Positiva'],
         transferDate: row['Data Repasse'],
@@ -111,13 +139,21 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
     const data = XLSX.utils.sheet_to_json(sheet) as any[];
     
     data.forEach((row, index) => {
+      const campaign = normalizeAndValidate(row['Campanha']);
+      const name = normalizeAndValidate(row['Nome']);
+      
+      // Skip rows with empty required fields
+      if (!isValidString(campaign) || !isValidString(name)) {
+        return;
+      }
+      
       negativeLeads.push({
-        id: `negative-${index}`,
-        campaign: row['Campanha'] || '',
-        linkedin: row['LinkedIn'] || '',
-        name: row['Nome'] || '',
-        position: row['Cargo'] || '',
-        company: row['Empresa'] || '',
+        id: `negative-${index}-${Date.now()}`,
+        campaign,
+        linkedin: normalizeAndValidate(row['LinkedIn']),
+        name,
+        position: normalizeAndValidate(row['Cargo']),
+        company: normalizeAndValidate(row['Empresa']),
         status: 'negative',
         negativeResponseDate: row['Data Resposta Negativa'],
         transferDate: row['Data Repasse'],

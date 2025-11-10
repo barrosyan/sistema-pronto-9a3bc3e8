@@ -7,6 +7,17 @@ export interface ParsedCampaignData {
   leads: Lead[];
 }
 
+// Função para normalizar e validar strings
+function normalizeAndValidate(value: any): string {
+  if (!value || typeof value !== 'string') return '';
+  return value.trim();
+}
+
+// Função para verificar se uma string é válida (não vazia após trim)
+function isValidString(value: string): boolean {
+  return value.length > 0;
+}
+
 export function parseCampaignFile(file: File): Promise<ParsedCampaignData> {
   return new Promise((resolve, reject) => {
     const fileName = file.name.toLowerCase();
@@ -87,6 +98,15 @@ function processCampaignData(data: any[]): ParsedCampaignData {
     // Check for campaign metrics format
     if ('Campaign Name' in firstRow && 'Event Type' in firstRow) {
       data.forEach((row, index) => {
+        const campaignName = normalizeAndValidate(row['Campaign Name']);
+        const eventType = normalizeAndValidate(row['Event Type']);
+        const profileName = normalizeAndValidate(row['Profile Name']);
+        
+        // Skip rows with empty required fields
+        if (!isValidString(campaignName) || !isValidString(eventType) || !isValidString(profileName)) {
+          return;
+        }
+        
         const dailyData: Record<string, number> = {};
         
         Object.keys(row).forEach(key => {
@@ -96,9 +116,9 @@ function processCampaignData(data: any[]): ParsedCampaignData {
         });
         
         metrics.push({
-          campaignName: row['Campaign Name'] || '',
-          eventType: row['Event Type'] || '',
-          profileName: row['Profile Name'] || '',
+          campaignName,
+          eventType,
+          profileName,
           totalCount: Number(row['Total Count']) || 0,
           dailyData,
         });
@@ -110,13 +130,21 @@ function processCampaignData(data: any[]): ParsedCampaignData {
       const isPositive = 'Data Resposta Positiva' in firstRow;
       
       data.forEach((row, index) => {
+        const campaign = normalizeAndValidate(row['Campanha']);
+        const name = normalizeAndValidate(row['Nome']);
+        
+        // Skip rows with empty required fields
+        if (!isValidString(campaign) || !isValidString(name)) {
+          return;
+        }
+        
         const lead: Lead = {
-          id: `lead-${index}`,
-          campaign: row['Campanha'] || '',
-          linkedin: row['LinkedIn'] || '',
-          name: row['Nome'] || '',
-          position: row['Cargo'] || '',
-          company: row['Empresa'] || '',
+          id: `lead-${index}-${Date.now()}`,
+          campaign,
+          linkedin: normalizeAndValidate(row['LinkedIn']),
+          name,
+          position: normalizeAndValidate(row['Cargo']),
+          company: normalizeAndValidate(row['Empresa']),
           status: isPositive ? 'positive' : 'negative',
         };
         
@@ -168,7 +196,10 @@ export function groupMetricsByCampaign(metrics: CampaignMetrics[]): Map<string, 
   const grouped = new Map<string, CampaignMetrics[]>();
   
   metrics.forEach(metric => {
-    const key = metric.campaignName;
+    const key = metric.campaignName.trim();
+    // Skip entries with empty campaign names
+    if (!key) return;
+    
     if (!grouped.has(key)) {
       grouped.set(key, []);
     }
