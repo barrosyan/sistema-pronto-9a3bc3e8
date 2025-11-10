@@ -134,6 +134,13 @@ const Campaigns = () => {
 
   const saveToDatabase = async (metrics: any[], posLeads: any[], negLeads: any[]) => {
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Usuário não autenticado');
+        return;
+      }
+
       // Save campaign metrics
       const metricsToInsert = metrics.map(m => ({
         campaign_name: m.campaignName,
@@ -160,6 +167,7 @@ const Campaigns = () => {
         position: l.position,
         company: l.company,
         status: l.status,
+        user_id: user.id,
         positive_response_date: l.positiveResponseDate,
         transfer_date: l.transferDate,
         status_details: l.statusDetails,

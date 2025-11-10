@@ -193,10 +193,14 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
     set({ positiveLeads: leads });
     
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated');
+
       const { error: deleteError } = await supabase
         .from('leads')
         .delete()
-        .eq('status', 'positive');
+        .eq('status', 'positive')
+        .eq('user_id', user.id);
 
       if (deleteError) throw deleteError;
 
@@ -207,6 +211,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         position: l.position,
         company: l.company,
         status: 'positive',
+        user_id: user.id,
         positive_response_date: l.positiveResponseDate,
         transfer_date: l.transferDate,
         status_details: l.statusDetails,
@@ -254,6 +259,9 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
     set({ positiveLeads: mergedLeads });
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated');
+
       const leadsToInsert = newLeads.map(l => ({
         campaign: l.campaign,
         linkedin: l.linkedin,
@@ -261,6 +269,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         position: l.position,
         company: l.company,
         status: 'positive',
+        user_id: user.id,
         positive_response_date: l.positiveResponseDate,
         transfer_date: l.transferDate,
         status_details: l.statusDetails,
@@ -306,10 +315,14 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
     set({ negativeLeads: leads });
     
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated');
+
       const { error: deleteError } = await supabase
         .from('leads')
         .delete()
-        .eq('status', 'negative');
+        .eq('status', 'negative')
+        .eq('user_id', user.id);
 
       if (deleteError) throw deleteError;
 
@@ -320,6 +333,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         position: l.position,
         company: l.company,
         status: 'negative',
+        user_id: user.id,
         positive_response_date: l.positiveResponseDate,
         transfer_date: l.transferDate,
         status_details: l.statusDetails,
@@ -367,6 +381,9 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
     set({ negativeLeads: mergedLeads });
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated');
+
       const leadsToInsert = newLeads.map(l => ({
         campaign: l.campaign,
         linkedin: l.linkedin,
@@ -374,6 +391,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         position: l.position,
         company: l.company,
         status: 'negative',
+        user_id: user.id,
         positive_response_date: l.positiveResponseDate,
         transfer_date: l.transferDate,
         status_details: l.statusDetails,
@@ -419,6 +437,9 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
     set((state) => ({ positiveLeads: [...state.positiveLeads, lead] }));
     
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated');
+
       const { error } = await supabase.from('leads').insert({
         campaign: lead.campaign,
         linkedin: lead.linkedin,
@@ -426,7 +447,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         position: lead.position,
         company: lead.company,
         status: 'positive',
-        // ... rest of positive lead fields
+        user_id: user.id,
       });
       if (error) throw error;
     } catch (error) {
@@ -439,6 +460,9 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
     set((state) => ({ negativeLeads: [...state.negativeLeads, lead] }));
     
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated');
+
       const { error } = await supabase.from('leads').insert({
         campaign: lead.campaign,
         linkedin: lead.linkedin,
@@ -446,7 +470,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         position: lead.position,
         company: lead.company,
         status: 'negative',
-        // ... rest of negative lead fields
+        user_id: user.id,
       });
       if (error) throw error;
     } catch (error) {

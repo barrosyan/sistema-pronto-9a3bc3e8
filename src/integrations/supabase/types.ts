@@ -86,6 +86,7 @@ export type Database = {
           status_details: string | null
           transfer_date: string | null
           updated_at: string | null
+          user_id: string
           whatsapp: string | null
         }
         Insert: {
@@ -126,6 +127,7 @@ export type Database = {
           status_details?: string | null
           transfer_date?: string | null
           updated_at?: string | null
+          user_id: string
           whatsapp?: string | null
         }
         Update: {
@@ -166,6 +168,7 @@ export type Database = {
           status_details?: string | null
           transfer_date?: string | null
           updated_at?: string | null
+          user_id?: string
           whatsapp?: string | null
         }
         Relationships: []
