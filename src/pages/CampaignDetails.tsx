@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,13 +14,26 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, eachWeekOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+const ITEMS_PER_PAGE = 15;
+
 
 const CampaignDetails = () => {
   const { campaignName } = useParams<{ campaignName: string }>();
   const navigate = useNavigate();
   const { campaignMetrics, getAllLeads } = useCampaignData();
+  const [dailyPage, setDailyPage] = useState(1);
+  const [weeklyPage, setWeeklyPage] = useState(1);
 
   const decodedName = decodeURIComponent(campaignName || '');
   const campaignData = campaignMetrics.filter(m => m.campaignName === decodedName);
@@ -184,7 +198,12 @@ const CampaignDetails = () => {
         <TabsContent value="daily" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Métricas Diárias</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Métricas Diárias</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  {sortedDates.length} dias registrados
+                </p>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -201,31 +220,83 @@ const CampaignDetails = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedDates.map((date) => {
-                      const metrics = getDailyMetrics(date);
-                      const formattedDate = format(new Date(date), 'dd/MM/yyyy', { locale: ptBR });
-                      const dayOfWeek = format(new Date(date), 'EEEE', { locale: ptBR });
-                      
-                      return (
-                        <TableRow key={date}>
-                          <TableCell className="font-medium">
-                            <div className="flex flex-col">
-                              <span>{formattedDate}</span>
-                              <span className="text-xs text-muted-foreground capitalize">{dayOfWeek}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">{metrics.invitations}</TableCell>
-                          <TableCell className="text-right">{metrics.connections}</TableCell>
-                          <TableCell className="text-right">{metrics.messages}</TableCell>
-                          <TableCell className="text-right">{metrics.profileVisits}</TableCell>
-                          <TableCell className="text-right">{metrics.likes}</TableCell>
-                          <TableCell className="text-right">{metrics.comments}</TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {sortedDates
+                      .slice((dailyPage - 1) * ITEMS_PER_PAGE, dailyPage * ITEMS_PER_PAGE)
+                      .map((date) => {
+                        const metrics = getDailyMetrics(date);
+                        const formattedDate = format(new Date(date), 'dd/MM/yyyy', { locale: ptBR });
+                        const dayOfWeek = format(new Date(date), 'EEEE', { locale: ptBR });
+                        
+                        return (
+                          <TableRow key={date}>
+                            <TableCell className="font-medium">
+                              <div className="flex flex-col">
+                                <span>{formattedDate}</span>
+                                <span className="text-xs text-muted-foreground capitalize">{dayOfWeek}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">{metrics.invitations}</TableCell>
+                            <TableCell className="text-right">{metrics.connections}</TableCell>
+                            <TableCell className="text-right">{metrics.messages}</TableCell>
+                            <TableCell className="text-right">{metrics.profileVisits}</TableCell>
+                            <TableCell className="text-right">{metrics.likes}</TableCell>
+                            <TableCell className="text-right">{metrics.comments}</TableCell>
+                          </TableRow>
+                        );
+                      })}
                   </TableBody>
                 </Table>
               </div>
+
+              {Math.ceil(sortedDates.length / ITEMS_PER_PAGE) > 1 && (
+                <div className="mt-4">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => setDailyPage(prev => Math.max(1, prev - 1))}
+                          className={dailyPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                      
+                      {Array.from({ length: Math.ceil(sortedDates.length / ITEMS_PER_PAGE) }, (_, i) => i + 1).map((page) => {
+                        const totalPages = Math.ceil(sortedDates.length / ITEMS_PER_PAGE);
+                        if (
+                          page === 1 ||
+                          page === totalPages ||
+                          (page >= dailyPage - 1 && page <= dailyPage + 1)
+                        ) {
+                          return (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                onClick={() => setDailyPage(page)}
+                                isActive={dailyPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        } else if (page === dailyPage - 2 || page === dailyPage + 2) {
+                          return (
+                            <PaginationItem key={page}>
+                              <span className="px-4">...</span>
+                            </PaginationItem>
+                          );
+                        }
+                        return null;
+                      })}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => setDailyPage(prev => Math.min(Math.ceil(sortedDates.length / ITEMS_PER_PAGE), prev + 1))}
+                          className={dailyPage === Math.ceil(sortedDates.length / ITEMS_PER_PAGE) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -233,7 +304,12 @@ const CampaignDetails = () => {
         <TabsContent value="weekly" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Métricas Semanais</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Métricas Semanais</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  {weeklyMetrics.length} semanas registradas
+                </p>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -250,22 +326,74 @@ const CampaignDetails = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {weeklyMetrics.map((week, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="font-medium">
-                          {week.weekStart} - {week.weekEnd}
-                        </TableCell>
-                        <TableCell className="text-right">{week.invitations}</TableCell>
-                        <TableCell className="text-right">{week.connections}</TableCell>
-                        <TableCell className="text-right">{week.messages}</TableCell>
-                        <TableCell className="text-right">{week.profileVisits}</TableCell>
-                        <TableCell className="text-right">{week.likes}</TableCell>
-                        <TableCell className="text-right">{week.comments}</TableCell>
-                      </TableRow>
-                    ))}
+                    {weeklyMetrics
+                      .slice((weeklyPage - 1) * ITEMS_PER_PAGE, weeklyPage * ITEMS_PER_PAGE)
+                      .map((week, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="font-medium">
+                            {week.weekStart} - {week.weekEnd}
+                          </TableCell>
+                          <TableCell className="text-right">{week.invitations}</TableCell>
+                          <TableCell className="text-right">{week.connections}</TableCell>
+                          <TableCell className="text-right">{week.messages}</TableCell>
+                          <TableCell className="text-right">{week.profileVisits}</TableCell>
+                          <TableCell className="text-right">{week.likes}</TableCell>
+                          <TableCell className="text-right">{week.comments}</TableCell>
+                        </TableRow>
+                      ))}
                   </TableBody>
                 </Table>
               </div>
+
+              {Math.ceil(weeklyMetrics.length / ITEMS_PER_PAGE) > 1 && (
+                <div className="mt-4">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => setWeeklyPage(prev => Math.max(1, prev - 1))}
+                          className={weeklyPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                      
+                      {Array.from({ length: Math.ceil(weeklyMetrics.length / ITEMS_PER_PAGE) }, (_, i) => i + 1).map((page) => {
+                        const totalPages = Math.ceil(weeklyMetrics.length / ITEMS_PER_PAGE);
+                        if (
+                          page === 1 ||
+                          page === totalPages ||
+                          (page >= weeklyPage - 1 && page <= weeklyPage + 1)
+                        ) {
+                          return (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                onClick={() => setWeeklyPage(page)}
+                                isActive={weeklyPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        } else if (page === weeklyPage - 2 || page === weeklyPage + 2) {
+                          return (
+                            <PaginationItem key={page}>
+                              <span className="px-4">...</span>
+                            </PaginationItem>
+                          );
+                        }
+                        return null;
+                      })}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => setWeeklyPage(prev => Math.min(Math.ceil(weeklyMetrics.length / ITEMS_PER_PAGE), prev + 1))}
+                          className={weeklyPage === Math.ceil(weeklyMetrics.length / ITEMS_PER_PAGE) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
