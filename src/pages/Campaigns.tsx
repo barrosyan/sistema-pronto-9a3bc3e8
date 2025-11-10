@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Upload, Plus, TrendingUp, FileSpreadsheet } from 'lucide-react';
@@ -6,22 +7,115 @@ import { toast } from 'sonner';
 import { parseExcelSheets } from '@/utils/excelSheetParser';
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { groupMetricsByCampaign } from '@/utils/campaignParser';
+import { supabase } from '@/integrations/supabase/client';
 
 const Campaigns = () => {
+  const navigate = useNavigate();
   const { campaignMetrics, setCampaignMetrics, setPositiveLeads, setNegativeLeads } = useCampaignData();
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Auto-load the default data file on mount if no data exists
-    if (campaignMetrics.length === 0) {
-      loadDefaultData();
-    }
+    loadDataFromDatabase();
   }, []);
+
+  const loadDataFromDatabase = async () => {
+    setIsLoading(true);
+    try {
+      // Load campaign metrics from database
+      const { data: metricsData, error: metricsError } = await supabase
+        .from('campaign_metrics')
+        .select('*');
+
+      if (metricsError) throw metricsError;
+
+      // Load leads from database
+      const { data: leadsData, error: leadsError } = await supabase
+        .from('leads')
+        .select('*');
+
+      if (leadsError) throw leadsError;
+
+      if (metricsData && metricsData.length > 0) {
+        const parsedMetrics = metricsData.map(m => ({
+          campaignName: m.campaign_name,
+          eventType: m.event_type,
+          profileName: m.profile_name,
+          totalCount: m.total_count,
+          dailyData: (typeof m.daily_data === 'object' && m.daily_data !== null) 
+            ? (m.daily_data as Record<string, number>) 
+            : {}
+        }));
+        setCampaignMetrics(parsedMetrics);
+      } else {
+        // If database is empty, load from default file
+        await loadDefaultData();
+      }
+
+      if (leadsData && leadsData.length > 0) {
+        const positive = leadsData
+          .filter(l => l.status === 'positive')
+          .map(l => mapDatabaseLeadToType(l));
+        const negative = leadsData
+          .filter(l => l.status === 'negative')
+          .map(l => mapDatabaseLeadToType(l));
+        
+        setPositiveLeads(positive);
+        setNegativeLeads(negative);
+      }
+    } catch (error) {
+      console.error('Error loading data from database:', error);
+      toast.error('Erro ao carregar dados do banco');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const mapDatabaseLeadToType = (dbLead: any): any => {
+    return {
+      id: dbLead.id,
+      campaign: dbLead.campaign,
+      linkedin: dbLead.linkedin,
+      name: dbLead.name,
+      position: dbLead.position,
+      company: dbLead.company,
+      status: dbLead.status,
+      positiveResponseDate: dbLead.positive_response_date,
+      transferDate: dbLead.transfer_date,
+      statusDetails: dbLead.status_details,
+      comments: dbLead.comments,
+      followUp1Date: dbLead.follow_up_1_date,
+      followUp1Comments: dbLead.follow_up_1_comments,
+      followUp2Date: dbLead.follow_up_2_date,
+      followUp2Comments: dbLead.follow_up_2_comments,
+      followUp3Date: dbLead.follow_up_3_date,
+      followUp3Comments: dbLead.follow_up_3_comments,
+      followUp4Date: dbLead.follow_up_4_date,
+      followUp4Comments: dbLead.follow_up_4_comments,
+      observations: dbLead.observations,
+      meetingScheduleDate: dbLead.meeting_schedule_date,
+      meetingDate: dbLead.meeting_date,
+      proposalDate: dbLead.proposal_date,
+      proposalValue: dbLead.proposal_value,
+      saleDate: dbLead.sale_date,
+      saleValue: dbLead.sale_value,
+      profile: dbLead.profile,
+      classification: dbLead.classification,
+      attendedWebinar: dbLead.attended_webinar,
+      whatsapp: dbLead.whatsapp,
+      standDay: dbLead.stand_day,
+      pavilion: dbLead.pavilion,
+      stand: dbLead.stand,
+      negativeResponseDate: dbLead.negative_response_date,
+      hadFollowUp: dbLead.had_follow_up,
+      followUpReason: dbLead.follow_up_reason,
+    };
+  };
 
   const loadDefaultData = async () => {
     setIsLoading(true);
     try {
       const data = await parseExcelSheets('/data/campaign-data.xlsx');
+      await saveToDatabase(data.campaignMetrics, data.positiveLeads, data.negativeLeads);
       setCampaignMetrics(data.campaignMetrics);
       setPositiveLeads(data.positiveLeads);
       setNegativeLeads(data.negativeLeads);
@@ -34,6 +128,80 @@ const Campaigns = () => {
     }
   };
 
+  const saveToDatabase = async (metrics: any[], posLeads: any[], negLeads: any[]) => {
+    try {
+      // Save campaign metrics
+      const metricsToInsert = metrics.map(m => ({
+        campaign_name: m.campaignName,
+        event_type: m.eventType,
+        profile_name: m.profileName,
+        total_count: m.totalCount,
+        daily_data: m.dailyData
+      }));
+
+      const { error: metricsError } = await supabase
+        .from('campaign_metrics')
+        .upsert(metricsToInsert, { onConflict: 'campaign_name,event_type,profile_name' });
+
+      if (metricsError) {
+        console.error('Error saving metrics:', metricsError);
+      }
+
+      // Save leads
+      const allLeads = [...posLeads, ...negLeads];
+      const leadsToInsert = allLeads.map(l => ({
+        campaign: l.campaign,
+        linkedin: l.linkedin,
+        name: l.name,
+        position: l.position,
+        company: l.company,
+        status: l.status,
+        positive_response_date: l.positiveResponseDate,
+        transfer_date: l.transferDate,
+        status_details: l.statusDetails,
+        comments: l.comments,
+        follow_up_1_date: l.followUp1Date,
+        follow_up_1_comments: l.followUp1Comments,
+        follow_up_2_date: l.followUp2Date,
+        follow_up_2_comments: l.followUp2Comments,
+        follow_up_3_date: l.followUp3Date,
+        follow_up_3_comments: l.followUp3Comments,
+        follow_up_4_date: l.followUp4Date,
+        follow_up_4_comments: l.followUp4Comments,
+        observations: l.observations,
+        meeting_schedule_date: l.meetingScheduleDate,
+        meeting_date: l.meetingDate,
+        proposal_date: l.proposalDate,
+        proposal_value: l.proposalValue,
+        sale_date: l.saleDate,
+        sale_value: l.saleValue,
+        profile: l.profile,
+        classification: l.classification,
+        attended_webinar: l.attendedWebinar,
+        whatsapp: l.whatsapp,
+        stand_day: l.standDay,
+        pavilion: l.pavilion,
+        stand: l.stand,
+        negative_response_date: l.negativeResponseDate,
+        had_follow_up: l.hadFollowUp,
+        follow_up_reason: l.followUpReason,
+      }));
+
+      const { error: leadsError } = await supabase
+        .from('leads')
+        .insert(leadsToInsert);
+
+      if (leadsError) {
+        console.error('Error saving leads:', leadsError);
+      }
+
+      toast.success('Dados salvos no banco de dados com sucesso!');
+    } catch (error) {
+      console.error('Error saving to database:', error);
+      toast.error('Erro ao salvar no banco de dados');
+    }
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -43,11 +211,12 @@ const Campaigns = () => {
 
     try {
       const data = await parseExcelSheets(files[0]);
+      await saveToDatabase(data.campaignMetrics, data.positiveLeads, data.negativeLeads);
       setCampaignMetrics(data.campaignMetrics);
       setPositiveLeads(data.positiveLeads);
       setNegativeLeads(data.negativeLeads);
       
-      toast.success(`Dados importados com sucesso! ${data.campaignMetrics.length} métricas de campanha, ${data.positiveLeads.length} leads positivos, ${data.negativeLeads.length} leads negativos`);
+      toast.success(`Dados importados e salvos! ${data.campaignMetrics.length} métricas de campanha, ${data.positiveLeads.length} leads positivos, ${data.negativeLeads.length} leads negativos`);
     } catch (error) {
       console.error('Error processing file:', error);
       toast.error('Erro ao processar arquivo');
@@ -163,7 +332,11 @@ const Campaigns = () => {
                     <span className="font-medium">{campaign.acceptanceRate}%</span>
                   </div>
                 </div>
-                <Button className="w-full mt-4" variant="outline">
+                <Button 
+                  className="w-full mt-4" 
+                  variant="outline"
+                  onClick={() => navigate(`/campaign/${encodeURIComponent(campaign.name)}`)}
+                >
                   Ver Detalhes
                 </Button>
               </CardContent>
