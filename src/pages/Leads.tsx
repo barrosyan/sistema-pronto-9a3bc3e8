@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,17 +14,34 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Lead } from '@/types/campaign';
+import { useCampaignData } from '@/hooks/useCampaignData';
+import { parseExcelSheets } from '@/utils/excelSheetParser';
 
 const Leads = () => {
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const { positiveLeads, negativeLeads, setPositiveLeads, setNegativeLeads } = useCampaignData();
+  const allLeads = [...positiveLeads, ...negativeLeads];
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
+    setIsLoading(true);
     toast.info('Processando lista de leads...');
-    // TODO: Implement lead file processing
+
+    try {
+      const data = await parseExcelSheets(files[0]);
+      setPositiveLeads(data.positiveLeads);
+      setNegativeLeads(data.negativeLeads);
+      
+      toast.success(`Leads importados: ${data.positiveLeads.length} positivos, ${data.negativeLeads.length} negativos`);
+    } catch (error) {
+      console.error('Error processing leads file:', error);
+      toast.error('Erro ao processar arquivo de leads');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const getStatusBadge = (status: Lead['status']) => {
@@ -38,11 +55,18 @@ const Leads = () => {
     }
   };
 
-  const filteredLeads = leads.filter(lead => 
+  const filteredLeads = allLeads.filter(lead => 
     lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.campaign.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const stats = {
+    total: allLeads.length,
+    positive: positiveLeads.length,
+    negative: negativeLeads.length,
+    pending: allLeads.filter(l => l.status === 'pending').length
+  };
 
   return (
     <div className="space-y-6">
@@ -53,10 +77,9 @@ const Leads = () => {
             Acompanhe e classifique seus leads de eventos
           </p>
         </div>
-        
-        <Button onClick={() => document.getElementById('leads-upload')?.click()}>
+        <Button onClick={() => document.getElementById('leads-upload')?.click()} disabled={isLoading}>
           <Upload className="mr-2 h-4 w-4" />
-          Importar Leads
+          {isLoading ? 'Processando...' : 'Importar Leads'}
         </Button>
         <input
           id="leads-upload"
@@ -66,6 +89,32 @@ const Leads = () => {
           onChange={handleFileUpload}
         />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Estatísticas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-foreground">{stats.total}</div>
+              <div className="text-sm text-muted-foreground">Total</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-success">{stats.positive}</div>
+              <div className="text-sm text-muted-foreground">Positivos</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-destructive">{stats.negative}</div>
+              <div className="text-sm text-muted-foreground">Negativos</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-muted-foreground">{stats.pending}</div>
+              <div className="text-sm text-muted-foreground">Pendentes</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -86,7 +135,7 @@ const Leads = () => {
         </CardContent>
       </Card>
 
-      {leads.length > 0 && (
+      {allLeads.length > 0 && (
         <>
           <div className="flex gap-4">
             <div className="relative flex-1">
@@ -150,7 +199,7 @@ const Leads = () => {
         </>
       )}
 
-      {leads.length === 0 && (
+      {allLeads.length === 0 && (
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
