@@ -9,7 +9,8 @@ export type MergeType = 'lead-name' | 'company-name';
 
 const NAME_FIELDS = [
   'nome', 'name', 'first name', 'firstname', 'first_name', 
-  'last name', 'lastname', 'last_name', 'full name', 'fullname', 'full_name'
+  'last name', 'lastname', 'last_name', 'full name', 'fullname', 'full_name',
+  'lead', 'lead_name', 'lead name', 'leadname'
 ];
 
 const COMPANY_FIELDS = [
@@ -39,9 +40,11 @@ export function detectNameColumns(headers: string[]): {
 } {
   const lowerHeaders = headers.map(h => h.toLowerCase());
   
+  // Check for full name variations including "lead"
   const fullNameIndex = lowerHeaders.findIndex(h => 
     h.includes('full') && (h.includes('name') || h.includes('nome')) ||
-    h === 'nome' || h === 'name'
+    h === 'nome' || h === 'name' ||
+    h === 'lead' || h === 'lead_name' || h === 'lead name' || h === 'leadname'
   );
   
   if (fullNameIndex !== -1) {

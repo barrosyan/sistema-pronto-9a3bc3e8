@@ -55,7 +55,7 @@ export function MergeConfiguration({
               <Label htmlFor="lead-name" className="font-normal cursor-pointer">
                 Nome do Lead
                 <span className="block text-sm text-muted-foreground">
-                  Busca por Nome, First Name, Last Name, Full Name, etc.
+                  Busca por Nome, Lead, Lead Name, First Name, Last Name, Full Name, etc.
                 </span>
               </Label>
             </div>
