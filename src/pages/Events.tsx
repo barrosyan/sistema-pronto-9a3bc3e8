@@ -31,32 +31,34 @@ const Events = () => {
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showComparison, setShowComparison] = useState(false);
-  const [campaign1, setCampaign1] = useState<string>('');
-  const [campaign2, setCampaign2] = useState<string>('');
+  const [campaign1, setCampaign1] = useState<string>('_placeholder1');
+  const [campaign2, setCampaign2] = useState<string>('_placeholder2');
 
   const eventAnalysis = getEventLeadsAnalysis();
   const recurrentLeads = getRecurrentLeads();
   const groupedCampaigns = groupMetricsByCampaign(campaignMetrics);
 
-  const campaignsList = Array.from(groupedCampaigns.entries()).map(([name, metrics]) => {
-    const invitations = metrics.find(m => m.eventType === 'Connection Requests Sent')?.totalCount || 0;
-    const connections = metrics.find(m => m.eventType === 'Connection Requests Accepted')?.totalCount || 0;
-    const messages = metrics.find(m => m.eventType === 'Messages Sent')?.totalCount || 0;
-    const acceptanceRate = invitations > 0 ? (connections / invitations) * 100 : 0;
-    
-    const campaignLeads = getAllLeads().filter(l => l.campaign.includes(name.split(' ')[0]));
-    const positiveLeads = campaignLeads.filter(l => l.status === 'positive').length;
-    
-    return {
-      name,
-      profile: metrics[0]?.profileName || '',
-      invitations,
-      connections,
-      messages,
-      positiveLeads,
-      acceptanceRate
-    };
-  });
+  const campaignsList = Array.from(groupedCampaigns.entries())
+    .map(([name, metrics]) => {
+      const invitations = metrics.find(m => m.eventType === 'Connection Requests Sent')?.totalCount || 0;
+      const connections = metrics.find(m => m.eventType === 'Connection Requests Accepted')?.totalCount || 0;
+      const messages = metrics.find(m => m.eventType === 'Messages Sent')?.totalCount || 0;
+      const acceptanceRate = invitations > 0 ? (connections / invitations) * 100 : 0;
+      
+      const campaignLeads = getAllLeads().filter(l => l.campaign.includes(name.split(' ')[0]));
+      const positiveLeads = campaignLeads.filter(l => l.status === 'positive').length;
+      
+      return {
+        name,
+        profile: metrics[0]?.profileName || '',
+        invitations,
+        connections,
+        messages,
+        positiveLeads,
+        acceptanceRate
+      };
+    })
+    .filter(c => c.name && c.name.trim() !== ''); // Filter out empty names
 
   const selectedEventData = selectedEvent === 'all' 
     ? null 
@@ -73,7 +75,7 @@ const Events = () => {
       );
 
   const getComparisonData = () => {
-    if (!campaign1 || !campaign2) return null;
+    if (!campaign1 || !campaign2 || campaign1 === '_placeholder1' || campaign2 === '_placeholder2') return null;
     
     const c1 = campaignsList.find(c => c.name === campaign1);
     const c2 = campaignsList.find(c => c.name === campaign2);
@@ -171,6 +173,7 @@ const Events = () => {
                     <SelectValue placeholder="Selecione a primeira campanha" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="_placeholder1">Selecione uma campanha</SelectItem>
                     {campaignsList.length > 0 ? (
                       campaignsList.map(c => (
                         <SelectItem key={c.name} value={c.name}>
@@ -193,6 +196,7 @@ const Events = () => {
                     <SelectValue placeholder="Selecione a segunda campanha" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="_placeholder2">Selecione uma campanha</SelectItem>
                     {campaignsList.length > 0 ? (
                       campaignsList.map(c => (
                         <SelectItem key={c.name} value={c.name}>
