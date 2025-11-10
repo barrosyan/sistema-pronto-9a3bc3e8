@@ -111,17 +111,22 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
     set({ campaignMetrics: metrics });
     
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated');
+
       const metricsToInsert = metrics.map(m => ({
         campaign_name: m.campaignName,
         event_type: m.eventType,
         profile_name: m.profileName,
         total_count: m.totalCount,
-        daily_data: m.dailyData
+        daily_data: m.dailyData,
+        user_id: user.id
       }));
 
       const { error } = await supabase
         .from('campaign_metrics')
         .delete()
+        .eq('user_id', user.id)
         .neq('id', '00000000-0000-0000-0000-000000000000');
 
       if (error) throw error;
@@ -168,12 +173,16 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
     set({ campaignMetrics: mergedMetrics });
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated');
+
       const metricsToUpsert = mergedMetrics.map(m => ({
         campaign_name: m.campaignName,
         event_type: m.eventType,
         profile_name: m.profileName,
         total_count: m.totalCount,
-        daily_data: m.dailyData
+        daily_data: m.dailyData,
+        user_id: user.id
       }));
 
       const { error } = await supabase
@@ -509,8 +518,11 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
   
   reset: async () => {
     try {
-      await supabase.from('campaign_metrics').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('leads').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated');
+
+      await supabase.from('campaign_metrics').delete().eq('user_id', user.id);
+      await supabase.from('leads').delete().eq('user_id', user.id);
       
       set({
         campaignMetrics: [],

@@ -147,7 +147,8 @@ const Campaigns = () => {
         event_type: m.eventType,
         profile_name: m.profileName,
         total_count: m.totalCount,
-        daily_data: m.dailyData
+        daily_data: m.dailyData,
+        user_id: user.id
       }));
 
       const { error: metricsError } = await supabase

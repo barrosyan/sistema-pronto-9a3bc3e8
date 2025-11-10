@@ -24,6 +24,7 @@ export type Database = {
           profile_name: string
           total_count: number | null
           updated_at: string | null
+          user_id: string
         }
         Insert: {
           campaign_name: string
@@ -34,6 +35,7 @@ export type Database = {
           profile_name: string
           total_count?: number | null
           updated_at?: string | null
+          user_id: string
         }
         Update: {
           campaign_name?: string
@@ -44,6 +46,7 @@ export type Database = {
           profile_name?: string
           total_count?: number | null
           updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
