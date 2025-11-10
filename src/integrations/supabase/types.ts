@@ -14,7 +14,162 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      campaign_metrics: {
+        Row: {
+          campaign_name: string
+          created_at: string | null
+          daily_data: Json | null
+          event_type: string
+          id: string
+          profile_name: string
+          total_count: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          campaign_name: string
+          created_at?: string | null
+          daily_data?: Json | null
+          event_type: string
+          id?: string
+          profile_name: string
+          total_count?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          campaign_name?: string
+          created_at?: string | null
+          daily_data?: Json | null
+          event_type?: string
+          id?: string
+          profile_name?: string
+          total_count?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          attended_webinar: boolean | null
+          campaign: string
+          classification: string | null
+          comments: string | null
+          company: string | null
+          created_at: string | null
+          follow_up_1_comments: string | null
+          follow_up_1_date: string | null
+          follow_up_2_comments: string | null
+          follow_up_2_date: string | null
+          follow_up_3_comments: string | null
+          follow_up_3_date: string | null
+          follow_up_4_comments: string | null
+          follow_up_4_date: string | null
+          follow_up_reason: string | null
+          had_follow_up: boolean | null
+          id: string
+          linkedin: string | null
+          meeting_date: string | null
+          meeting_schedule_date: string | null
+          name: string
+          negative_response_date: string | null
+          observations: string | null
+          pavilion: string | null
+          position: string | null
+          positive_response_date: string | null
+          profile: string | null
+          proposal_date: string | null
+          proposal_value: number | null
+          sale_date: string | null
+          sale_value: number | null
+          stand: string | null
+          stand_day: string | null
+          status: string
+          status_details: string | null
+          transfer_date: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          attended_webinar?: boolean | null
+          campaign: string
+          classification?: string | null
+          comments?: string | null
+          company?: string | null
+          created_at?: string | null
+          follow_up_1_comments?: string | null
+          follow_up_1_date?: string | null
+          follow_up_2_comments?: string | null
+          follow_up_2_date?: string | null
+          follow_up_3_comments?: string | null
+          follow_up_3_date?: string | null
+          follow_up_4_comments?: string | null
+          follow_up_4_date?: string | null
+          follow_up_reason?: string | null
+          had_follow_up?: boolean | null
+          id?: string
+          linkedin?: string | null
+          meeting_date?: string | null
+          meeting_schedule_date?: string | null
+          name: string
+          negative_response_date?: string | null
+          observations?: string | null
+          pavilion?: string | null
+          position?: string | null
+          positive_response_date?: string | null
+          profile?: string | null
+          proposal_date?: string | null
+          proposal_value?: number | null
+          sale_date?: string | null
+          sale_value?: number | null
+          stand?: string | null
+          stand_day?: string | null
+          status: string
+          status_details?: string | null
+          transfer_date?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          attended_webinar?: boolean | null
+          campaign?: string
+          classification?: string | null
+          comments?: string | null
+          company?: string | null
+          created_at?: string | null
+          follow_up_1_comments?: string | null
+          follow_up_1_date?: string | null
+          follow_up_2_comments?: string | null
+          follow_up_2_date?: string | null
+          follow_up_3_comments?: string | null
+          follow_up_3_date?: string | null
+          follow_up_4_comments?: string | null
+          follow_up_4_date?: string | null
+          follow_up_reason?: string | null
+          had_follow_up?: boolean | null
+          id?: string
+          linkedin?: string | null
+          meeting_date?: string | null
+          meeting_schedule_date?: string | null
+          name?: string
+          negative_response_date?: string | null
+          observations?: string | null
+          pavilion?: string | null
+          position?: string | null
+          positive_response_date?: string | null
+          profile?: string | null
+          proposal_date?: string | null
+          proposal_value?: number | null
+          sale_date?: string | null
+          sale_value?: number | null
+          stand?: string | null
+          stand_day?: string | null
+          status?: string
+          status_details?: string | null
+          transfer_date?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
