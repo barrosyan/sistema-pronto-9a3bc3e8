@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NavLink } from './NavLink';
-import { Merge, BarChart3, Users, TrendingUp, Calendar, Sparkles, LogOut, GitCompare } from 'lucide-react';
+import { Merge, BarChart3, Users, TrendingUp, Calendar, Sparkles, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
@@ -63,9 +63,6 @@ export const Layout = ({ children }: LayoutProps) => {
             </NavLink>
             <NavLink to="/analytics" icon={<BarChart3 className="h-4 w-4" />}>
               Analytics
-            </NavLink>
-            <NavLink to="/comparison" icon={<GitCompare className="h-4 w-4" />}>
-              Comparação
             </NavLink>
             <NavLink to="/content-generation" icon={<Sparkles className="h-4 w-4" />}>
               Geração de Conteúdo

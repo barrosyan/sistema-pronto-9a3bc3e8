@@ -1,13 +1,17 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { useEventAnalysis } from '@/hooks/useEventAnalysis';
 import { CampaignComparison } from '@/components/CampaignComparison';
 import { groupMetricsByCampaign } from '@/utils/campaignParser';
-import { Users, Calendar, Search, Filter, GitCompare } from 'lucide-react';
+import { Users, Calendar, Search, Filter, GitCompare, TrendingUp, TrendingDown, ArrowUpRight } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { AreaChart, Area, BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis } from 'recharts';
 import {
   Table,
   TableBody,
@@ -23,9 +27,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toast } from 'sonner';
 
 const Events = () => {
-  const { campaignMetrics, getAllLeads } = useCampaignData();
+  const { campaignMetrics, positiveLeads, getAllLeads, loadFromDatabase } = useCampaignData();
   const { getEventLeadsAnalysis, getRecurrentLeads, getRecommendedApproach } = useEventAnalysis();
   
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
@@ -33,6 +38,22 @@ const Events = () => {
   const [showComparison, setShowComparison] = useState(false);
   const [campaign1, setCampaign1] = useState<string>('_placeholder1');
   const [campaign2, setCampaign2] = useState<string>('_placeholder2');
+  
+  // Advanced comparison states
+  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
+  const [availableCampaigns, setAvailableCampaigns] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadFromDatabase();
+  }, [loadFromDatabase]);
+
+  useEffect(() => {
+    const campaigns = [...new Set(campaignMetrics.map(m => m.campaignName).filter(Boolean))];
+    setAvailableCampaigns(campaigns);
+    if (campaigns.length >= 2 && selectedCampaigns.length === 0) {
+      setSelectedCampaigns([campaigns[0], campaigns[1]]);
+    }
+  }, [campaignMetrics]);
 
   const eventAnalysis = getEventLeadsAnalysis();
   const validEvents = eventAnalysis.filter(e => e.eventName && e.eventName.trim() !== '');
@@ -88,14 +109,54 @@ const Events = () => {
 
   const comparisonData = getComparisonData();
 
+  const handleCampaignSelect = (index: number, value: string) => {
+    const newSelection = [...selectedCampaigns];
+    newSelection[index] = value;
+    setSelectedCampaigns(newSelection);
+  };
+
+  const addCampaign = () => {
+    if (selectedCampaigns.length >= 4) {
+      toast.error('Máximo de 4 campanhas para comparação');
+      return;
+    }
+    const available = availableCampaigns.find(c => !selectedCampaigns.includes(c));
+    if (available) {
+      setSelectedCampaigns([...selectedCampaigns, available]);
+    }
+  };
+
+  const removeCampaign = (index: number) => {
+    if (selectedCampaigns.length <= 1) {
+      toast.error('Mantenha pelo menos 1 campanha selecionada');
+      return;
+    }
+    setSelectedCampaigns(selectedCampaigns.filter((_, i) => i !== index));
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Análise de Eventos</h1>
+        <h1 className="text-3xl font-bold text-foreground">Análise de Eventos e Comparações</h1>
         <p className="text-muted-foreground mt-1">
           Compare campanhas, visualize leads por evento e identifique participantes recorrentes
         </p>
       </div>
+
+      <Tabs defaultValue="events" className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="events">
+            <Calendar className="mr-2 h-4 w-4" />
+            Análise de Eventos
+          </TabsTrigger>
+          <TabsTrigger value="comparison">
+            <GitCompare className="mr-2 h-4 w-4" />
+            Comparação Avançada
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="events" className="space-y-6 mt-6"
+>
 
       {/* Event Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -348,6 +409,14 @@ const Events = () => {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="comparison" className="space-y-6 mt-6">
+          <p className="text-center text-muted-foreground py-8">
+            Funcionalidade de comparação avançada em desenvolvimento
+          </p>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
