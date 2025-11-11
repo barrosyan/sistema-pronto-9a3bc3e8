@@ -40,10 +40,27 @@ function parseCsvFile(file: File): Promise<ParsedCampaignData> {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: true,
+      skipEmptyLines: true,
       complete: (results) => {
         try {
-          const data = processCampaignData(results.data);
-          resolve(data);
+          const data = results.data as any[];
+          
+          // Detecta se é formato Kontax de leads
+          if (isKontaxLeadsFormat(data)) {
+            // Extrai nome da campanha do nome do arquivo
+            const campaignName = file.name
+              .replace(/^Perfil_.*?_-_/, '')
+              .replace(/_all_leads\.csv$/, '')
+              .replace(/_/g, ' ')
+              .trim();
+            
+            const leads = convertKontaxLeadsToSystemFormat(data, campaignName || 'Campanha Importada');
+            resolve({ metrics: [], leads });
+          } else {
+            // Formato padrão de campanha
+            const processedData = processCampaignData(data);
+            resolve(processedData);
+          }
         } catch (error) {
           reject(error);
         }
@@ -87,6 +104,53 @@ function parseExcelFile(file: File): Promise<ParsedCampaignData> {
   });
 }
 
+// Detecta se é um CSV de leads do formato Kontax
+function isKontaxLeadsFormat(data: any[]): boolean {
+  if (data.length === 0) return false;
+  const firstRow = data[0];
+  const kontaxColumns = ['First Name', 'Last Name', 'Company', 'Position', 'linkedin_url', 'Connected At'];
+  return kontaxColumns.every(col => col in firstRow);
+}
+
+// Converte leads do formato Kontax para o formato do sistema
+function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Lead[] {
+  return data.map((row, index) => ({
+    id: `kontax-lead-${index}-${Date.now()}`,
+    campaign: campaignName,
+    linkedin: normalizeAndValidate(row.linkedin_url),
+    name: `${normalizeAndValidate(row['First Name'])} ${normalizeAndValidate(row['Last Name'])}`.trim(),
+    position: normalizeAndValidate(row.Position),
+    company: normalizeAndValidate(row.Company),
+    positiveResponseDate: null,
+    transferDate: null,
+    status: 'pending' as const,
+    statusDetails: normalizeAndValidate(row.Status),
+    comments: '',
+    followUp1Date: null,
+    followUp1Comments: '',
+    followUp2Date: null,
+    followUp2Comments: '',
+    followUp3Date: null,
+    followUp3Comments: '',
+    followUp4Date: null,
+    followUp4Comments: '',
+    observations: `Messages Sent: ${row['Messages Sent by Kontax'] || 0}, Received: ${row['Messages Received by the lead'] || 0}, Connected: ${row['Connected At'] || 'N/A'}`,
+    meetingScheduleDate: null,
+    meetingDate: null,
+    proposalDate: null,
+    proposalValue: undefined,
+    saleDate: null,
+    saleValue: undefined,
+    profile: '',
+    classification: '',
+    attendedWebinar: false,
+    whatsapp: normalizeAndValidate(row.Email),
+    standDay: row['Imported At'] || null,
+    pavilion: '',
+    stand: ''
+  }));
+}
+
 function processCampaignData(data: any[]): ParsedCampaignData {
   const metrics: CampaignMetrics[] = [];
   const leads: Lead[] = [];
@@ -94,6 +158,11 @@ function processCampaignData(data: any[]): ParsedCampaignData {
   // Detect if this is campaign metrics or leads data
   if (data.length > 0) {
     const firstRow = data[0];
+    
+    // Check for Kontax leads format
+    if (isKontaxLeadsFormat(data)) {
+      return { metrics: [], leads: [] }; // Will be handled in parseCsvFile
+    }
     
     // Check for campaign metrics format
     if ('Campaign Name' in firstRow && 'Event Type' in firstRow) {
