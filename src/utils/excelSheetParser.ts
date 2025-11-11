@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { CampaignMetrics, Lead } from '@/types/campaign';
+import { parseCampaignFile } from './campaignParser';
 
 export interface ExcelSheetData {
   campaignMetrics: CampaignMetrics[];
@@ -19,6 +20,21 @@ function isValidString(value: string): boolean {
 }
 
 export async function parseExcelSheets(file: File | string): Promise<ExcelSheetData> {
+  // Se for um arquivo File, verificar se é CSV e usar o parser apropriado
+  if (file instanceof File) {
+    const fileName = file.name.toLowerCase();
+    if (fileName.endsWith('.csv')) {
+      // Usar o parser de CSV que suporta formato Kontax
+      const parsedData = await parseCampaignFile(file);
+      return {
+        campaignMetrics: parsedData.metrics,
+        positiveLeads: parsedData.leads.filter(l => l.status === 'positive'),
+        negativeLeads: parsedData.leads.filter(l => l.status === 'negative'),
+      };
+    }
+  }
+
+  // Para arquivos Excel ou URLs, continuar com o fluxo original
   let workbook: XLSX.WorkBook;
 
   if (typeof file === 'string') {

@@ -220,15 +220,33 @@ const Campaigns = () => {
     if (!files || files.length === 0) return;
 
     setIsLoading(true);
-    toast.info('Processando arquivo de campanha...');
+    const fileName = files[0].name.toLowerCase();
+    const fileType = fileName.endsWith('.csv') ? 'CSV' : 'Excel';
+    toast.info(`Processando arquivo ${fileType}...`);
 
     try {
       const data = await parseExcelSheets(files[0]);
-      await addCampaignMetrics(data.campaignMetrics);
-      await addPositiveLeads(data.positiveLeads);
-      await addNegativeLeads(data.negativeLeads);
       
-      toast.success(`Dados adicionados com sucesso! ${data.campaignMetrics.length} métricas, ${data.positiveLeads.length} leads positivos, ${data.negativeLeads.length} leads negativos`);
+      const metricsCount = data.campaignMetrics.length;
+      const posLeadsCount = data.positiveLeads.length;
+      const negLeadsCount = data.negativeLeads.length;
+      
+      // Adiciona os dados ao banco
+      if (metricsCount > 0) await addCampaignMetrics(data.campaignMetrics);
+      if (posLeadsCount > 0) await addPositiveLeads(data.positiveLeads);
+      if (negLeadsCount > 0) await addNegativeLeads(data.negativeLeads);
+      
+      // Mensagem de sucesso detalhada
+      const parts = [];
+      if (metricsCount > 0) parts.push(`${metricsCount} métricas`);
+      if (posLeadsCount > 0) parts.push(`${posLeadsCount} leads positivos`);
+      if (negLeadsCount > 0) parts.push(`${negLeadsCount} leads negativos`);
+      
+      if (parts.length > 0) {
+        toast.success(`Dados adicionados: ${parts.join(', ')}`);
+      } else {
+        toast.warning('Nenhum dado foi encontrado no arquivo');
+      }
     } catch (error) {
       console.error('Error processing file:', error);
       toast.error('Erro ao processar arquivo');
