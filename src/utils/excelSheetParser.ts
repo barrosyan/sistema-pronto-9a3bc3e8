@@ -24,12 +24,21 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
   if (file instanceof File) {
     const fileName = file.name.toLowerCase();
     if (fileName.endsWith('.csv')) {
+      console.log('Detectado arquivo CSV, usando parser específico');
       // Usar o parser de CSV que suporta formato Kontax
       const parsedData = await parseCampaignFile(file);
+      console.log('Dados parseados do CSV:', {
+        metrics: parsedData.metrics.length,
+        leads: parsedData.leads.length,
+        sampleLead: parsedData.leads[0]
+      });
+      
+      // Os leads do Kontax vêm com status 'pending', vamos classificá-los como positivos por padrão
+      // O usuário pode reclassificá-los depois
       return {
         campaignMetrics: parsedData.metrics,
-        positiveLeads: parsedData.leads.filter(l => l.status === 'positive'),
-        negativeLeads: parsedData.leads.filter(l => l.status === 'negative'),
+        positiveLeads: parsedData.leads, // Todos os leads importados vão para positivos por padrão
+        negativeLeads: [],
       };
     }
   }

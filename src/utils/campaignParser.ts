@@ -119,41 +119,55 @@ function isKontaxLeadsFormat(data: any[]): boolean {
 // Converte leads do formato Kontax para o formato do sistema
 function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Lead[] {
   console.log(`Convertendo ${data.length} leads do formato Kontax para campanha: ${campaignName}`);
-  const leads = data.map((row, index) => ({
-    id: `kontax-lead-${index}-${Date.now()}`,
-    campaign: campaignName,
-    linkedin: normalizeAndValidate(row.linkedin_url),
-    name: `${normalizeAndValidate(row['First Name'])} ${normalizeAndValidate(row['Last Name'])}`.trim(),
-    position: normalizeAndValidate(row.Position),
-    company: normalizeAndValidate(row.Company),
-    positiveResponseDate: null,
-    transferDate: null,
-    status: 'pending' as const,
-    statusDetails: normalizeAndValidate(row.Status),
-    comments: '',
-    followUp1Date: null,
-    followUp1Comments: '',
-    followUp2Date: null,
-    followUp2Comments: '',
-    followUp3Date: null,
-    followUp3Comments: '',
-    followUp4Date: null,
-    followUp4Comments: '',
-    observations: `Messages Sent: ${row['Messages Sent by Kontax'] || 0}, Received: ${row['Messages Received by the lead'] || 0}, Connected: ${row['Connected At'] || 'N/A'}`,
-    meetingScheduleDate: null,
-    meetingDate: null,
-    proposalDate: null,
-    proposalValue: undefined,
-    saleDate: null,
-    saleValue: undefined,
-    profile: '',
-    classification: '',
-    attendedWebinar: false,
-    whatsapp: normalizeAndValidate(row.Email),
-    standDay: row['Imported At'] || null,
-    pavilion: '',
-    stand: ''
-  }));
+  const leads = data.map((row, index) => {
+    const firstName = normalizeAndValidate(row['First Name']);
+    const lastName = normalizeAndValidate(row['Last Name']);
+    const fullName = `${firstName} ${lastName}`.trim();
+    
+    console.log(`Lead ${index + 1}:`, {
+      firstName,
+      lastName,
+      fullName,
+      company: row.Company,
+      position: row.Position
+    });
+    
+    return {
+      id: `kontax-lead-${index}-${Date.now()}`,
+      campaign: campaignName,
+      linkedin: normalizeAndValidate(row.linkedin_url),
+      name: fullName,
+      position: normalizeAndValidate(row.Position),
+      company: normalizeAndValidate(row.Company),
+      positiveResponseDate: null,
+      transferDate: null,
+      status: 'positive' as const, // Importados como positivos por padrão
+      statusDetails: normalizeAndValidate(row.Status),
+      comments: '',
+      followUp1Date: null,
+      followUp1Comments: '',
+      followUp2Date: null,
+      followUp2Comments: '',
+      followUp3Date: null,
+      followUp3Comments: '',
+      followUp4Date: null,
+      followUp4Comments: '',
+      observations: `Messages Sent: ${row['Messages Sent by Kontax'] || 0}, Received: ${row['Messages Received by the lead'] || 0}, Connected: ${row['Connected At'] || 'N/A'}`,
+      meetingScheduleDate: null,
+      meetingDate: null,
+      proposalDate: null,
+      proposalValue: undefined,
+      saleDate: null,
+      saleValue: undefined,
+      profile: '',
+      classification: 'positive', // Classificação inicial como positivo
+      attendedWebinar: false,
+      whatsapp: normalizeAndValidate(row.Email),
+      standDay: row['Imported At'] || null,
+      pavilion: '',
+      stand: ''
+    };
+  });
   console.log('Leads convertidos:', leads.length);
   return leads;
 }
