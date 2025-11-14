@@ -8,47 +8,53 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Save, X } from 'lucide-react';
+import { Pencil, Save, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
-import type { ProfileInfo, ConsolidatedMetrics, ConversionRates, ProfileObservations, WeeklyActivityCalendar, CampaignComparison } from '@/types/profile';
+import type { ProfileInfo, ConsolidatedMetrics, ConversionRates, ProfileObservations, WeeklyActivityCalendar, CampaignComparison, WeeklyMetrics } from '@/types/profile';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export default function Profile() {
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [profileInfo, setProfileInfo] = useState<ProfileInfo>({
     empresa: 'Presto',
     perfil: 'Ursula Aleixo',
-    campanha: 'Ursula Sebrae 100 Startups',
-    objetivoDaCampanha: 'Conectar com as startups classificadas para o Prêmio Sebrae do Startp Summit 2025',
+    campanhas: [
+      'Ursula Sebrae 100 Startups',
+      'Ursula Sebrae 1000 Startups',
+      'Ursula NEON 2025',
+      'Ursula Web Summit Lisboa 2025'
+    ],
+    objetivoDasCampanhas: 'Conectar com startups e ampliar network em eventos estratégicos',
     cadencia: 'https://docs.google.com/document/d/...',
     cargosNaPesquisa: 'Founder, CEO, CTO'
   });
 
   const [metrics] = useState<ConsolidatedMetrics>({
-    inicioDoPeriodo: '21/07/2025',
-    fimDoPeriodo: '24/08/2025',
-    campanhasAtivas: 1,
-    diasAtivos: 14,
-    convitesEnviados: 74,
-    conexoesRealizadas: 43,
-    taxaDeAceiteDeConexao: 58,
-    mensagensEnviadas: 42,
-    visitas: 80,
-    likes: 39,
+    inicioDoPeriodo: '02/06/2025',
+    fimDoPeriodo: '02/11/2025',
+    campanhasAtivas: 28,
+    diasAtivos: 120, // Placeholder
+    convitesEnviados: 1020,
+    conexoesRealizadas: 578,
+    taxaDeAceiteDeConexao: 57,
+    mensagensEnviadas: 1212,
+    visitas: 1165,
+    likes: 464,
     comentarios: 0,
-    totalDeAtividades: 235,
-    respostasPositivas: 5,
-    leadsProcessados: 0,
-    reunioes: 0,
-    propostas: 0,
-    vendas: 0
+    totalDeAtividades: 3861,
+    respostasPositivas: 149,
+    leadsProcessados: 1373,
+    reunioes: 47,
+    propostas: 7,
+    vendas: 1
   });
 
   const [conversionRates] = useState<ConversionRates>({
-    respostasPositivasConvitesEnviados: 6.8,
-    respostasPositivasConexoesRealizadas: 11.6,
-    respostasPositivasMensagensEnviadas: 11.9,
-    numeroDeReunioesRespostasPositivas: 0,
-    numeroDeReunioesConvitesEnviados: 0
+    respostasPositivasConvitesEnviados: 14.6,
+    respostasPositivasConexoesRealizadas: 25.8,
+    respostasPositivasMensagensEnviadas: 12.3,
+    numeroDeReunioesRespostasPositivas: 31.5,
+    numeroDeReunioesConvitesEnviados: 4.6
   });
 
   const [observations] = useState<ProfileObservations>({
@@ -62,8 +68,67 @@ export default function Profile() {
     { semana: '21/07/2025', segundaFeira: 'Inativo', tercaFeira: 'Inativo', quartaFeira: 'Inativo', quintaFeira: 'Inativo', sextaFeira: 'Ativo', sabado: 'Ativo', domingo: 'Inativo', diasAtivos: 2 },
     { semana: '28/07/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Ativo', diasAtivos: 6 },
     { semana: '04/08/2025', segundaFeira: 'Ativo', tercaFeira: 'Inativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Inativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 3 },
-    { semana: '11/08/2025', segundaFeira: 'Inativo', tercaFeira: 'Inativo', quartaFeira: 'Inativo', quintaFeira: 'Ativo', sextaFeira: 'Inativo', sabado: 'Inativo', domingo: 'Ativo', diasAtivos: 2 },
-    { semana: '18/08/2025', segundaFeira: 'Inativo', tercaFeira: 'Inativo', quartaFeira: 'Inativo', quintaFeira: 'Ativo', sextaFeira: 'Inativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 1 }
+  ]);
+
+  const [weeklyMetrics] = useState<WeeklyMetrics[]>([
+    {
+      semana: '1ª Semana',
+      inicioDoPeriodo: '02/06/2025',
+      fimDoPeriodo: '08/06/2025',
+      campanhasAtivas: ['Ursula Minas Summit 2025 conectar', 'Ursula Minas Summit 2025 conectados'],
+      diasAtivos: 5,
+      convitesEnviados: 0,
+      conexoesRealizadas: 4,
+      taxaDeAceiteDeConexao: 0,
+      mensagensEnviadas: 2,
+      visitas: 0,
+      likes: 0,
+      comentarios: 0,
+      totalDeAtividades: 2,
+      respostasPositivas: 11,
+      leadsProcessados: 0,
+      reunioes: 0,
+      propostas: 0,
+      vendas: 0,
+      respostasPositivasConvitesEnviados: 0,
+      respostasPositivasConexoesRealizadas: 275.0,
+      respostasPositivasMensagensEnviadas: 550.0,
+      numeroDeReunioesRespostasPositivas: 0,
+      numeroDeReunioesConvitesEnviados: 0,
+      observacoes: '-',
+      problemasTecnicos: '-',
+      ajustesNaPesquisa: '-',
+      analiseComparativa: '-'
+    },
+    {
+      semana: '9ª Semana',
+      inicioDoPeriodo: '28/07/2025',
+      fimDoPeriodo: '03/08/2025',
+      campanhasAtivas: ['Ursula Sebrae 100 Startups', 'Ursula Sebrae 1000 Startups', 'Ursula Sebrae Startups Leads Conectados'],
+      diasAtivos: 6,
+      convitesEnviados: 163,
+      conexoesRealizadas: 72,
+      taxaDeAceiteDeConexao: 44,
+      mensagensEnviadas: 97,
+      visitas: 199,
+      likes: 88,
+      comentarios: 0,
+      totalDeAtividades: 547,
+      respostasPositivas: 9,
+      leadsProcessados: 174,
+      reunioes: 0,
+      propostas: 0,
+      vendas: 0,
+      respostasPositivasConvitesEnviados: 5.5,
+      respostasPositivasConexoesRealizadas: 12.5,
+      respostasPositivasMensagensEnviadas: 9.3,
+      numeroDeReunioesRespostasPositivas: 0,
+      numeroDeReunioesConvitesEnviados: 0,
+      observacoes: '-',
+      problemasTecnicos: '-',
+      ajustesNaPesquisa: '-',
+      analiseComparativa: '-'
+    }
   ]);
 
   const [campaignComparisons] = useState<CampaignComparison[]>([
@@ -119,6 +184,7 @@ export default function Profile() {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+            <TabsTrigger value="weekly">Métricas Semanais</TabsTrigger>
             <TabsTrigger value="calendar">Calendário de Atividades</TabsTrigger>
             <TabsTrigger value="comparison">Comparação de Campanhas</TabsTrigger>
           </TabsList>
@@ -171,20 +237,21 @@ export default function Profile() {
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="campanha">Campanha</Label>
-                  <Input
-                    id="campanha"
-                    value={profileInfo.campanha}
-                    onChange={(e) => setProfileInfo({ ...profileInfo, campanha: e.target.value })}
+                  <Label htmlFor="campanhas">Campanhas (separadas por vírgula)</Label>
+                  <Textarea
+                    id="campanhas"
+                    value={profileInfo.campanhas.join(', ')}
+                    onChange={(e) => setProfileInfo({ ...profileInfo, campanhas: e.target.value.split(',').map(c => c.trim()) })}
                     disabled={!isEditingInfo}
+                    rows={3}
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="objetivo">Objetivo da Campanha</Label>
+                  <Label htmlFor="objetivo">Objetivo das Campanhas</Label>
                   <Textarea
                     id="objetivo"
-                    value={profileInfo.objetivoDaCampanha}
-                    onChange={(e) => setProfileInfo({ ...profileInfo, objetivoDaCampanha: e.target.value })}
+                    value={profileInfo.objetivoDasCampanhas}
+                    onChange={(e) => setProfileInfo({ ...profileInfo, objetivoDasCampanhas: e.target.value })}
                     disabled={!isEditingInfo}
                     rows={3}
                   />
@@ -214,10 +281,17 @@ export default function Profile() {
             <Card>
               <CardHeader>
                 <CardTitle>Métricas Consolidadas</CardTitle>
-                <CardDescription>Período: {metrics.inicioDoPeriodo} - {metrics.fimDoPeriodo}</CardDescription>
+                <CardDescription>
+                  Período: {metrics.inicioDoPeriodo} - {metrics.fimDoPeriodo} | 
+                  {' '}{metrics.campanhasAtivas} campanhas ativas
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Campanhas Ativas</p>
+                    <p className="text-2xl font-bold">{metrics.campanhasAtivas}</p>
+                  </div>
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">Dias Ativos</p>
                     <p className="text-2xl font-bold">{metrics.diasAtivos}</p>
@@ -327,6 +401,159 @@ export default function Profile() {
                   <Label>Análise Comparativa</Label>
                   <Textarea value={observations.analiseComparativa} rows={3} placeholder="Nenhuma análise disponível" disabled />
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="weekly">
+            <Card>
+              <CardHeader>
+                <CardTitle>Métricas Semanais Detalhadas</CardTitle>
+                <CardDescription>Evolução semanal de todas as métricas e campanhas ativas</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {weeklyMetrics.map((week, index) => (
+                  <Collapsible key={index}>
+                    <Card>
+                      <CollapsibleTrigger className="w-full">
+                        <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="text-left">
+                              <CardTitle className="text-lg">{week.semana}</CardTitle>
+                              <CardDescription>
+                                {week.inicioDoPeriodo} - {week.fimDoPeriodo} | {week.campanhasAtivas.length} campanhas ativas
+                              </CardDescription>
+                            </div>
+                            <ChevronDown className="h-5 w-5" />
+                          </div>
+                        </CardHeader>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <CardContent className="space-y-4 pt-0">
+                          {/* Campanhas Ativas */}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-semibold">Campanhas Ativas:</Label>
+                            <div className="flex flex-wrap gap-2">
+                              {week.campanhasAtivas.map((campaign, idx) => (
+                                <Badge key={idx} variant="outline">{campaign}</Badge>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Métricas de Atividade */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="space-y-1">
+                              <p className="text-sm text-muted-foreground">Dias Ativos</p>
+                              <p className="text-xl font-bold">{week.diasAtivos}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm text-muted-foreground">Convites Enviados</p>
+                              <p className="text-xl font-bold">{week.convitesEnviados}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm text-muted-foreground">Conexões</p>
+                              <p className="text-xl font-bold">{week.conexoesRealizadas}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm text-muted-foreground">Taxa de Aceite</p>
+                              <p className="text-xl font-bold">{week.taxaDeAceiteDeConexao}%</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm text-muted-foreground">Mensagens</p>
+                              <p className="text-xl font-bold">{week.mensagensEnviadas}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm text-muted-foreground">Visitas</p>
+                              <p className="text-xl font-bold">{week.visitas}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm text-muted-foreground">Likes</p>
+                              <p className="text-xl font-bold">{week.likes}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm text-muted-foreground">Total Atividades</p>
+                              <p className="text-xl font-bold">{week.totalDeAtividades}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm text-muted-foreground">Respostas Positivas</p>
+                              <p className="text-xl font-bold text-green-600">{week.respostasPositivas}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm text-muted-foreground">Reuniões</p>
+                              <p className="text-xl font-bold text-blue-600">{week.reunioes}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm text-muted-foreground">Propostas</p>
+                              <p className="text-xl font-bold text-purple-600">{week.propostas}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm text-muted-foreground">Vendas</p>
+                              <p className="text-xl font-bold text-yellow-600">{week.vendas}</p>
+                            </div>
+                          </div>
+
+                          {/* Taxas de Conversão */}
+                          <div className="border-t pt-4">
+                            <Label className="text-sm font-semibold mb-3 block">Taxas de Conversão:</Label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">Resp. Pos. / Convites</p>
+                                <p className="text-lg font-bold">{week.respostasPositivasConvitesEnviados}%</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">Resp. Pos. / Conexões</p>
+                                <p className="text-lg font-bold">{week.respostasPositivasConexoesRealizadas}%</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">Resp. Pos. / Mensagens</p>
+                                <p className="text-lg font-bold">{week.respostasPositivasMensagensEnviadas}%</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">Reuniões / Resp. Pos.</p>
+                                <p className="text-lg font-bold">{week.numeroDeReunioesRespostasPositivas}%</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">Reuniões / Convites</p>
+                                <p className="text-lg font-bold">{week.numeroDeReunioesConvitesEnviados}%</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Observações */}
+                          {(week.observacoes !== '-' || week.problemasTecnicos !== '-' || week.ajustesNaPesquisa !== '-' || week.analiseComparativa !== '-') && (
+                            <div className="border-t pt-4 space-y-3">
+                              <Label className="text-sm font-semibold">Observações:</Label>
+                              {week.observacoes !== '-' && (
+                                <div className="space-y-1">
+                                  <p className="text-xs text-muted-foreground">Observações Gerais:</p>
+                                  <p className="text-sm">{week.observacoes}</p>
+                                </div>
+                              )}
+                              {week.problemasTecnicos !== '-' && (
+                                <div className="space-y-1">
+                                  <p className="text-xs text-muted-foreground">Problemas Técnicos:</p>
+                                  <p className="text-sm">{week.problemasTecnicos}</p>
+                                </div>
+                              )}
+                              {week.ajustesNaPesquisa !== '-' && (
+                                <div className="space-y-1">
+                                  <p className="text-xs text-muted-foreground">Ajustes na Pesquisa:</p>
+                                  <p className="text-sm">{week.ajustesNaPesquisa}</p>
+                                </div>
+                              )}
+                              {week.analiseComparativa !== '-' && (
+                                <div className="space-y-1">
+                                  <p className="text-xs text-muted-foreground">Análise Comparativa:</p>
+                                  <p className="text-sm">{week.analiseComparativa}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </CardContent>
+                      </CollapsibleContent>
+                    </Card>
+                  </Collapsible>
+                ))}
               </CardContent>
             </Card>
           </TabsContent>
