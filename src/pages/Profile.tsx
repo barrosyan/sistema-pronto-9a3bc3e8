@@ -12,9 +12,11 @@ import { Pencil, Save, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ProfileInfo, ConsolidatedMetrics, ConversionRates, ProfileObservations, WeeklyActivityCalendar, CampaignComparison, WeeklyMetrics } from '@/types/profile';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function Profile() {
   const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState<string>('Todas');
   const [profileInfo, setProfileInfo] = useState<ProfileInfo>({
     empresa: 'Presto',
     perfil: 'Ursula Aleixo',
@@ -742,11 +744,34 @@ export default function Profile() {
           <TabsContent value="weekly">
             <Card>
               <CardHeader>
-                <CardTitle>Métricas Semanais Detalhadas</CardTitle>
-                <CardDescription>Evolução semanal de todas as métricas e campanhas ativas</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Métricas Semanais Detalhadas</CardTitle>
+                    <CardDescription>Evolução semanal de todas as métricas e campanhas ativas</CardDescription>
+                  </div>
+                  <div className="w-72">
+                    <Label htmlFor="campaign-select-weekly" className="text-sm mb-2 block">Filtrar por Campanha</Label>
+                    <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+                      <SelectTrigger id="campaign-select-weekly" className="bg-background">
+                        <SelectValue placeholder="Selecione a campanha" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background z-50">
+                        <SelectItem value="Todas">Todas as Campanhas</SelectItem>
+                        {profileInfo.campanhas.map((campaign, idx) => (
+                          <SelectItem key={idx} value={campaign}>{campaign}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {weeklyMetrics.map((week, index) => (
+                {weeklyMetrics
+                  .filter(week => 
+                    selectedCampaign === 'Todas' || 
+                    week.campanhasAtivas.some(c => c.includes(selectedCampaign))
+                  )
+                  .map((week, index) => (
                   <Collapsible key={index}>
                     <Card>
                       <CollapsibleTrigger className="w-full">
@@ -895,8 +920,26 @@ export default function Profile() {
           <TabsContent value="calendar">
             <Card>
               <CardHeader>
-                <CardTitle>Calendário Semanal de Atividades</CardTitle>
-                <CardDescription>Status de atividade por dia da semana</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Calendário Semanal de Atividades</CardTitle>
+                    <CardDescription>Status de atividade por dia da semana</CardDescription>
+                  </div>
+                  <div className="w-72">
+                    <Label htmlFor="campaign-select-calendar" className="text-sm mb-2 block">Filtrar por Campanha</Label>
+                    <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+                      <SelectTrigger id="campaign-select-calendar" className="bg-background">
+                        <SelectValue placeholder="Selecione a campanha" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background z-50">
+                        <SelectItem value="Todas">Todas as Campanhas</SelectItem>
+                        {profileInfo.campanhas.map((campaign, idx) => (
+                          <SelectItem key={idx} value={campaign}>{campaign}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
