@@ -957,7 +957,21 @@ export default function Profile() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {weeklyCalendar.map((week, index) => (
+                    {weeklyCalendar
+                      .filter((week, index) => {
+                        // Se "Todas" está selecionado, mostra todas as semanas
+                        if (selectedCampaign === 'Todas') return true;
+                        
+                        // Encontra a métrica semanal correspondente para verificar campanhas ativas
+                        const weekMetric = weeklyMetrics.find(m => m.inicioDoPeriodo === week.semana);
+                        
+                        // Se não encontrou métrica, não mostra a semana
+                        if (!weekMetric) return false;
+                        
+                        // Verifica se a campanha selecionada estava ativa nesta semana
+                        return weekMetric.campanhasAtivas.some(c => c.includes(selectedCampaign));
+                      })
+                      .map((week, index) => (
                       <TableRow key={index}>
                         <TableCell className="font-medium">{week.semana}</TableCell>
                         <TableCell className="text-center">
