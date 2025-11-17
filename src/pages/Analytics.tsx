@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { Upload } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
@@ -321,9 +323,7 @@ export default function Analytics() {
 
   const handleCampaignToggle = (campaign: string, checked: boolean) => {
     if (checked) {
-      if (selectedCampaigns.length < 4) {
-        setSelectedCampaigns([...selectedCampaigns, campaign]);
-      }
+      setSelectedCampaigns([...selectedCampaigns, campaign]);
     } else {
       setSelectedCampaigns(selectedCampaigns.filter(c => c !== campaign));
     }
@@ -395,45 +395,81 @@ export default function Analytics() {
         </CardContent>
       </Card>
 
-      {/* Seleção de Campanhas */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Selecionar Campanhas para Comparar</CardTitle>
-          <CardDescription>Escolha até 4 campanhas para visualizar comparativos (mínimo 2)</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {allCampaigns.map((campaign, idx) => (
-              <div key={idx} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`campaign-${idx}`}
-                  checked={selectedCampaigns.includes(campaign)}
-                  onCheckedChange={(checked) => handleCampaignToggle(campaign, checked as boolean)}
-                  disabled={!selectedCampaigns.includes(campaign) && selectedCampaigns.length >= 4}
-                />
-                <Label
-                  htmlFor={`campaign-${idx}`}
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
-                  {campaign}
-                </Label>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Seleção de Campanhas e Importação de Dados */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Selecionar Campanhas para Comparar</CardTitle>
+            <CardDescription>Escolha uma ou mais campanhas para visualizar comparativos</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {allCampaigns.map((campaign, idx) => (
+                <div key={idx} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`campaign-${idx}`}
+                    checked={selectedCampaigns.includes(campaign)}
+                    onCheckedChange={(checked) => handleCampaignToggle(campaign, checked as boolean)}
+                  />
+                  <Label
+                    htmlFor={`campaign-${idx}`}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    {campaign}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
-      {selectedCampaigns.length < 2 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Importar Dados</CardTitle>
+            <CardDescription>Faça upload de arquivos CSV ou Excel</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <input
+                type="file"
+                id="analytics-file-upload"
+                accept=".csv,.xlsx,.xls"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    // TODO: Implementar importação de dados
+                    console.log('Arquivos selecionados:', e.target.files);
+                  }
+                }}
+              />
+              <Button
+                onClick={() => document.getElementById('analytics-file-upload')?.click()}
+                className="w-full"
+                variant="outline"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Selecionar Arquivos
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Suporta CSV do Kontax ou planilhas Excel completas
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {selectedCampaigns.length === 0 && (
         <Card className="border-yellow-500/50 bg-yellow-500/10">
           <CardContent className="pt-6">
             <p className="text-sm text-yellow-600 dark:text-yellow-400">
-              Selecione pelo menos 2 campanhas para visualizar os comparativos.
+              Selecione pelo menos uma campanha para visualizar os dados.
             </p>
           </CardContent>
         </Card>
       )}
 
-      {selectedCampaigns.length >= 2 && (
+      {selectedCampaigns.length >= 1 && (
         <>
           {/* Gráfico de Convites Enviados */}
           <Card>

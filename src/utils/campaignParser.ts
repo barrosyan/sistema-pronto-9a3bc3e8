@@ -116,6 +116,23 @@ function isKontaxLeadsFormat(data: any[]): boolean {
   return hasAllColumns;
 }
 
+// Função para extrair data de conexão de campos especiais
+function extractConnectionDate(value: string): string | null {
+  if (!value || typeof value !== 'string') return null;
+  
+  // Procura por padrão "Connected: <data>"
+  const connectedMatch = value.match(/Connected:\s*(.+?)(?:,|$)/i);
+  if (connectedMatch && connectedMatch[1]) {
+    const dateStr = connectedMatch[1].trim();
+    // Tenta parsear a data
+    const parsedDate = new Date(dateStr);
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate.toISOString();
+    }
+  }
+  return null;
+}
+
 // Converte leads do formato Kontax para o formato do sistema
 function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Lead[] {
   console.log(`Convertendo ${data.length} leads do formato Kontax para campanha: ${campaignName}`);
@@ -124,12 +141,36 @@ function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Le
     const lastName = normalizeAndValidate(row['Last Name']);
     const fullName = `${firstName} ${lastName}`.trim();
     
+    // Tentar extrair data de conexão de múltiplos campos possíveis
+    let connectionDate: string | null = null;
+    
+    // Verificar campo "Connected At" direto
+    if (row['Connected At']) {
+      const parsedDate = new Date(row['Connected At']);
+      if (!isNaN(parsedDate.getTime())) {
+        connectionDate = parsedDate.toISOString();
+      }
+    }
+    
+    // Verificar campos que podem conter informações de conexão
+    const possibleFields = ['Messages Sent', 'Status', 'Notes', 'Comments'];
+    for (const field of possibleFields) {
+      if (row[field] && !connectionDate) {
+        const extracted = extractConnectionDate(row[field]);
+        if (extracted) {
+          connectionDate = extracted;
+          break;
+        }
+      }
+    }
+    
     console.log(`Lead ${index + 1}:`, {
       firstName,
       lastName,
       fullName,
       company: row.Company,
-      position: row.Position
+      position: row.Position,
+      connectionDate
     });
     
     return {
@@ -139,7 +180,7 @@ function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Le
       name: fullName,
       position: normalizeAndValidate(row.Position),
       company: normalizeAndValidate(row.Company),
-      positiveResponseDate: null,
+      positiveResponseDate: connectionDate, // Data de conexão extraída
       transferDate: null,
       status: 'positive' as const, // Importados como positivos por padrão
       statusDetails: normalizeAndValidate(row.Status),
