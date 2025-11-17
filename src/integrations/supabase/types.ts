@@ -50,10 +50,47 @@ export type Database = {
         }
         Relationships: []
       }
+      campaigns: {
+        Row: {
+          cadence: string | null
+          created_at: string | null
+          id: string
+          job_titles: string | null
+          name: string
+          objective: string | null
+          profile_name: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cadence?: string | null
+          created_at?: string | null
+          id?: string
+          job_titles?: string | null
+          name: string
+          objective?: string | null
+          profile_name?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cadence?: string | null
+          created_at?: string | null
+          id?: string
+          job_titles?: string | null
+          name?: string
+          objective?: string | null
+          profile_name?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           attended_webinar: boolean | null
           campaign: string
+          campaign_id: string | null
           classification: string | null
           comments: string | null
           company: string | null
@@ -95,6 +132,7 @@ export type Database = {
         Insert: {
           attended_webinar?: boolean | null
           campaign: string
+          campaign_id?: string | null
           classification?: string | null
           comments?: string | null
           company?: string | null
@@ -136,6 +174,7 @@ export type Database = {
         Update: {
           attended_webinar?: boolean | null
           campaign?: string
+          campaign_id?: string | null
           classification?: string | null
           comments?: string | null
           company?: string | null
@@ -174,6 +213,62 @@ export type Database = {
           user_id?: string
           whatsapp?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: "leads_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
         Relationships: []
       }
     }
@@ -181,10 +276,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -311,6 +412,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
