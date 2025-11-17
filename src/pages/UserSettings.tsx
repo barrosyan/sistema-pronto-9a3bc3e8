@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, Trash2, Download, FileSpreadsheet, FileText } from 'lucide-react';
+import { Upload, Trash2, Download, FileSpreadsheet, FileText, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
+import { parseExcelSheets } from '@/utils/excelSheetParser';
 
 type FileUpload = {
   id: string;
@@ -20,6 +21,7 @@ export default function UserSettings() {
   const [files, setFiles] = useState<FileUpload[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     loadFiles();
@@ -180,6 +182,146 @@ export default function UserSettings() {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
+  const processAllFiles = async () => {
+    if (files.length === 0) {
+      toast.error('Nenhum arquivo para processar');
+      return;
+    }
+
+    setProcessing(true);
+    let totalMetrics = 0;
+    let totalLeads = 0;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Usuário não autenticado');
+        return;
+      }
+
+      for (const fileRecord of files) {
+        try {
+          // Download file from storage
+          const { data: fileData, error: downloadError } = await supabase.storage
+            .from('user-uploads')
+            .download(fileRecord.storage_path);
+
+          if (downloadError) throw downloadError;
+
+          // Convert blob to File object
+          const file = new File([fileData], fileRecord.file_name, { type: fileRecord.file_type });
+
+          // Parse file
+          const parsedData = await parseExcelSheets(file);
+
+          // Insert campaign metrics
+          if (parsedData.campaignMetrics.length > 0) {
+            const metricsToInsert = parsedData.campaignMetrics.map(metric => ({
+              user_id: user.id,
+              campaign_name: metric.campaignName,
+              event_type: metric.eventType,
+              profile_name: metric.profileName,
+              total_count: metric.totalCount,
+              daily_data: metric.dailyData,
+            }));
+
+            const { error: metricsError } = await supabase
+              .from('campaign_metrics')
+              .insert(metricsToInsert);
+
+            if (metricsError) throw metricsError;
+            totalMetrics += parsedData.campaignMetrics.length;
+          }
+
+          // Insert positive leads
+          if (parsedData.positiveLeads.length > 0) {
+            const leadsToInsert = parsedData.positiveLeads.map(lead => ({
+              user_id: user.id,
+              campaign: lead.campaign,
+              linkedin: lead.linkedin || null,
+              name: lead.name,
+              position: lead.position || null,
+              company: lead.company || null,
+              status: 'positive',
+              positive_response_date: lead.positiveResponseDate || null,
+              transfer_date: lead.transferDate || null,
+              status_details: lead.statusDetails || null,
+              comments: lead.comments || null,
+              follow_up_1_date: lead.followUp1Date || null,
+              follow_up_1_comments: lead.followUp1Comments || null,
+              follow_up_2_date: lead.followUp2Date || null,
+              follow_up_2_comments: lead.followUp2Comments || null,
+              follow_up_3_date: lead.followUp3Date || null,
+              follow_up_3_comments: lead.followUp3Comments || null,
+              follow_up_4_date: lead.followUp4Date || null,
+              follow_up_4_comments: lead.followUp4Comments || null,
+              observations: lead.observations || null,
+              meeting_schedule_date: lead.meetingScheduleDate || null,
+              meeting_date: lead.meetingDate || null,
+              proposal_date: lead.proposalDate || null,
+              proposal_value: lead.proposalValue || null,
+              sale_date: lead.saleDate || null,
+              sale_value: lead.saleValue || null,
+              profile: lead.profile || null,
+              classification: lead.classification || null,
+              attended_webinar: lead.attendedWebinar || false,
+              whatsapp: lead.whatsapp || null,
+              stand_day: lead.standDay || null,
+              pavilion: lead.pavilion || null,
+              stand: lead.stand || null,
+              connection_date: lead.connectionDate || null,
+            }));
+
+            const { error: leadsError } = await supabase
+              .from('leads')
+              .insert(leadsToInsert);
+
+            if (leadsError) throw leadsError;
+            totalLeads += parsedData.positiveLeads.length;
+          }
+
+          // Insert negative leads
+          if (parsedData.negativeLeads.length > 0) {
+            const leadsToInsert = parsedData.negativeLeads.map(lead => ({
+              user_id: user.id,
+              campaign: lead.campaign,
+              linkedin: lead.linkedin || null,
+              name: lead.name,
+              position: lead.position || null,
+              company: lead.company || null,
+              status: 'negative',
+              negative_response_date: lead.negativeResponseDate || null,
+              transfer_date: lead.transferDate || null,
+              status_details: lead.statusDetails || null,
+              observations: lead.observations || null,
+              had_follow_up: lead.hadFollowUp || false,
+              follow_up_reason: lead.followUpReason || null,
+            }));
+
+            const { error: leadsError } = await supabase
+              .from('leads')
+              .insert(leadsToInsert);
+
+            if (leadsError) throw leadsError;
+            totalLeads += parsedData.negativeLeads.length;
+          }
+
+          toast.success(`Arquivo ${fileRecord.file_name} processado com sucesso!`);
+        } catch (error) {
+          console.error(`Erro ao processar ${fileRecord.file_name}:`, error);
+          toast.error(`Erro ao processar ${fileRecord.file_name}`);
+        }
+      }
+
+      toast.success(`Processamento concluído! ${totalMetrics} métricas e ${totalLeads} leads adicionados.`);
+    } catch (error) {
+      console.error('Error processing files:', error);
+      toast.error('Erro ao processar arquivos');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const getFileIcon = (fileName: string) => {
     if (fileName.match(/\.csv$/i)) {
       return <FileText className="h-5 w-5 text-primary" />;
@@ -200,7 +342,7 @@ export default function UserSettings() {
         <CardHeader>
           <CardTitle>Meus Arquivos</CardTitle>
           <CardDescription>
-            Faça upload de arquivos CSV e Excel com dados de campanhas e leads
+            Faça upload de arquivos CSV e Excel e processe-os para popular o banco de dados
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -212,17 +354,28 @@ export default function UserSettings() {
                 accept=".csv,.xlsx,.xls,.ods"
                 multiple
                 onChange={handleFileUpload}
-                disabled={uploading}
+                disabled={uploading || processing}
                 className="hidden"
               />
               <Button
                 onClick={() => document.getElementById('file-upload')?.click()}
-                disabled={uploading}
+                disabled={uploading || processing}
                 className="w-full sm:w-auto"
               >
                 <Upload className="mr-2 h-4 w-4" />
                 {uploading ? 'Enviando...' : 'Fazer Upload'}
               </Button>
+              {files.length > 0 && (
+                <Button
+                  onClick={processAllFiles}
+                  disabled={uploading || processing}
+                  variant="default"
+                  className="w-full sm:w-auto"
+                >
+                  <Play className="mr-2 h-4 w-4" />
+                  {processing ? 'Processando...' : 'Processar Todos os Arquivos'}
+                </Button>
+              )}
             </div>
 
             {loading ? (
