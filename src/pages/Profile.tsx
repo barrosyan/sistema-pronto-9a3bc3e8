@@ -61,11 +61,30 @@ export default function Profile() {
     numeroDeReunioesConvitesEnviados: 4.6
   });
 
-  const [weeklyCalendar] = useState<WeeklyActivityCalendar[]>([
-    { semana: '02/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 5 },
-    { semana: '09/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Inativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 4 },
-    { semana: '16/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Ativo', domingo: 'Inativo', diasAtivos: 6 },
-  ]);
+  const [weeklyCalendar] = useState<Record<string, WeeklyActivityCalendar[]>>({
+    'Todas': [
+      { semana: '02/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 5 },
+      { semana: '09/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Inativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 4 },
+      { semana: '16/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Ativo', domingo: 'Inativo', diasAtivos: 6 },
+    ],
+    'Ursula Sebrae 100 Startups': [
+      { semana: '02/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 5 },
+      { semana: '09/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Inativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 4 },
+      { semana: '16/06/2025', segundaFeira: 'Inativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Inativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 3 },
+    ],
+    'Ursula NEON 2025': [
+      { semana: '02/06/2025', segundaFeira: 'Inativo', tercaFeira: 'Inativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 3 },
+      { semana: '09/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Ativo', domingo: 'Inativo', diasAtivos: 6 },
+      { semana: '16/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Inativo', quartaFeira: 'Inativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 3 },
+    ],
+    'Ursula Sebrae 1000 Startups': [
+      { semana: '02/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Inativo', quartaFeira: 'Ativo', quintaFeira: 'Inativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 3 },
+      { semana: '09/06/2025', segundaFeira: 'Inativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 4 },
+    ],
+    'Ursula Web Summit Lisboa 2025': [
+      { semana: '02/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Inativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Ativo', domingo: 'Inativo', diasAtivos: 5 },
+    ]
+  });
 
   const [campaignComparisons] = useState<CampaignComparison[]>([
     {
@@ -180,6 +199,7 @@ export default function Profile() {
 
   const displayedMetrics = getFilteredMetrics(selectedCampaignMetrics);
   const displayedConversionRates = getFilteredConversionRates(selectedCampaignConversion);
+  const displayedCalendar = weeklyCalendar[selectedCampaignCalendar] || weeklyCalendar['Todas'];
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -442,7 +462,7 @@ export default function Profile() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {weeklyCalendar.map((week) => (
+                    {displayedCalendar.map((week) => (
                       <TableRow key={week.semana}>
                         <TableCell className="font-medium">{week.semana}</TableCell>
                         <TableCell><Badge variant={week.segundaFeira === 'Ativo' ? 'default' : 'secondary'}>{week.segundaFeira}</Badge></TableCell>
