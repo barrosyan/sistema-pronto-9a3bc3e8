@@ -2,15 +2,29 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
 import type { WeeklyMetrics } from '@/types/profile';
+
+type DailyMetrics = {
+  dia: string;
+  convitesEnviados: number;
+  conexoesRealizadas: number;
+  mensagensEnviadas: number;
+  respostasPositivas: number;
+  reunioes: number;
+  visitas: number;
+  likes: number;
+  comentarios: number;
+};
 
 export default function Analytics() {
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([
     'Ursula Sebrae 100 Startups',
     'Ursula NEON 2025'
   ]);
+  const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('weekly');
 
   // Mock data - Em produção, isso viria do banco de dados
   const allCampaigns = [
@@ -19,6 +33,52 @@ export default function Analytics() {
     'Ursula NEON 2025',
     'Ursula Web Summit Lisboa 2025'
   ];
+
+  const dailyData: Record<string, DailyMetrics[]> = {
+    'Ursula Sebrae 100 Startups': [
+      { dia: '02/06', convitesEnviados: 10, conexoesRealizadas: 6, mensagensEnviadas: 12, respostasPositivas: 2, reunioes: 1, visitas: 10, likes: 4, comentarios: 0 },
+      { dia: '03/06', convitesEnviados: 9, conexoesRealizadas: 5, mensagensEnviadas: 10, respostasPositivas: 1, reunioes: 0, visitas: 9, likes: 3, comentarios: 0 },
+      { dia: '04/06', convitesEnviados: 8, conexoesRealizadas: 6, mensagensEnviadas: 11, respostasPositivas: 2, reunioes: 0, visitas: 10, likes: 4, comentarios: 0 },
+      { dia: '05/06', convitesEnviados: 10, conexoesRealizadas: 6, mensagensEnviadas: 10, respostasPositivas: 2, reunioes: 1, visitas: 10, likes: 4, comentarios: 0 },
+      { dia: '06/06', convitesEnviados: 8, conexoesRealizadas: 5, mensagensEnviadas: 9, respostasPositivas: 1, reunioes: 0, visitas: 9, likes: 3, comentarios: 0 },
+      { dia: '09/06', convitesEnviados: 10, conexoesRealizadas: 6, mensagensEnviadas: 12, respostasPositivas: 2, reunioes: 0, visitas: 11, likes: 4, comentarios: 0 },
+      { dia: '10/06', convitesEnviados: 9, conexoesRealizadas: 5, mensagensEnviadas: 11, respostasPositivas: 1, reunioes: 0, visitas: 10, likes: 4, comentarios: 0 },
+      { dia: '11/06', convitesEnviados: 10, conexoesRealizadas: 6, mensagensEnviadas: 11, respostasPositivas: 2, reunioes: 1, visitas: 11, likes: 4, comentarios: 0 },
+      { dia: '12/06', convitesEnviados: 9, conexoesRealizadas: 5, mensagensEnviadas: 11, respostasPositivas: 1, reunioes: 0, visitas: 10, likes: 3, comentarios: 0 },
+      { dia: '16/06', convitesEnviados: 11, conexoesRealizadas: 7, mensagensEnviadas: 12, respostasPositivas: 2, reunioes: 1, visitas: 11, likes: 4, comentarios: 1 },
+      { dia: '17/06', convitesEnviados: 10, conexoesRealizadas: 6, mensagensEnviadas: 11, respostasPositivas: 2, reunioes: 0, visitas: 10, likes: 4, comentarios: 0 },
+      { dia: '18/06', convitesEnviados: 10, conexoesRealizadas: 6, mensagensEnviadas: 11, respostasPositivas: 2, reunioes: 1, visitas: 10, likes: 4, comentarios: 0 },
+      { dia: '19/06', convitesEnviados: 9, conexoesRealizadas: 6, mensagensEnviadas: 11, respostasPositivas: 2, reunioes: 0, visitas: 10, likes: 4, comentarios: 1 },
+      { dia: '20/06', convitesEnviados: 10, conexoesRealizadas: 5, mensagensEnviadas: 10, respostasPositivas: 2, reunioes: 1, visitas: 9, likes: 4, comentarios: 0 },
+      { dia: '23/06', convitesEnviados: 11, conexoesRealizadas: 7, mensagensEnviadas: 12, respostasPositivas: 2, reunioes: 1, visitas: 11, likes: 4, comentarios: 0 },
+      { dia: '24/06', convitesEnviados: 10, conexoesRealizadas: 6, mensagensEnviadas: 12, respostasPositivas: 2, reunioes: 0, visitas: 11, likes: 4, comentarios: 0 },
+      { dia: '25/06', convitesEnviados: 11, conexoesRealizadas: 6, mensagensEnviadas: 12, respostasPositivas: 2, reunioes: 0, visitas: 12, likes: 4, comentarios: 1 },
+      { dia: '26/06', convitesEnviados: 10, conexoesRealizadas: 6, mensagensEnviadas: 12, respostasPositivas: 1, reunioes: 1, visitas: 11, likes: 4, comentarios: 0 }
+    ],
+    'Ursula NEON 2025': [
+      { dia: '02/06', convitesEnviados: 13, conexoesRealizadas: 8, mensagensEnviadas: 14, respostasPositivas: 3, reunioes: 1, visitas: 13, likes: 5, comentarios: 0 },
+      { dia: '03/06', convitesEnviados: 12, conexoesRealizadas: 7, mensagensEnviadas: 13, respostasPositivas: 2, reunioes: 1, visitas: 13, likes: 5, comentarios: 0 },
+      { dia: '04/06', convitesEnviados: 13, conexoesRealizadas: 8, mensagensEnviadas: 14, respostasPositivas: 2, reunioes: 1, visitas: 13, likes: 5, comentarios: 0 },
+      { dia: '05/06', convitesEnviados: 12, conexoesRealizadas: 8, mensagensEnviadas: 14, respostasPositivas: 3, reunioes: 0, visitas: 13, likes: 5, comentarios: 0 },
+      { dia: '06/06', convitesEnviados: 12, conexoesRealizadas: 7, mensagensEnviadas: 13, respostasPositivas: 2, reunioes: 1, visitas: 13, likes: 4, comentarios: 0 },
+      { dia: '09/06', convitesEnviados: 12, conexoesRealizadas: 8, mensagensEnviadas: 13, respostasPositivas: 2, reunioes: 1, visitas: 12, likes: 5, comentarios: 0 },
+      { dia: '10/06', convitesEnviados: 12, conexoesRealizadas: 7, mensagensEnviadas: 13, respostasPositivas: 2, reunioes: 1, visitas: 12, likes: 5, comentarios: 0 },
+      { dia: '11/06', convitesEnviados: 12, conexoesRealizadas: 8, mensagensEnviadas: 13, respostasPositivas: 3, reunioes: 1, visitas: 12, likes: 5, comentarios: 0 },
+      { dia: '12/06', convitesEnviados: 11, conexoesRealizadas: 7, mensagensEnviadas: 13, respostasPositivas: 2, reunioes: 0, visitas: 12, likes: 4, comentarios: 0 },
+      { dia: '13/06', convitesEnviados: 12, conexoesRealizadas: 8, mensagensEnviadas: 13, respostasPositivas: 3, reunioes: 1, visitas: 12, likes: 5, comentarios: 0 },
+      { dia: '14/06', convitesEnviados: 12, conexoesRealizadas: 7, mensagensEnviadas: 13, respostasPositivas: 2, reunioes: 1, visitas: 12, likes: 4, comentarios: 0 },
+      { dia: '16/06', convitesEnviados: 14, conexoesRealizadas: 9, mensagensEnviadas: 15, respostasPositivas: 3, reunioes: 1, visitas: 14, likes: 5, comentarios: 1 },
+      { dia: '17/06', convitesEnviados: 13, conexoesRealizadas: 8, mensagensEnviadas: 15, respostasPositivas: 3, reunioes: 1, visitas: 14, likes: 5, comentarios: 1 },
+      { dia: '18/06', convitesEnviados: 14, conexoesRealizadas: 9, mensagensEnviadas: 15, respostasPositivas: 3, reunioes: 2, visitas: 14, likes: 5, comentarios: 0 },
+      { dia: '19/06', convitesEnviados: 13, conexoesRealizadas: 8, mensagensEnviadas: 15, respostasPositivas: 4, reunioes: 1, visitas: 14, likes: 6, comentarios: 1 },
+      { dia: '20/06', convitesEnviados: 14, conexoesRealizadas: 8, mensagensEnviadas: 15, respostasPositivas: 3, reunioes: 1, visitas: 14, likes: 5, comentarios: 0 },
+      { dia: '23/06', convitesEnviados: 15, conexoesRealizadas: 10, mensagensEnviadas: 16, respostasPositivas: 4, reunioes: 2, visitas: 16, likes: 6, comentarios: 0 },
+      { dia: '24/06', convitesEnviados: 15, conexoesRealizadas: 10, mensagensEnviadas: 17, respostasPositivas: 4, reunioes: 1, visitas: 16, likes: 6, comentarios: 1 },
+      { dia: '25/06', convitesEnviados: 15, conexoesRealizadas: 9, mensagensEnviadas: 16, respostasPositivas: 3, reunioes: 2, visitas: 15, likes: 6, comentarios: 0 },
+      { dia: '26/06', convitesEnviados: 15, conexoesRealizadas: 10, mensagensEnviadas: 17, respostasPositivas: 4, reunioes: 1, visitas: 16, likes: 6, comentarios: 0 },
+      { dia: '27/06', convitesEnviados: 15, conexoesRealizadas: 9, mensagensEnviadas: 16, respostasPositivas: 3, reunioes: 1, visitas: 15, likes: 6, comentarios: 1 }
+    ]
+  };
 
   const weeklyData: Record<string, WeeklyMetrics[]> = {
     'Ursula Sebrae 100 Startups': [
@@ -271,26 +331,47 @@ export default function Analytics() {
 
   // Preparar dados para gráficos de comparação
   const comparisonData = selectedCampaigns.length > 0 ? (() => {
-    const weeks = new Set<string>();
-    selectedCampaigns.forEach(campaign => {
-      weeklyData[campaign]?.forEach(week => {
-        weeks.add(week.inicioDoPeriodo);
-      });
-    });
-
-    return Array.from(weeks).sort().map(week => {
-      const dataPoint: any = { week };
+    if (viewMode === 'daily') {
+      const days = new Set<string>();
       selectedCampaigns.forEach(campaign => {
-        const weekData = weeklyData[campaign]?.find(w => w.inicioDoPeriodo === week);
-        // Sempre adicionar os dados, mesmo que seja 0
-        dataPoint[`${campaign}_convites`] = weekData?.convitesEnviados ?? 0;
-        dataPoint[`${campaign}_conexoes`] = weekData?.conexoesRealizadas ?? 0;
-        dataPoint[`${campaign}_mensagens`] = weekData?.mensagensEnviadas ?? 0;
-        dataPoint[`${campaign}_respostas`] = weekData?.respostasPositivas ?? 0;
-        dataPoint[`${campaign}_reunioes`] = weekData?.reunioes ?? 0;
+        dailyData[campaign]?.forEach(day => {
+          days.add(day.dia);
+        });
       });
-      return dataPoint;
-    });
+
+      return Array.from(days).sort().map(day => {
+        const dataPoint: any = { period: day };
+        selectedCampaigns.forEach(campaign => {
+          const dayData = dailyData[campaign]?.find(d => d.dia === day);
+          dataPoint[`${campaign}_convites`] = dayData?.convitesEnviados ?? 0;
+          dataPoint[`${campaign}_conexoes`] = dayData?.conexoesRealizadas ?? 0;
+          dataPoint[`${campaign}_mensagens`] = dayData?.mensagensEnviadas ?? 0;
+          dataPoint[`${campaign}_respostas`] = dayData?.respostasPositivas ?? 0;
+          dataPoint[`${campaign}_reunioes`] = dayData?.reunioes ?? 0;
+        });
+        return dataPoint;
+      });
+    } else {
+      const weeks = new Set<string>();
+      selectedCampaigns.forEach(campaign => {
+        weeklyData[campaign]?.forEach(week => {
+          weeks.add(week.inicioDoPeriodo);
+        });
+      });
+
+      return Array.from(weeks).sort().map(week => {
+        const dataPoint: any = { period: week };
+        selectedCampaigns.forEach(campaign => {
+          const weekData = weeklyData[campaign]?.find(w => w.inicioDoPeriodo === week);
+          dataPoint[`${campaign}_convites`] = weekData?.convitesEnviados ?? 0;
+          dataPoint[`${campaign}_conexoes`] = weekData?.conexoesRealizadas ?? 0;
+          dataPoint[`${campaign}_mensagens`] = weekData?.mensagensEnviadas ?? 0;
+          dataPoint[`${campaign}_respostas`] = weekData?.respostasPositivas ?? 0;
+          dataPoint[`${campaign}_reunioes`] = weekData?.reunioes ?? 0;
+        });
+        return dataPoint;
+      });
+    }
   })() : [];
 
   const chartColors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))'];
@@ -299,8 +380,20 @@ export default function Analytics() {
     <div className="container mx-auto p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Analytics - Comparação de Campanhas</h1>
-        <p className="text-muted-foreground">Compare métricas semanais entre diferentes campanhas</p>
+        <p className="text-muted-foreground">Compare métricas {viewMode === 'daily' ? 'diárias' : 'semanais'} entre diferentes campanhas</p>
       </div>
+
+      {/* Seleção de Modo de Visualização */}
+      <Card>
+        <CardContent className="pt-6">
+          <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'daily' | 'weekly')}>
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="daily">Visualização Diária</TabsTrigger>
+              <TabsTrigger value="weekly">Visualização Semanal</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       {/* Seleção de Campanhas */}
       <Card>
@@ -345,7 +438,7 @@ export default function Analytics() {
           {/* Gráfico de Convites Enviados */}
           <Card>
             <CardHeader>
-              <CardTitle>Convites Enviados por Semana</CardTitle>
+              <CardTitle>Convites Enviados por {viewMode === 'daily' ? 'Dia' : 'Semana'}</CardTitle>
               <CardDescription>Comparação de volume de convites enviados</CardDescription>
             </CardHeader>
             <CardContent>
@@ -361,7 +454,7 @@ export default function Analytics() {
               >
                 <LineChart data={comparisonData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="week" />
+                  <XAxis dataKey="period" />
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Legend />
@@ -383,7 +476,7 @@ export default function Analytics() {
           {/* Gráfico de Conexões Realizadas */}
           <Card>
             <CardHeader>
-              <CardTitle>Conexões Realizadas por Semana</CardTitle>
+              <CardTitle>Conexões Realizadas por {viewMode === 'daily' ? 'Dia' : 'Semana'}</CardTitle>
               <CardDescription>Comparação de conexões aceitas</CardDescription>
             </CardHeader>
             <CardContent>
@@ -399,7 +492,7 @@ export default function Analytics() {
               >
                 <BarChart data={comparisonData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="week" />
+                  <XAxis dataKey="period" />
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Legend />
@@ -419,7 +512,7 @@ export default function Analytics() {
           {/* Gráfico de Mensagens Enviadas */}
           <Card>
             <CardHeader>
-              <CardTitle>Mensagens Enviadas por Semana</CardTitle>
+              <CardTitle>Mensagens Enviadas por {viewMode === 'daily' ? 'Dia' : 'Semana'}</CardTitle>
               <CardDescription>Volume de mensagens enviadas</CardDescription>
             </CardHeader>
             <CardContent>
@@ -435,7 +528,7 @@ export default function Analytics() {
               >
                 <LineChart data={comparisonData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="week" />
+                  <XAxis dataKey="period" />
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Legend />
@@ -457,7 +550,7 @@ export default function Analytics() {
           {/* Gráfico de Respostas Positivas e Reuniões */}
           <Card>
             <CardHeader>
-              <CardTitle>Respostas Positivas e Reuniões por Semana</CardTitle>
+              <CardTitle>Respostas Positivas e Reuniões por {viewMode === 'daily' ? 'Dia' : 'Semana'}</CardTitle>
               <CardDescription>Comparação de conversão (respostas e reuniões)</CardDescription>
             </CardHeader>
             <CardContent>
@@ -477,7 +570,7 @@ export default function Analytics() {
               >
                 <BarChart data={comparisonData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="week" />
+                  <XAxis dataKey="period" />
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Legend />
