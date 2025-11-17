@@ -60,6 +60,13 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Chart palette (semantic) */
+    --chart-1: 217 91% 60%; /* primary */
+    --chart-2: 142 76% 45%; /* accent/success */
+    --chart-3: 25 95% 53%;  /* orange */
+    --chart-4: 271 81% 56%; /* purple */
+    --chart-5: 346 77% 55%; /* pink/red */
   }
 
   .dark {
@@ -86,7 +93,7 @@ All colors MUST be HSL.
 
     --destructive: 0 62.8% 50%;
     --destructive-foreground: 0 0% 100%;
-
+    
     --border: 215 20% 22%;
     --input: 215 20% 22%;
     --ring: 217 91% 60%;
@@ -105,6 +112,13 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Chart palette (semantic) - tuned for dark */
+    --chart-1: 217 91% 60%;
+    --chart-2: 142 70% 50%;
+    --chart-3: 25 90% 60%;
+    --chart-4: 271 75% 62%;
+    --chart-5: 346 70% 60%;
   }
 }
 

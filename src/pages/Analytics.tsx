@@ -509,6 +509,8 @@ export default function Analytics() {
                         strokeWidth={2}
                         dot={{ r: 4 }}
                         activeDot={{ r: 6 }}
+                        connectNulls
+                        isAnimationActive={false}
                       />
                     ))}
                   </LineChart>
