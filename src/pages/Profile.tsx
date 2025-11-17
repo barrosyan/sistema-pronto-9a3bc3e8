@@ -1,545 +1,250 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Pencil, Save } from 'lucide-react';
-import { toast } from 'sonner';
-import type { ProfileInfo, ConsolidatedMetrics, ConversionRates, WeeklyActivityCalendar, CampaignComparison } from '@/types/profile';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { WeeklyComparison } from '@/components/WeeklyComparison';
+import { useCampaignData } from '@/hooks/useCampaignData';
 import { Separator } from '@/components/ui/separator';
 
 export default function Profile() {
-  const [isEditingInfo, setIsEditingInfo] = useState(false);
-  const [selectedCampaignMetrics, setSelectedCampaignMetrics] = useState<string>('Todas');
-  const [selectedCampaignConversion, setSelectedCampaignConversion] = useState<string>('Todas');
-  const [selectedCampaignCalendar, setSelectedCampaignCalendar] = useState<string>('Todas');
-  const [profileInfo, setProfileInfo] = useState<ProfileInfo>({
-    empresa: 'Presto',
-    perfil: 'Ursula Aleixo',
-    campanhas: [
-      'Ursula Sebrae 100 Startups',
-      'Ursula Sebrae 1000 Startups',
-      'Ursula NEON 2025',
-      'Ursula Web Summit Lisboa 2025'
-    ],
-    objetivoDasCampanhas: 'Conectar com startups e ampliar network em eventos estratégicos',
-    cadencia: 'https://docs.google.com/document/d/...',
-    cargosNaPesquisa: 'Founder, CEO, CTO'
-  });
+  const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
 
-  const [metrics] = useState<ConsolidatedMetrics>({
-    inicioDoPeriodo: '02/06/2025',
-    fimDoPeriodo: '02/11/2025',
-    campanhasAtivas: 28,
-    diasAtivos: 120,
-    convitesEnviados: 1020,
-    conexoesRealizadas: 578,
-    taxaDeAceiteDeConexao: 57,
-    mensagensEnviadas: 1212,
-    visitas: 1165,
-    likes: 464,
-    comentarios: 0,
-    totalDeAtividades: 3861,
-    respostasPositivas: 149,
-    leadsProcessados: 1373,
-    reunioes: 47,
-    propostas: 7,
-    vendas: 1
-  });
+  useEffect(() => {
+    loadFromDatabase();
+  }, [loadFromDatabase]);
 
-  const [conversionRates] = useState<ConversionRates>({
-    respostasPositivasConvitesEnviados: 14.6,
-    respostasPositivasConexoesRealizadas: 25.8,
-    respostasPositivasMensagensEnviadas: 12.3,
-    numeroDeReunioesRespostasPositivas: 31.5,
-    numeroDeReunioesConvitesEnviados: 4.6
-  });
+  // Extract unique campaigns from database
+  const uniqueCampaigns = Array.from(new Set(campaignMetrics.map(m => m.campaignName).filter(Boolean)));
 
-  const [weeklyCalendar] = useState<Record<string, WeeklyActivityCalendar[]>>({
-    'Todas': [
-      { semana: '02/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 5 },
-      { semana: '09/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Inativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 4 },
-      { semana: '16/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Ativo', domingo: 'Inativo', diasAtivos: 6 },
-    ],
-    'Ursula Sebrae 100 Startups': [
-      { semana: '02/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 5 },
-      { semana: '09/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Inativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 4 },
-      { semana: '16/06/2025', segundaFeira: 'Inativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Inativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 3 },
-    ],
-    'Ursula NEON 2025': [
-      { semana: '02/06/2025', segundaFeira: 'Inativo', tercaFeira: 'Inativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 3 },
-      { semana: '09/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Ativo', domingo: 'Inativo', diasAtivos: 6 },
-      { semana: '16/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Inativo', quartaFeira: 'Inativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 3 },
-    ],
-    'Ursula Sebrae 1000 Startups': [
-      { semana: '02/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Inativo', quartaFeira: 'Ativo', quintaFeira: 'Inativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 3 },
-      { semana: '09/06/2025', segundaFeira: 'Inativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 4 },
-    ],
-    'Ursula Web Summit Lisboa 2025': [
-      { semana: '02/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Inativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Ativo', domingo: 'Inativo', diasAtivos: 5 },
-    ]
-  });
+  // Calculate consolidated metrics from all campaigns
+  const calculateMetrics = () => {
+    const totals = {
+      convitesEnviados: 0,
+      conexoesRealizadas: 0,
+      mensagensEnviadas: 0,
+      visitas: 0,
+      likes: 0,
+      comentarios: 0
+    };
 
-  const [campaignComparisons] = useState<CampaignComparison[]>([
-    {
-      campaignName: 'Ursula Sebrae 100 Startups',
-      inicioDoPeriodo: '02/06/2025',
-      fimDoPeriodo: '16/06/2025',
-      diasAtivos: 12,
-      convitesEnviados: 120,
-      conexoesRealizadas: 72,
-      taxaDeAceiteDeConexao: 60,
-      mensagensEnviadas: 144,
-      visitas: 132,
-      likes: 52,
-      comentarios: 2,
-      totalDeAtividades: 462,
-      respostasPositivas: 18,
-      leadsProcessados: 132,
-      reunioes: 6,
-      propostas: 2,
-      vendas: 0,
-      respostasPositivasConvitesEnviados: 15,
-      respostasPositivasConexoesRealizadas: 25,
-      respostasPositivasMensagensEnviadas: 12.5,
-      numeroDeReunioesRespostasPositivas: 33.3,
-      numeroDeReunioesConvitesEnviados: 5,
-      observacoes: 'Campanha com bom engajamento inicial',
-      problemasTecnicos: '',
-      ajustesNaPesquisa: '',
-      analiseComparativa: ''
-    },
-    {
-      campaignName: 'Ursula NEON 2025',
-      inicioDoPeriodo: '02/06/2025',
-      fimDoPeriodo: '16/06/2025',
-      diasAtivos: 10,
-      convitesEnviados: 100,
-      conexoesRealizadas: 55,
-      taxaDeAceiteDeConexao: 55,
-      mensagensEnviadas: 120,
-      visitas: 110,
-      likes: 40,
-      comentarios: 1,
-      totalDeAtividades: 380,
-      respostasPositivas: 15,
-      leadsProcessados: 110,
-      reunioes: 5,
-      propostas: 1,
-      vendas: 0,
-      respostasPositivasConvitesEnviados: 15,
-      respostasPositivasConexoesRealizadas: 27.3,
-      respostasPositivasMensagensEnviadas: 12.5,
-      numeroDeReunioesRespostasPositivas: 33.3,
-      numeroDeReunioesConvitesEnviados: 5,
-      observacoes: 'Campanha com resultados consistentes',
-      problemasTecnicos: '',
-      ajustesNaPesquisa: '',
-      analiseComparativa: ''
-    }
-  ]);
+    campaignMetrics.forEach(metric => {
+      Object.values(metric.dailyData || {}).forEach(value => {
+        if (metric.eventType === 'Connection Requests Sent') {
+          totals.convitesEnviados += value;
+        } else if (metric.eventType === 'Connection Requests Accepted') {
+          totals.conexoesRealizadas += value;
+        } else if (metric.eventType === 'Messages Sent') {
+          totals.mensagensEnviadas += value;
+        } else if (metric.eventType === 'Profile Visits') {
+          totals.visitas += value;
+        } else if (metric.eventType === 'Post Likes') {
+          totals.likes += value;
+        } else if (metric.eventType === 'Comments Done') {
+          totals.comentarios += value;
+        }
+      });
+    });
 
-  const availableCampaigns = profileInfo.campanhas;
+    const allLeads = getAllLeads();
+    const positiveLeads = allLeads.filter(l => l.status === 'positive');
+    const reunioes = positiveLeads.filter(l => l.meetingDate).length;
+    const propostas = positiveLeads.filter(l => l.proposalDate).length;
+    const vendas = positiveLeads.filter(l => l.saleDate).length;
 
-  const handleSaveInfo = () => {
-    setIsEditingInfo(false);
-    toast.success('Informações do perfil atualizadas!');
-  };
+    const taxaAceite = totals.convitesEnviados > 0 
+      ? ((totals.conexoesRealizadas / totals.convitesEnviados) * 100).toFixed(1)
+      : '0.0';
 
-  // Funções para calcular métricas filtradas
-  const getFilteredMetrics = (campaignFilter: string) => {
-    if (campaignFilter === 'Todas') return metrics;
-    
-    const campaign = campaignComparisons.find(c => c.campaignName === campaignFilter);
-    if (!campaign) return metrics;
-    
     return {
-      inicioDoPeriodo: campaign.inicioDoPeriodo,
-      fimDoPeriodo: campaign.fimDoPeriodo,
-      campanhasAtivas: 1,
-      diasAtivos: campaign.diasAtivos,
-      convitesEnviados: campaign.convitesEnviados,
-      conexoesRealizadas: campaign.conexoesRealizadas,
-      taxaDeAceiteDeConexao: campaign.taxaDeAceiteDeConexao,
-      mensagensEnviadas: campaign.mensagensEnviadas,
-      visitas: campaign.visitas,
-      likes: campaign.likes,
-      comentarios: campaign.comentarios,
-      totalDeAtividades: campaign.totalDeAtividades,
-      respostasPositivas: campaign.respostasPositivas,
-      leadsProcessados: campaign.leadsProcessados,
-      reunioes: campaign.reunioes,
-      propostas: campaign.propostas,
-      vendas: campaign.vendas
+      ...totals,
+      respostasPositivas: positiveLeads.length,
+      reunioes,
+      propostas,
+      vendas,
+      taxaAceite,
+      totalAtividades: totals.convitesEnviados + totals.conexoesRealizadas + totals.mensagensEnviadas + 
+                       totals.visitas + totals.likes + totals.comentarios
     };
   };
 
-  const getFilteredConversionRates = (campaignFilter: string) => {
-    if (campaignFilter === 'Todas') return conversionRates;
-    
-    const campaign = campaignComparisons.find(c => c.campaignName === campaignFilter);
-    if (!campaign) return conversionRates;
-    
-    return {
-      respostasPositivasConvitesEnviados: campaign.respostasPositivasConvitesEnviados,
-      respostasPositivasConexoesRealizadas: campaign.respostasPositivasConexoesRealizadas,
-      respostasPositivasMensagensEnviadas: campaign.respostasPositivasMensagensEnviadas,
-      numeroDeReunioesRespostasPositivas: campaign.numeroDeReunioesRespostasPositivas,
-      numeroDeReunioesConvitesEnviados: campaign.numeroDeReunioesConvitesEnviados
-    };
+  const metrics = calculateMetrics();
+
+  // Calculate conversion rates
+  const conversionRates = {
+    respostasPositivasConvitesEnviados: metrics.convitesEnviados > 0 
+      ? ((metrics.respostasPositivas / metrics.convitesEnviados) * 100).toFixed(1) 
+      : '0.0',
+    respostasPositivasConexoesRealizadas: metrics.conexoesRealizadas > 0 
+      ? ((metrics.respostasPositivas / metrics.conexoesRealizadas) * 100).toFixed(1)
+      : '0.0',
+    respostasPositivasMensagensEnviadas: metrics.mensagensEnviadas > 0 
+      ? ((metrics.respostasPositivas / metrics.mensagensEnviadas) * 100).toFixed(1)
+      : '0.0',
+    numeroDeReunioesRespostasPositivas: metrics.respostasPositivas > 0 
+      ? ((metrics.reunioes / metrics.respostasPositivas) * 100).toFixed(1)
+      : '0.0',
+    numeroDeReunioesConvitesEnviados: metrics.convitesEnviados > 0 
+      ? ((metrics.reunioes / metrics.convitesEnviados) * 100).toFixed(1)
+      : '0.0'
   };
 
-  const displayedMetrics = getFilteredMetrics(selectedCampaignMetrics);
-  const displayedConversionRates = getFilteredConversionRates(selectedCampaignConversion);
-  const displayedCalendar = weeklyCalendar[selectedCampaignCalendar] || weeklyCalendar['Todas'];
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Carregando dados...
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (uniqueCampaigns.length === 0) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Sem Dados de Campanhas</CardTitle>
+            <CardDescription>
+              Nenhuma campanha encontrada. Vá para Settings e faça upload dos arquivos, depois clique em "Processar Todos os Arquivos".
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Perfil de Campanhas</h1>
-          <p className="text-muted-foreground mt-1">Análise detalhada de performance e métricas</p>
-        </div>
+    <div className="container mx-auto p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Perfil de Campanhas</h1>
+        <p className="text-muted-foreground">Análise detalhada de performance e métricas</p>
       </div>
 
-      {/* Informações do Perfil */}
+      {/* Campanhas Ativas */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Informações do Perfil</CardTitle>
-            <CardDescription>Dados gerais sobre o perfil e campanhas</CardDescription>
-          </div>
-          <Button
-            variant={isEditingInfo ? "default" : "outline"}
-            size="sm"
-            onClick={() => isEditingInfo ? handleSaveInfo() : setIsEditingInfo(true)}
-          >
-            {isEditingInfo ? <><Save className="h-4 w-4 mr-2" /> Salvar</> : <><Pencil className="h-4 w-4 mr-2" /> Editar</>}
-          </Button>
+        <CardHeader>
+          <CardTitle>Campanhas Ativas</CardTitle>
+          <CardDescription>Campanhas encontradas nos dados importados</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Empresa</Label>
-              {isEditingInfo ? (
-                <Input
-                  value={profileInfo.empresa}
-                  onChange={(e) => setProfileInfo({...profileInfo, empresa: e.target.value})}
-                />
-              ) : (
-                <p className="text-lg font-medium mt-1">{profileInfo.empresa}</p>
-              )}
-            </div>
-            <div>
-              <Label>Perfil</Label>
-              {isEditingInfo ? (
-                <Input
-                  value={profileInfo.perfil}
-                  onChange={(e) => setProfileInfo({...profileInfo, perfil: e.target.value})}
-                />
-              ) : (
-                <p className="text-lg font-medium mt-1">{profileInfo.perfil}</p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <Label>Campanhas Ativas</Label>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {profileInfo.campanhas.map((campaign) => (
-                <Badge key={campaign} variant="secondary">{campaign}</Badge>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <Label>Objetivo das Campanhas</Label>
-            {isEditingInfo ? (
-              <Textarea
-                value={profileInfo.objetivoDasCampanhas}
-                onChange={(e) => setProfileInfo({...profileInfo, objetivoDasCampanhas: e.target.value})}
-                rows={3}
-              />
-            ) : (
-              <p className="mt-1">{profileInfo.objetivoDasCampanhas}</p>
-            )}
-          </div>
-
-          <div>
-            <Label>Cadência</Label>
-            {isEditingInfo ? (
-              <Input
-                value={profileInfo.cadencia}
-                onChange={(e) => setProfileInfo({...profileInfo, cadencia: e.target.value})}
-              />
-            ) : (
-              <p className="mt-1 text-primary hover:underline">{profileInfo.cadencia}</p>
-            )}
-          </div>
-
-          <div>
-            <Label>Cargos na Pesquisa</Label>
-            {isEditingInfo ? (
-              <Input
-                value={profileInfo.cargosNaPesquisa}
-                onChange={(e) => setProfileInfo({...profileInfo, cargosNaPesquisa: e.target.value})}
-              />
-            ) : (
-              <p className="mt-1">{profileInfo.cargosNaPesquisa}</p>
-            )}
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {uniqueCampaigns.map(campaign => (
+              <span key={campaign} className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
+                {campaign}
+              </span>
+            ))}
           </div>
         </CardContent>
       </Card>
 
       <Separator />
 
-      {/* Métricas Gerais */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Métricas Gerais</h2>
-            <p className="text-muted-foreground">Visão geral do desempenho</p>
+      {/* Métricas Consolidadas */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Métricas Gerais</CardTitle>
+          <CardDescription>Totais consolidados de todas as campanhas</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Convites Enviados</p>
+              <p className="text-2xl font-bold">{metrics.convitesEnviados}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Conexões Realizadas</p>
+              <p className="text-2xl font-bold">{metrics.conexoesRealizadas}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Mensagens Enviadas</p>
+              <p className="text-2xl font-bold">{metrics.mensagensEnviadas}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Taxa de Aceite</p>
+              <p className="text-2xl font-bold">{metrics.taxaAceite}%</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Visitas</p>
+              <p className="text-2xl font-bold">{metrics.visitas}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Likes</p>
+              <p className="text-2xl font-bold">{metrics.likes}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Comentários</p>
+              <p className="text-2xl font-bold">{metrics.comentarios}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Total Atividades</p>
+              <p className="text-2xl font-bold">{metrics.totalAtividades}</p>
+            </div>
           </div>
-          <Select value={selectedCampaignMetrics} onValueChange={setSelectedCampaignMetrics}>
-            <SelectTrigger className="w-[250px]">
-              <SelectValue placeholder="Selecione uma campanha" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Todas">Todas as Campanhas</SelectItem>
-              {availableCampaigns.map((campaign) => (
-                <SelectItem key={campaign} value={campaign}>{campaign}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        </CardContent>
+      </Card>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedMetrics.convitesEnviados}</div>
-                <div className="text-sm text-muted-foreground mt-1">Convites Enviados</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedMetrics.visitas}</div>
-                <div className="text-sm text-muted-foreground mt-1">Visitas ao Perfil</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedMetrics.conexoesRealizadas}</div>
-                <div className="text-sm text-muted-foreground mt-1">Conexões Realizadas</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedMetrics.likes}</div>
-                <div className="text-sm text-muted-foreground mt-1">Likes</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedMetrics.mensagensEnviadas}</div>
-                <div className="text-sm text-muted-foreground mt-1">Mensagens Enviadas</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedMetrics.comentarios}</div>
-                <div className="text-sm text-muted-foreground mt-1">Comentários</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedMetrics.respostasPositivas}</div>
-                <div className="text-sm text-muted-foreground mt-1">Respostas Positivas</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedMetrics.reunioes}</div>
-                <div className="text-sm text-muted-foreground mt-1">Reuniões Marcadas</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedMetrics.propostas}</div>
-                <div className="text-sm text-muted-foreground mt-1">Propostas</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedMetrics.vendas}</div>
-                <div className="text-sm text-muted-foreground mt-1">Vendas</div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <Separator />
+
+      {/* Resultados de Leads */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Resultados de Leads</CardTitle>
+          <CardDescription>Performance do pipeline de vendas</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Respostas Positivas</p>
+              <p className="text-2xl font-bold text-success">{metrics.respostasPositivas}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Reuniões</p>
+              <p className="text-2xl font-bold text-primary">{metrics.reunioes}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Propostas</p>
+              <p className="text-2xl font-bold text-warning">{metrics.propostas}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Vendas</p>
+              <p className="text-2xl font-bold text-success">{metrics.vendas}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Separator />
 
       {/* Taxas de Conversão */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Taxas de Conversão</h2>
-            <p className="text-muted-foreground">Análise de eficiência</p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Taxas de Conversão</CardTitle>
+          <CardDescription>Performance em cada etapa do funil</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+              <span className="text-sm">Respostas Positivas / Convites Enviados</span>
+              <span className="font-bold">{conversionRates.respostasPositivasConvitesEnviados}%</span>
+            </div>
+            <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+              <span className="text-sm">Respostas Positivas / Conexões Realizadas</span>
+              <span className="font-bold">{conversionRates.respostasPositivasConexoesRealizadas}%</span>
+            </div>
+            <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+              <span className="text-sm">Respostas Positivas / Mensagens Enviadas</span>
+              <span className="font-bold">{conversionRates.respostasPositivasMensagensEnviadas}%</span>
+            </div>
+            <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+              <span className="text-sm">Reuniões / Respostas Positivas</span>
+              <span className="font-bold">{conversionRates.numeroDeReunioesRespostasPositivas}%</span>
+            </div>
+            <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+              <span className="text-sm">Reuniões / Convites Enviados</span>
+              <span className="font-bold">{conversionRates.numeroDeReunioesConvitesEnviados}%</span>
+            </div>
           </div>
-          <Select value={selectedCampaignConversion} onValueChange={setSelectedCampaignConversion}>
-            <SelectTrigger className="w-[250px]">
-              <SelectValue placeholder="Selecione uma campanha" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Todas">Todas as Campanhas</SelectItem>
-              {availableCampaigns.map((campaign) => (
-                <SelectItem key={campaign} value={campaign}>{campaign}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedConversionRates.respostasPositivasConvitesEnviados.toFixed(1)}%</div>
-                <div className="text-sm text-muted-foreground mt-1">Respostas Positivas / Convites Enviados</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedConversionRates.respostasPositivasConexoesRealizadas.toFixed(1)}%</div>
-                <div className="text-sm text-muted-foreground mt-1">Respostas Positivas / Conexões Realizadas</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedConversionRates.respostasPositivasMensagensEnviadas.toFixed(1)}%</div>
-                <div className="text-sm text-muted-foreground mt-1">Respostas Positivas / Mensagens Enviadas</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedConversionRates.numeroDeReunioesRespostasPositivas.toFixed(1)}%</div>
-                <div className="text-sm text-muted-foreground mt-1">Número de Reuniões / Respostas Positivas</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-foreground">{displayedConversionRates.numeroDeReunioesConvitesEnviados.toFixed(1)}%</div>
-                <div className="text-sm text-muted-foreground mt-1">Número de Reuniões / Convites Enviados</div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Calendário Semanal */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Calendário Semanal de Atividades</h2>
-            <p className="text-muted-foreground">Registro de atividades por dia da semana</p>
-          </div>
-          <Select value={selectedCampaignCalendar} onValueChange={setSelectedCampaignCalendar}>
-            <SelectTrigger className="w-[250px]">
-              <SelectValue placeholder="Selecione uma campanha" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Todas">Todas as Campanhas</SelectItem>
-              {availableCampaigns.map((campaign) => (
-                <SelectItem key={campaign} value={campaign}>{campaign}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Semana</TableHead>
-                  <TableHead>Segunda</TableHead>
-                  <TableHead>Terça</TableHead>
-                  <TableHead>Quarta</TableHead>
-                  <TableHead>Quinta</TableHead>
-                  <TableHead>Sexta</TableHead>
-                  <TableHead>Sábado</TableHead>
-                  <TableHead>Domingo</TableHead>
-                  <TableHead>Dias Ativos</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {displayedCalendar.map((week) => (
-                  <TableRow key={week.semana}>
-                    <TableCell className="font-medium">{week.semana}</TableCell>
-                    <TableCell><Badge variant={week.segundaFeira === 'Ativo' ? 'default' : 'secondary'}>{week.segundaFeira}</Badge></TableCell>
-                    <TableCell><Badge variant={week.tercaFeira === 'Ativo' ? 'default' : 'secondary'}>{week.tercaFeira}</Badge></TableCell>
-                    <TableCell><Badge variant={week.quartaFeira === 'Ativo' ? 'default' : 'secondary'}>{week.quartaFeira}</Badge></TableCell>
-                    <TableCell><Badge variant={week.quintaFeira === 'Ativo' ? 'default' : 'secondary'}>{week.quintaFeira}</Badge></TableCell>
-                    <TableCell><Badge variant={week.sextaFeira === 'Ativo' ? 'default' : 'secondary'}>{week.sextaFeira}</Badge></TableCell>
-                    <TableCell><Badge variant={week.sabado === 'Ativo' ? 'default' : 'secondary'}>{week.sabado}</Badge></TableCell>
-                    <TableCell><Badge variant={week.domingo === 'Ativo' ? 'default' : 'secondary'}>{week.domingo}</Badge></TableCell>
-                    <TableCell className="font-semibold">{week.diasAtivos}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Separator />
-
-      {/* Comparação Semanal */}
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Comparação Semanal entre Campanhas</h2>
-          <p className="text-muted-foreground">Análise comparativa de performance</p>
-        </div>
-
-        <WeeklyComparison 
-          weeklyData={campaignComparisons}
-          availableCampaigns={availableCampaigns}
-        />
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
