@@ -28,6 +28,13 @@ export default function Analytics() {
   ]);
   const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('weekly');
 
+  const chartConfig = {
+    'Ursula Sebrae 100 Startups': { color: 'hsl(var(--chart-1))' },
+    'Ursula Sebrae 1000 Startups': { color: 'hsl(var(--chart-2))' },
+    'Ursula NEON 2025': { color: 'hsl(var(--chart-3))' },
+    'Ursula Web Summit Lisboa 2025': { color: 'hsl(var(--chart-4))' },
+  };
+
   // Mock data - Em produção, isso viria do banco de dados
   const allCampaigns = [
     'Ursula Sebrae 100 Startups',
@@ -494,9 +501,9 @@ export default function Analytics() {
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={comparisonData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="period" />
-                    <YAxis />
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="period" className="text-xs" />
+                    <YAxis className="text-xs" />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend />
                     {selectedCampaigns.map((campaign, idx) => (
@@ -506,10 +513,10 @@ export default function Analytics() {
                         dataKey={`${campaign}_convites`}
                         stroke={chartColors[idx]}
                         name={campaign}
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
+                        strokeWidth={2.5}
+                        dot={{ r: 4, fill: chartColors[idx] }}
                         activeDot={{ r: 6 }}
-                        connectNulls
+                        connectNulls={true}
                         isAnimationActive={false}
                       />
                     ))}
@@ -536,21 +543,23 @@ export default function Analytics() {
                 }), {})}
                 className="h-[300px]"
               >
-                <BarChart data={comparisonData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="period" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  {selectedCampaigns.map((campaign, idx) => (
-                    <Bar
-                      key={campaign}
-                      dataKey={`${campaign}_conexoes`}
-                      fill={chartColors[idx]}
-                      name={campaign}
-                    />
-                  ))}
-                </BarChart>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={comparisonData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="period" className="text-xs" />
+                    <YAxis className="text-xs" />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Legend />
+                    {selectedCampaigns.map((campaign, idx) => (
+                      <Bar
+                        key={campaign}
+                        dataKey={`${campaign}_conexoes`}
+                        fill={chartColors[idx]}
+                        name={campaign}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
               </ChartContainer>
             </CardContent>
           </Card>
@@ -574,9 +583,9 @@ export default function Analytics() {
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={comparisonData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="period" />
-                    <YAxis />
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="period" className="text-xs" />
+                    <YAxis className="text-xs" />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend />
                     {selectedCampaigns.map((campaign, idx) => (
@@ -586,9 +595,11 @@ export default function Analytics() {
                         dataKey={`${campaign}_mensagens`}
                         stroke={chartColors[idx]}
                         name={campaign}
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
+                        strokeWidth={2.5}
+                        dot={{ r: 4, fill: chartColors[idx] }}
                         activeDot={{ r: 6 }}
+                        connectNulls={true}
+                        isAnimationActive={false}
                       />
                     ))}
                   </LineChart>
@@ -618,30 +629,32 @@ export default function Analytics() {
                 }), {})}
                 className="h-[300px]"
               >
-                <BarChart data={comparisonData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="period" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  {selectedCampaigns.map((campaign, idx) => (
-                    <>
-                      <Bar
-                        key={`${campaign}_respostas`}
-                        dataKey={`${campaign}_respostas`}
-                        fill={chartColors[idx]}
-                        name={`${campaign} - Respostas`}
-                      />
-                      <Bar
-                        key={`${campaign}_reunioes`}
-                        dataKey={`${campaign}_reunioes`}
-                        fill={chartColors[idx]}
-                        fillOpacity={0.6}
-                        name={`${campaign} - Reuniões`}
-                      />
-                    </>
-                  ))}
-                </BarChart>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={comparisonData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="period" className="text-xs" />
+                    <YAxis className="text-xs" />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Legend />
+                    {selectedCampaigns.map((campaign, idx) => (
+                      <>
+                        <Bar
+                          key={`${campaign}_respostas`}
+                          dataKey={`${campaign}_respostas`}
+                          fill={chartColors[idx]}
+                          name={`${campaign} - Respostas`}
+                        />
+                        <Bar
+                          key={`${campaign}_reunioes`}
+                          dataKey={`${campaign}_reunioes`}
+                          fill={chartColors[idx]}
+                          fillOpacity={0.6}
+                          name={`${campaign} - Reuniões`}
+                        />
+                      </>
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
               </ChartContainer>
             </CardContent>
           </Card>
