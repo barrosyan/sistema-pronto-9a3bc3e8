@@ -355,9 +355,41 @@ export default function UserSettings() {
           console.log('Processando leads positivos:', parsedData.positiveLeads.length);
           
           const leadsToInsert = parsedData.positiveLeads.map(lead => ({
-            ...lead,
             user_id: user.id,
-            id: undefined,
+            campaign: lead.campaign,
+            linkedin: lead.linkedin,
+            name: lead.name,
+            position: lead.position,
+            company: lead.company,
+            status: lead.status,
+            positive_response_date: lead.positiveResponseDate,
+            transfer_date: lead.transferDate,
+            status_details: lead.statusDetails,
+            comments: lead.comments,
+            follow_up_1_date: lead.followUp1Date,
+            follow_up_1_comments: lead.followUp1Comments,
+            follow_up_2_date: lead.followUp2Date,
+            follow_up_2_comments: lead.followUp2Comments,
+            follow_up_3_date: lead.followUp3Date,
+            follow_up_3_comments: lead.followUp3Comments,
+            follow_up_4_date: lead.followUp4Date,
+            follow_up_4_comments: lead.followUp4Comments,
+            observations: lead.observations,
+            meeting_schedule_date: lead.meetingScheduleDate,
+            meeting_date: lead.meetingDate,
+            proposal_date: lead.proposalDate,
+            proposal_value: lead.proposalValue,
+            sale_date: lead.saleDate,
+            sale_value: lead.saleValue,
+            profile: lead.profile,
+            classification: lead.classification,
+            attended_webinar: lead.attendedWebinar,
+            whatsapp: lead.whatsapp,
+            stand_day: lead.standDay,
+            pavilion: lead.pavilion,
+            stand: lead.stand,
+            source: lead.source,
+            connection_date: lead.connectionDate,
           }));
 
           const { error: leadsError } = await supabase
@@ -380,9 +412,26 @@ export default function UserSettings() {
           console.log('Processando leads negativos:', parsedData.negativeLeads.length);
           
           const leadsToInsert = parsedData.negativeLeads.map(lead => ({
-            ...lead,
             user_id: user.id,
-            id: undefined,
+            campaign: lead.campaign,
+            linkedin: lead.linkedin,
+            name: lead.name,
+            position: lead.position,
+            company: lead.company,
+            status: lead.status,
+            negative_response_date: lead.negativeResponseDate,
+            transfer_date: lead.transferDate,
+            status_details: lead.statusDetails,
+            observations: lead.observations,
+            had_follow_up: lead.hadFollowUp,
+            follow_up_reason: lead.followUpReason,
+            source: lead.source,
+            connection_date: lead.connectionDate,
+            attended_webinar: lead.attendedWebinar,
+            whatsapp: lead.whatsapp,
+            stand_day: lead.standDay,
+            pavilion: lead.pavilion,
+            stand: lead.stand,
           }));
 
           const { error: leadsError } = await supabase
