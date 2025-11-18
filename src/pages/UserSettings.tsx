@@ -257,26 +257,45 @@ export default function UserSettings() {
   };
 
   const confirmImport = async () => {
+    console.log('=== Iniciando importação ===');
+    console.log('Arquivos parseados:', parsedFilesData.length);
+    
     setProcessing(true);
     let totalMetrics = 0;
     let totalLeads = 0;
 
     try {
       for (const { parsedData, user } of parsedFilesData) {
+        console.log('Processando arquivo com dados:', {
+          campanhas: parsedData.allCampaignDetails?.length,
+          metricas: parsedData.campaignMetrics.length,
+          leadsPositivos: parsedData.positiveLeads.length,
+          leadsNegativos: parsedData.negativeLeads.length
+        });
         const campaignDetailsArray = parsedData.allCampaignDetails || 
           (parsedData.campaignDetails ? [parsedData.campaignDetails] : []);
 
+        console.log('Processando campanhas:', campaignDetailsArray.length);
+
         for (const campaignDetail of campaignDetailsArray) {
           if (campaignDetail.campaignName) {
-            const { data: existingCampaign } = await supabase
+            console.log('Salvando campanha:', campaignDetail.campaignName);
+            
+            const { data: existingCampaign, error: selectError } = await supabase
               .from('campaigns')
               .select('id')
               .eq('user_id', user.id)
               .eq('name', campaignDetail.campaignName)
-              .single();
+              .maybeSingle();
+
+            if (selectError) {
+              console.error('Erro ao buscar campanha existente:', selectError);
+              throw selectError;
+            }
 
             if (existingCampaign) {
-              await supabase
+              console.log('Atualizando campanha existente:', campaignDetail.campaignName);
+              const { error: updateError } = await supabase
                 .from('campaigns')
                 .update({
                   company: campaignDetail.company || null,
@@ -286,8 +305,14 @@ export default function UserSettings() {
                   job_titles: campaignDetail.jobTitles || null,
                 })
                 .eq('id', existingCampaign.id);
+              
+              if (updateError) {
+                console.error('Erro ao atualizar campanha:', updateError);
+                throw updateError;
+              }
             } else {
-              await supabase
+              console.log('Inserindo nova campanha:', campaignDetail.campaignName);
+              const { error: insertError } = await supabase
                 .from('campaigns')
                 .insert({
                   user_id: user.id,
@@ -298,11 +323,18 @@ export default function UserSettings() {
                   cadence: campaignDetail.cadence || null,
                   job_titles: campaignDetail.jobTitles || null,
                 });
+              
+              if (insertError) {
+                console.error('Erro ao inserir campanha:', insertError);
+                throw insertError;
+              }
             }
           }
         }
 
         if (parsedData.campaignMetrics.length > 0) {
+          console.log('Processando métricas:', parsedData.campaignMetrics.length);
+          
           const metricsToInsert = parsedData.campaignMetrics.map(metric => ({
             user_id: user.id,
             campaign_name: metric.campaignName,
@@ -312,7 +344,6 @@ export default function UserSettings() {
             daily_data: metric.dailyData,
           }));
 
-          // Use upsert to handle duplicates - update on conflict
           const { error: metricsError } = await supabase
             .from('campaign_metrics')
             .upsert(metricsToInsert, {
@@ -320,18 +351,23 @@ export default function UserSettings() {
               ignoreDuplicates: false
             });
 
-          if (metricsError) throw metricsError;
+          if (metricsError) {
+            console.error('Erro ao inserir métricas:', metricsError);
+            throw metricsError;
+          }
+          console.log('Métricas inseridas com sucesso');
           totalMetrics += parsedData.campaignMetrics.length;
         }
 
         if (parsedData.positiveLeads.length > 0) {
+          console.log('Processando leads positivos:', parsedData.positiveLeads.length);
+          
           const leadsToInsert = parsedData.positiveLeads.map(lead => ({
             ...lead,
             user_id: user.id,
             id: undefined,
           }));
 
-          // Use upsert for leads - update if exists based on campaign + name
           const { error: leadsError } = await supabase
             .from('leads')
             .upsert(leadsToInsert, {
@@ -340,20 +376,22 @@ export default function UserSettings() {
             });
 
           if (leadsError) {
-            console.error('Error inserting positive leads:', leadsError);
+            console.error('Erro ao inserir leads positivos:', leadsError);
             throw leadsError;
           }
+          console.log('Leads positivos inseridos com sucesso');
           totalLeads += leadsToInsert.length;
         }
 
         if (parsedData.negativeLeads.length > 0) {
+          console.log('Processando leads negativos:', parsedData.negativeLeads.length);
+          
           const leadsToInsert = parsedData.negativeLeads.map(lead => ({
             ...lead,
             user_id: user.id,
             id: undefined,
           }));
 
-          // Use upsert for leads - update if exists based on campaign + name
           const { error: leadsError } = await supabase
             .from('leads')
             .upsert(leadsToInsert, {
@@ -362,20 +400,26 @@ export default function UserSettings() {
             });
 
           if (leadsError) {
-            console.error('Error inserting negative leads:', leadsError);
+            console.error('Erro ao inserir leads negativos:', leadsError);
             throw leadsError;
           }
+          console.log('Leads negativos inseridos com sucesso');
           totalLeads += leadsToInsert.length;
         }
       }
 
+      console.log('=== Importação concluída ===');
+      console.log('Total métricas:', totalMetrics);
+      console.log('Total leads:', totalLeads);
+      
       setShowPreview(false);
       setParsedFilesData([]);
       setPreviewData([]);
       toast.success(`Importação concluída! ${totalMetrics} métricas e ${totalLeads} leads adicionados.`);
     } catch (error) {
-      console.error('Error importing data:', error);
-      toast.error('Erro ao importar dados');
+      console.error('=== Erro na importação ===');
+      console.error('Detalhes do erro:', error);
+      toast.error(`Erro ao importar dados: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setProcessing(false);
     }
