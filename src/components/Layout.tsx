@@ -63,10 +63,10 @@ export const Layout = ({ children }: LayoutProps) => {
       <nav className="border-b border-border bg-card/50">
         <div className="container mx-auto px-4">
           <div className="flex gap-1">
-            <NavLink to="/profile" icon={<User className="h-4 w-4" />}>
+            <NavLink to="/profile" icon={<User className="h-4 w-4" />} subtitle="Compilado">
               Perfil
             </NavLink>
-            <NavLink to="/campaigns" icon={<Target className="h-4 w-4" />}>
+            <NavLink to="/campaigns" icon={<Target className="h-4 w-4" />} subtitle="Visão Geral">
               Campanhas
             </NavLink>
             <NavLink to="/" icon={<Users className="h-4 w-4" />}>
