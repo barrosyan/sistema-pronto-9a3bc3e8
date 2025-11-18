@@ -416,10 +416,25 @@ export default function UserSettings() {
       setParsedFilesData([]);
       setPreviewData([]);
       toast.success(`Importação concluída! ${totalMetrics} métricas e ${totalLeads} leads adicionados.`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('=== Erro na importação ===');
       console.error('Detalhes do erro:', error);
-      toast.error(`Erro ao importar dados: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      
+      // Mostrar mensagem de erro detalhada na tela
+      const errorMessage = error?.message || 'Erro desconhecido';
+      const errorCode = error?.code || '';
+      const errorDetails = error?.details || '';
+      
+      let userMessage = 'Erro ao importar dados';
+      if (errorMessage.includes('duplicate key')) {
+        userMessage = 'Alguns dados já existem no banco. Tente limpar os dados antes de importar.';
+      } else if (errorMessage.includes('violates')) {
+        userMessage = `Erro de validação: ${errorMessage}`;
+      } else {
+        userMessage = `${errorMessage}${errorCode ? ` (Código: ${errorCode})` : ''}${errorDetails ? ` - ${errorDetails}` : ''}`;
+      }
+      
+      toast.error(userMessage, { duration: 10000 });
     } finally {
       setProcessing(false);
     }
