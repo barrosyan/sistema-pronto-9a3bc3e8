@@ -295,31 +295,48 @@ export default function UserSettings() {
         const campaignDetailsArray = parsedData.allCampaignDetails || 
           (parsedData.campaignDetails ? [parsedData.campaignDetails] : []);
 
-        console.log('Processando campanhas:', campaignDetailsArray.length);
+        // Extrair nomes únicos de campanhas das métricas também
+        const uniqueCampaignNames = new Set<string>();
+        parsedData.campaignMetrics.forEach(metric => {
+          if (metric.campaignName) {
+            uniqueCampaignNames.add(metric.campaignName);
+          }
+        });
 
-        for (const campaignDetail of campaignDetailsArray) {
-          if (campaignDetail.campaignName) {
-            console.log('Salvando campanha:', campaignDetail.campaignName);
+        // Criar mapa de detalhes por nome de campanha
+        const campaignDetailsMap = new Map<string, typeof campaignDetailsArray[0]>();
+        campaignDetailsArray.forEach(detail => {
+          if (detail.campaignName) {
+            campaignDetailsMap.set(detail.campaignName, detail);
+          }
+        });
 
-            const { error: campaignError } = await supabase
-              .from('campaigns')
-              .upsert({
-                user_id: user.id,
-                name: campaignDetail.campaignName,
-                company: campaignDetail.company || null,
-                profile_name: campaignDetail.profile || null,
-                objective: campaignDetail.objective || null,
-                cadence: campaignDetail.cadence || null,
-                job_titles: campaignDetail.jobTitles || null,
-              }, {
-                onConflict: 'user_id,name',
-                ignoreDuplicates: false
-              });
-            
-            if (campaignError) {
-              console.error('Erro ao upsert campanha:', campaignError);
-              throw campaignError;
-            }
+        console.log('Processando campanhas:', uniqueCampaignNames.size, 'únicas encontradas');
+
+        // Salvar todas as campanhas únicas (com ou sem detalhes completos)
+        for (const campaignName of uniqueCampaignNames) {
+          console.log('Salvando campanha:', campaignName);
+          
+          const details = campaignDetailsMap.get(campaignName);
+
+          const { error: campaignError } = await supabase
+            .from('campaigns')
+            .upsert({
+              user_id: user.id,
+              name: campaignName,
+              company: details?.company || null,
+              profile_name: details?.profile || null,
+              objective: details?.objective || null,
+              cadence: details?.cadence || null,
+              job_titles: details?.jobTitles || null,
+            }, {
+              onConflict: 'user_id,name',
+              ignoreDuplicates: false
+            });
+          
+          if (campaignError) {
+            console.error('Erro ao upsert campanha:', campaignError);
+            throw campaignError;
           }
         }
 
