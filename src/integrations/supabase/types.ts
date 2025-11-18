@@ -157,6 +157,7 @@ export type Database = {
           proposal_value: number | null
           sale_date: string | null
           sale_value: number | null
+          source: string | null
           stand: string | null
           stand_day: string | null
           status: string
@@ -200,6 +201,7 @@ export type Database = {
           proposal_value?: number | null
           sale_date?: string | null
           sale_value?: number | null
+          source?: string | null
           stand?: string | null
           stand_day?: string | null
           status: string
@@ -243,6 +245,7 @@ export type Database = {
           proposal_value?: number | null
           sale_date?: string | null
           sale_value?: number | null
+          source?: string | null
           stand?: string | null
           stand_day?: string | null
           status?: string

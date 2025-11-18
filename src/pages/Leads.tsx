@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Upload, Search, Filter, Users, Edit } from 'lucide-react';
+import { Upload, Search, Filter, Users, Edit, Plus, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
@@ -26,18 +26,25 @@ import { Lead } from '@/types/campaign';
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { parseExcelSheets } from '@/utils/excelSheetParser';
 import { LeadEditDialog } from '@/components/LeadEditDialog';
+import { ManualLeadDialog } from '@/components/ManualLeadDialog';
 
 const ITEMS_PER_PAGE = 20;
 
+type SortField = 'name' | 'position' | 'company' | 'campaign' | 'status' | 'connectionDate';
+type SortOrder = 'asc' | 'desc';
+
 const Leads = () => {
-  const { positiveLeads, negativeLeads, setPositiveLeads, setNegativeLeads, updateLead } = useCampaignData();
+  const { positiveLeads, negativeLeads, setPositiveLeads, setNegativeLeads, updateLead, addPositiveLead } = useCampaignData();
   const allLeads = [...positiveLeads, ...negativeLeads];
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
   const [inputData, setInputData] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -82,11 +89,58 @@ const Leads = () => {
     }
   };
 
-  const filteredLeads = allLeads.filter(lead => 
-    lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lead.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lead.campaign.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleSaveManualLead = async (leadData: Partial<Lead>) => {
+    const newLead: Lead = {
+      id: `manual-${Date.now()}`,
+      campaign: leadData.campaign || '',
+      linkedin: leadData.linkedin || '',
+      name: leadData.name || '',
+      position: leadData.position || '',
+      company: leadData.company || '',
+      status: leadData.status || 'pending',
+      source: leadData.source || 'Manual',
+      ...leadData
+    };
+    
+    await addPositiveLead(newLead);
+    toast.success('Lead adicionado com sucesso!');
+  };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1 inline" />;
+    return sortOrder === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1 inline" />
+      : <ArrowDown className="h-4 w-4 ml-1 inline" />;
+  };
+
+  const filteredLeads = allLeads
+    .filter(lead => 
+      lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.campaign.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      let aValue = a[sortField] || '';
+      let bValue = b[sortField] || '';
+      
+      if (sortField === 'connectionDate') {
+        aValue = a.connectionDate ? new Date(a.connectionDate).getTime().toString() : '0';
+        bValue = b.connectionDate ? new Date(b.connectionDate).getTime().toString() : '0';
+      }
+      
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   const totalPages = Math.ceil(filteredLeads.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -114,10 +168,16 @@ const Leads = () => {
             Acompanhe e classifique seus leads de eventos
           </p>
         </div>
-        <Button onClick={() => document.getElementById('leads-upload')?.click()} disabled={isLoading}>
-          <Upload className="mr-2 h-4 w-4" />
-          {isLoading ? 'Processando...' : 'Importar Leads'}
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setIsManualDialogOpen(true)} variant="outline">
+            <Plus className="mr-2 h-4 w-4" />
+            Adicionar Lead
+          </Button>
+          <Button onClick={() => document.getElementById('leads-upload')?.click()} disabled={isLoading}>
+            <Upload className="mr-2 h-4 w-4" />
+            {isLoading ? 'Processando...' : 'Importar Leads'}
+          </Button>
+        </div>
         <input
           id="leads-upload"
           type="file"
@@ -226,12 +286,43 @@ const Leads = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Cargo</TableHead>
-                    <TableHead>Empresa</TableHead>
-                    <TableHead>Campanha</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Data Conexão</TableHead>
+                    <TableHead 
+                      className="cursor-pointer select-none"
+                      onClick={() => handleSort('name')}
+                    >
+                      Nome {getSortIcon('name')}
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer select-none"
+                      onClick={() => handleSort('position')}
+                    >
+                      Cargo {getSortIcon('position')}
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer select-none"
+                      onClick={() => handleSort('company')}
+                    >
+                      Empresa {getSortIcon('company')}
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer select-none"
+                      onClick={() => handleSort('campaign')}
+                    >
+                      Campanha {getSortIcon('campaign')}
+                    </TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead 
+                      className="cursor-pointer select-none"
+                      onClick={() => handleSort('status')}
+                    >
+                      Status {getSortIcon('status')}
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer select-none"
+                      onClick={() => handleSort('connectionDate')}
+                    >
+                      Data Conexão {getSortIcon('connectionDate')}
+                    </TableHead>
                     <TableHead>LinkedIn</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
@@ -243,6 +334,11 @@ const Leads = () => {
                       <TableCell>{lead.position}</TableCell>
                       <TableCell>{lead.company}</TableCell>
                       <TableCell>{lead.campaign}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {lead.source || 'N/A'}
+                        </Badge>
+                      </TableCell>
                       <TableCell>{getStatusBadge(lead.status)}</TableCell>
                       <TableCell>
                         {lead.connectionDate 
@@ -347,6 +443,12 @@ const Leads = () => {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         onSave={handleSaveLead}
+      />
+
+      <ManualLeadDialog
+        open={isManualDialogOpen}
+        onOpenChange={setIsManualDialogOpen}
+        onSave={handleSaveManualLead}
       />
     </div>
   );

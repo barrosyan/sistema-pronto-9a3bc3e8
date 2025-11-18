@@ -34,6 +34,7 @@ export interface Lead {
   position: string;
   company: string;
   status: 'positive' | 'negative' | 'pending';
+  source?: string;
   
   // Connection data
   connectionDate?: string;

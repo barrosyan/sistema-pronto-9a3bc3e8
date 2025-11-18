@@ -141,25 +141,35 @@ function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Le
     const lastName = normalizeAndValidate(row['Last Name']);
     const fullName = `${firstName} ${lastName}`.trim();
     
-    // Tentar extrair data de conexão de múltiplos campos possíveis
+    // Extrair data de conexão de "Sequence Generated At" (prioridade) ou "Connected At"
     let connectionDate: string | null = null;
     
-    // Verificar campo "Connected At" direto
-    if (row['Connected At']) {
+    // Prioridade 1: Sequence Generated At
+    if (row['Sequence Generated At']) {
+      const parsedDate = new Date(row['Sequence Generated At']);
+      if (!isNaN(parsedDate.getTime())) {
+        connectionDate = parsedDate.toISOString();
+      }
+    }
+    
+    // Fallback: Connected At
+    if (!connectionDate && row['Connected At']) {
       const parsedDate = new Date(row['Connected At']);
       if (!isNaN(parsedDate.getTime())) {
         connectionDate = parsedDate.toISOString();
       }
     }
     
-    // Verificar campos que podem conter informações de conexão
-    const possibleFields = ['Messages Sent', 'Status', 'Notes', 'Comments'];
-    for (const field of possibleFields) {
-      if (row[field] && !connectionDate) {
-        const extracted = extractConnectionDate(row[field]);
-        if (extracted) {
-          connectionDate = extracted;
-          break;
+    // Fallback: Tentar extrair de outros campos
+    if (!connectionDate) {
+      const possibleFields = ['Messages Sent', 'Status', 'Notes', 'Comments'];
+      for (const field of possibleFields) {
+        if (row[field]) {
+          const extracted = extractConnectionDate(row[field]);
+          if (extracted) {
+            connectionDate = extracted;
+            break;
+          }
         }
       }
     }
@@ -170,6 +180,7 @@ function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Le
       fullName,
       company: row.Company,
       position: row.Position,
+      sequenceGeneratedAt: row['Sequence Generated At'],
       connectionDate
     });
     
@@ -194,7 +205,8 @@ function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Le
       followUp3Comments: '',
       followUp4Date: null,
       followUp4Comments: '',
-      observations: `Messages Sent: ${row['Messages Sent by Kontax'] || 0}, Received: ${row['Messages Received by the lead'] || 0}, Connected: ${row['Connected At'] || 'N/A'}`,
+      observations: `Sequence Generated At: ${row['Sequence Generated At'] || 'N/A'}, Messages Sent: ${row['Messages Sent by Kontax'] || 0}, Received: ${row['Messages Received by the lead'] || 0}`,
+      source: 'Kontax',
       meetingScheduleDate: null,
       meetingDate: null,
       proposalDate: null,
