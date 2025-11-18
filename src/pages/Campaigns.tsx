@@ -51,6 +51,7 @@ export default function Campaigns() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedCampaignDetails, setSelectedCampaignDetails] = useState<any>(null);
   const [campaignsData, setCampaignsData] = useState<Record<string, any>>({});
+  const [calendarView, setCalendarView] = useState<'dates' | 'week-numbers'>('dates');
 
   useEffect(() => {
     loadFromDatabase();
@@ -257,6 +258,57 @@ export default function Campaigns() {
     return { ...totals, acceptanceRate };
   };
 
+  // Get data organized by week number for comparison
+  const getWeekNumberComparisonData = () => {
+    if (selectedCampaigns.length === 0) return [];
+    
+    // For each campaign, get their weeks and assign week numbers
+    const campaignWeekNumbers = new Map<string, WeeklyData[]>();
+    let maxWeeks = 0;
+    
+    selectedCampaigns.forEach(campaign => {
+      const weeks = getWeeklyDataForCampaign(campaign);
+      campaignWeekNumbers.set(campaign, weeks);
+      maxWeeks = Math.max(maxWeeks, weeks.length);
+    });
+    
+    // Create comparison data by week number
+    const comparisonData = [];
+    for (let weekNum = 1; weekNum <= maxWeeks; weekNum++) {
+      const row: any = { 
+        weekNumber: weekNum,
+        weekLabel: `${weekNum}ª Semana`
+      };
+      
+      selectedCampaigns.forEach(campaign => {
+        const weeks = campaignWeekNumbers.get(campaign) || [];
+        const weekData = weeks[weekNum - 1]; // 0-indexed
+        
+        if (weekData) {
+          row[`${campaign}_invitations`] = weekData.invitations;
+          row[`${campaign}_connections`] = weekData.connections;
+          row[`${campaign}_messages`] = weekData.messages;
+          row[`${campaign}_visits`] = weekData.visits;
+          row[`${campaign}_positiveResponses`] = weekData.positiveResponses;
+          row[`${campaign}_meetings`] = weekData.meetings;
+          row[`${campaign}_activeDays`] = weekData.activeDays;
+        } else {
+          row[`${campaign}_invitations`] = 0;
+          row[`${campaign}_connections`] = 0;
+          row[`${campaign}_messages`] = 0;
+          row[`${campaign}_visits`] = 0;
+          row[`${campaign}_positiveResponses`] = 0;
+          row[`${campaign}_meetings`] = 0;
+          row[`${campaign}_activeDays`] = 0;
+        }
+      });
+      
+      comparisonData.push(row);
+    }
+    
+    return comparisonData;
+  };
+
   const combinedData = getCombinedData();
   
   // Get pivot table data for all selected campaigns
@@ -312,8 +364,11 @@ export default function Campaigns() {
         });
     }
   };
-
-  const pivotData = getPivotTableData();
+  
+  // Determine which data to show based on calendar view
+  const pivotData = calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly'
+    ? getWeekNumberComparisonData()
+    : getPivotTableData();
   const totalPages = Math.ceil(pivotData.length / itemsPerPage);
   const paginatedData = pivotData.slice(
     (currentPage - 1) * itemsPerPage,
@@ -380,21 +435,44 @@ export default function Campaigns() {
         </CardContent>
       </Card>
 
-      {/* Granularity Selection */}
+      {/* Granularity and Calendar View Selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Granularidade de Dados</CardTitle>
+          <CardTitle>Opções de Visualização</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Select value={granularity} onValueChange={(v) => setGranularity(v as 'daily' | 'weekly')}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="daily">Diário</SelectItem>
-              <SelectItem value="weekly">Semanal</SelectItem>
-            </SelectContent>
-          </Select>
+        <CardContent className="space-y-4">
+          <div>
+            <Label className="mb-2 block">Granularidade de Dados</Label>
+            <Select value={granularity} onValueChange={(v) => setGranularity(v as 'daily' | 'weekly')}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily">Diário</SelectItem>
+                <SelectItem value="weekly">Semanal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {selectedCampaigns.length > 1 && granularity === 'weekly' && (
+            <div>
+              <Label className="mb-2 block">Visualização de Calendário</Label>
+              <Select value={calendarView} onValueChange={(v) => setCalendarView(v as 'dates' | 'week-numbers')}>
+                <SelectTrigger className="w-[250px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dates">Por Datas</SelectItem>
+                  <SelectItem value="week-numbers">Por Número de Semana</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground mt-1">
+                {calendarView === 'dates' 
+                  ? 'Mostra as semanas com suas datas específicas' 
+                  : 'Compara campanhas por posição da semana (1ª semana, 2ª semana, etc)'}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -614,8 +692,18 @@ export default function Campaigns() {
           {/* Pivot Table View */}
           <Card>
             <CardHeader>
-              <CardTitle>Tabela Comparativa - {granularity === 'daily' ? 'Dados Diários' : 'Dados Semanais'}</CardTitle>
-              <CardDescription>Visualização consolidada de todas as campanhas selecionadas</CardDescription>
+              <CardTitle>
+                Tabela Comparativa - {
+                  calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly'
+                    ? 'Por Número de Semana'
+                    : granularity === 'daily' ? 'Dados Diários' : 'Dados Semanais'
+                }
+              </CardTitle>
+              <CardDescription>
+                {calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly'
+                  ? 'Comparação de campanhas por posição da semana (1ª semana, 2ª semana, etc)'
+                  : 'Visualização consolidada de todas as campanhas selecionadas'}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -623,7 +711,9 @@ export default function Campaigns() {
                   <thead>
                     <tr className="border-b-2 border-border">
                       <th className="text-left p-3 text-sm font-semibold sticky left-0 bg-card z-10">
-                        {granularity === 'daily' ? 'Data' : 'Semana'}
+                        {calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly'
+                          ? 'Semana'
+                          : granularity === 'daily' ? 'Data' : 'Semana'}
                       </th>
                       {selectedCampaigns.map(campaign => (
                         <th key={campaign} colSpan={granularity === 'daily' ? 5 : 6} className="text-center p-3 text-sm font-semibold border-l border-border">
@@ -635,7 +725,11 @@ export default function Campaigns() {
                       <th className="text-left p-2 text-xs font-medium sticky left-0 bg-muted/50 z-10"></th>
                       {selectedCampaigns.map(campaign => (
                         <React.Fragment key={campaign}>
-                          <th className="text-center p-2 text-xs font-medium border-l border-border">Status</th>
+                          <th className="text-center p-2 text-xs font-medium border-l border-border">
+                            {calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly' 
+                              ? 'Dias Ativos' 
+                              : 'Status'}
+                          </th>
                           <th className="text-center p-2 text-xs font-medium">Convites</th>
                           <th className="text-center p-2 text-xs font-medium">Conexões</th>
                           <th className="text-center p-2 text-xs font-medium">Mensagens</th>
@@ -649,10 +743,13 @@ export default function Campaigns() {
                     {paginatedData.map((row, idx) => (
                       <tr key={idx} className="border-b border-border/50 hover:bg-muted/30">
                         <td className="p-2 text-sm font-medium sticky left-0 bg-card z-10">
-                          {granularity === 'daily' ? row.date : row.week}
+                          {calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly'
+                            ? row.weekLabel
+                            : granularity === 'daily' ? row.date : row.week}
                         </td>
                         {selectedCampaigns.map(campaign => {
                           const status = row[`${campaign}_status`];
+                          const activeDays = row[`${campaign}_activeDays`];
                           const isActive = granularity === 'daily' 
                             ? status === 'Ativo' 
                             : status && status !== '0/0';
@@ -660,7 +757,9 @@ export default function Campaigns() {
                           return (
                             <React.Fragment key={campaign}>
                               <td className="p-2 text-center border-l border-border">
-                                {granularity === 'daily' ? (
+                                {calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly' ? (
+                                  <span className="text-sm">{activeDays || 0}</span>
+                                ) : granularity === 'daily' ? (
                                   <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
                                     {status}
                                   </Badge>
