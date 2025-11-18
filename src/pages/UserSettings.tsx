@@ -256,6 +256,26 @@ export default function UserSettings() {
     }
   };
 
+  const clearAllData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Usuário não autenticado');
+        return;
+      }
+
+      // Delete all user data
+      await supabase.from('campaign_metrics').delete().eq('user_id', user.id);
+      await supabase.from('leads').delete().eq('user_id', user.id);
+      await supabase.from('campaigns').delete().eq('user_id', user.id);
+
+      toast.success('Todos os dados foram limpos com sucesso');
+    } catch (error) {
+      console.error('Erro ao limpar dados:', error);
+      toast.error('Erro ao limpar dados do banco');
+    }
+  };
+
   const confirmImport = async () => {
     console.log('=== Iniciando importação ===');
     console.log('Arquivos parseados:', parsedFilesData.length);
@@ -346,20 +366,17 @@ export default function UserSettings() {
 
           const { error: metricsError } = await supabase
             .from('campaign_metrics')
-            .insert(metricsToInsert);
+            .upsert(metricsToInsert, {
+              onConflict: 'user_id,campaign_name,event_type,profile_name',
+              ignoreDuplicates: false
+            });
 
           if (metricsError) {
-            // Ignorar erros de duplicata (código 23505)
-            if (metricsError.code === '23505') {
-              console.log('Algumas métricas já existem e foram ignoradas');
-            } else {
-              console.error('Erro ao inserir métricas:', metricsError);
-              throw metricsError;
-            }
-          } else {
-            console.log('Métricas inseridas com sucesso');
-            totalMetrics += parsedData.campaignMetrics.length;
+            console.error('Erro ao inserir métricas:', metricsError);
+            throw metricsError;
           }
+          console.log('Métricas inseridas/atualizadas com sucesso');
+          totalMetrics += parsedData.campaignMetrics.length;
         }
 
 
@@ -374,20 +391,17 @@ export default function UserSettings() {
 
           const { error: leadsError } = await supabase
             .from('leads')
-            .insert(leadsToInsert);
+            .upsert(leadsToInsert, {
+              onConflict: 'user_id,campaign,name',
+              ignoreDuplicates: false
+            });
 
           if (leadsError) {
-            // Ignorar erros de duplicata (código 23505)
-            if (leadsError.code === '23505') {
-              console.log('Alguns leads positivos já existem e foram ignorados');
-            } else {
-              console.error('Erro ao inserir leads positivos:', leadsError);
-              throw leadsError;
-            }
-          } else {
-            console.log('Leads positivos inseridos com sucesso');
-            totalLeads += leadsToInsert.length;
+            console.error('Erro ao inserir leads positivos:', leadsError);
+            throw leadsError;
           }
+          console.log('Leads positivos inseridos/atualizados com sucesso');
+          totalLeads += leadsToInsert.length;
         }
 
 
@@ -402,20 +416,17 @@ export default function UserSettings() {
 
           const { error: leadsError } = await supabase
             .from('leads')
-            .insert(leadsToInsert);
+            .upsert(leadsToInsert, {
+              onConflict: 'user_id,campaign,name',
+              ignoreDuplicates: false
+            });
 
           if (leadsError) {
-            // Ignorar erros de duplicata (código 23505)
-            if (leadsError.code === '23505') {
-              console.log('Alguns leads negativos já existem e foram ignorados');
-            } else {
-              console.error('Erro ao inserir leads negativos:', leadsError);
-              throw leadsError;
-            }
-          } else {
-            console.log('Leads negativos inseridos com sucesso');
-            totalLeads += leadsToInsert.length;
+            console.error('Erro ao inserir leads negativos:', leadsError);
+            throw leadsError;
           }
+          console.log('Leads negativos inseridos/atualizados com sucesso');
+          totalLeads += leadsToInsert.length;
         }
       }
 
@@ -495,15 +506,26 @@ export default function UserSettings() {
                 {uploading ? 'Enviando...' : 'Fazer Upload'}
               </Button>
               {files.length > 0 && (
-                <Button
-                  onClick={processAllFiles}
-                  disabled={uploading || processing}
-                  variant="default"
-                  className="w-full sm:w-auto"
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  {processing ? 'Processando...' : 'Processar Todos os Arquivos'}
-                </Button>
+                <>
+                  <Button
+                    onClick={processAllFiles}
+                    disabled={uploading || processing}
+                    variant="default"
+                    className="w-full sm:w-auto"
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    {processing ? 'Processando...' : 'Processar Todos os Arquivos'}
+                  </Button>
+                  <Button
+                    onClick={clearAllData}
+                    disabled={uploading || processing}
+                    variant="destructive"
+                    className="w-full sm:w-auto"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Limpar Banco de Dados
+                  </Button>
+                </>
               )}
             </div>
 
