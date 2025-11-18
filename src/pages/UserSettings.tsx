@@ -424,7 +424,23 @@ export default function UserSettings() {
         if (parsedData.positiveLeads.length > 0) {
           console.log('Processando leads positivos:', parsedData.positiveLeads.length);
           
-          const leadsToInsert = parsedData.positiveLeads.map(lead => ({
+          // Deduplicate leads with the same key
+          const leadsMap = new Map<string, typeof parsedData.positiveLeads[0]>();
+          
+          parsedData.positiveLeads.forEach(lead => {
+            const key = `${lead.campaign}|${lead.name}`;
+            
+            if (leadsMap.has(key)) {
+              console.log(`Lead duplicado encontrado: ${key}, mantendo o primeiro`);
+            } else {
+              leadsMap.set(key, lead);
+            }
+          });
+          
+          const uniqueLeads = Array.from(leadsMap.values());
+          console.log(`Leads após deduplicação: ${uniqueLeads.length} (original: ${parsedData.positiveLeads.length})`);
+          
+          const leadsToInsert = uniqueLeads.map(lead => ({
             user_id: user.id,
             campaign: lead.campaign,
             linkedin: lead.linkedin,
@@ -474,14 +490,30 @@ export default function UserSettings() {
             throw leadsError;
           }
           console.log('Leads positivos inseridos/atualizados com sucesso');
-          totalLeads += leadsToInsert.length;
+          totalLeads += uniqueLeads.length;
         }
 
 
         if (parsedData.negativeLeads.length > 0) {
           console.log('Processando leads negativos:', parsedData.negativeLeads.length);
           
-          const leadsToInsert = parsedData.negativeLeads.map(lead => ({
+          // Deduplicate leads with the same key
+          const negLeadsMap = new Map<string, typeof parsedData.negativeLeads[0]>();
+          
+          parsedData.negativeLeads.forEach(lead => {
+            const key = `${lead.campaign}|${lead.name}`;
+            
+            if (negLeadsMap.has(key)) {
+              console.log(`Lead negativo duplicado encontrado: ${key}, mantendo o primeiro`);
+            } else {
+              negLeadsMap.set(key, lead);
+            }
+          });
+          
+          const uniqueNegLeads = Array.from(negLeadsMap.values());
+          console.log(`Leads negativos após deduplicação: ${uniqueNegLeads.length} (original: ${parsedData.negativeLeads.length})`);
+          
+          const leadsToInsert = uniqueNegLeads.map(lead => ({
             user_id: user.id,
             campaign: lead.campaign,
             linkedin: lead.linkedin,
@@ -516,7 +548,7 @@ export default function UserSettings() {
             throw leadsError;
           }
           console.log('Leads negativos inseridos/atualizados com sucesso');
-          totalLeads += leadsToInsert.length;
+          totalLeads += uniqueNegLeads.length;
         }
       }
 
