@@ -300,54 +300,25 @@ export default function UserSettings() {
         for (const campaignDetail of campaignDetailsArray) {
           if (campaignDetail.campaignName) {
             console.log('Salvando campanha:', campaignDetail.campaignName);
-            
-            const { data: existingCampaign, error: selectError } = await supabase
+
+            const { error: campaignError } = await supabase
               .from('campaigns')
-              .select('id')
-              .eq('user_id', user.id)
-              .eq('name', campaignDetail.campaignName)
-              .maybeSingle();
-
-            if (selectError) {
-              console.error('Erro ao buscar campanha existente:', selectError);
-              throw selectError;
-            }
-
-            if (existingCampaign) {
-              console.log('Atualizando campanha existente:', campaignDetail.campaignName);
-              const { error: updateError } = await supabase
-                .from('campaigns')
-                .update({
-                  company: campaignDetail.company || null,
-                  profile_name: campaignDetail.profile || null,
-                  objective: campaignDetail.objective || null,
-                  cadence: campaignDetail.cadence || null,
-                  job_titles: campaignDetail.jobTitles || null,
-                })
-                .eq('id', existingCampaign.id);
-              
-              if (updateError) {
-                console.error('Erro ao atualizar campanha:', updateError);
-                throw updateError;
-              }
-            } else {
-              console.log('Inserindo nova campanha:', campaignDetail.campaignName);
-              const { error: insertError } = await supabase
-                .from('campaigns')
-                .insert({
-                  user_id: user.id,
-                  name: campaignDetail.campaignName,
-                  company: campaignDetail.company || null,
-                  profile_name: campaignDetail.profile || null,
-                  objective: campaignDetail.objective || null,
-                  cadence: campaignDetail.cadence || null,
-                  job_titles: campaignDetail.jobTitles || null,
-                });
-              
-              if (insertError) {
-                console.error('Erro ao inserir campanha:', insertError);
-                throw insertError;
-              }
+              .upsert({
+                user_id: user.id,
+                name: campaignDetail.campaignName,
+                company: campaignDetail.company || null,
+                profile_name: campaignDetail.profile || null,
+                objective: campaignDetail.objective || null,
+                cadence: campaignDetail.cadence || null,
+                job_titles: campaignDetail.jobTitles || null,
+              }, {
+                onConflict: 'user_id,name',
+                ignoreDuplicates: false
+              });
+            
+            if (campaignError) {
+              console.error('Erro ao upsert campanha:', campaignError);
+              throw campaignError;
             }
           }
         }
