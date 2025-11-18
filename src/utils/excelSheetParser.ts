@@ -16,6 +16,7 @@ export interface ExcelSheetData {
   positiveLeads: Lead[];
   negativeLeads: Lead[];
   campaignDetails?: CampaignDetails;
+  allCampaignDetails?: CampaignDetails[]; // Array com detalhes de todas as campanhas encontradas
 }
 
 // Função para normalizar e validar strings
@@ -27,6 +28,49 @@ function normalizeAndValidate(value: any): string {
 // Função para verificar se uma string é válida (não vazia após trim)
 function isValidString(value: string): boolean {
   return value.length > 0;
+}
+
+// Helper function to extract campaign details from a sheet looking for "Dados da campanha" section
+function extractCampaignDetailsFromSheet(sheet: XLSX.WorkSheet): CampaignDetails | null {
+  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+  
+  // Find the row with "Dados da campanha"
+  const campaignDataRowIndex = data.findIndex(row => 
+    row && row.some((cell: any) => 
+      typeof cell === 'string' && cell.toLowerCase().includes('dados da campanha')
+    )
+  );
+  
+  if (campaignDataRowIndex === -1) return null;
+  
+  // Extract details from rows after "Dados da campanha"
+  const details: CampaignDetails = {};
+  
+  for (let i = campaignDataRowIndex + 1; i < Math.min(campaignDataRowIndex + 10, data.length); i++) {
+    const row = data[i];
+    if (!row || row.length < 2) continue;
+    
+    const label = String(row[0] || '').trim();
+    const value = String(row[1] || '').trim();
+    
+    if (!label || !value) continue;
+    
+    if (label.toLowerCase().includes('empresa') || label.toLowerCase() === 'company') {
+      details.company = value;
+    } else if (label.toLowerCase().includes('perfil') || label.toLowerCase() === 'profile') {
+      details.profile = value;
+    } else if (label.toLowerCase().includes('campanha') && !label.toLowerCase().includes('objetivo')) {
+      details.campaignName = value;
+    } else if (label.toLowerCase().includes('objetivo')) {
+      details.objective = value;
+    } else if (label.toLowerCase().includes('cadência') || label.toLowerCase().includes('cadence')) {
+      details.cadence = value;
+    } else if (label.toLowerCase().includes('cargos')) {
+      details.jobTitles = value;
+    }
+  }
+  
+  return Object.keys(details).length > 0 ? details : null;
 }
 
 export async function parseExcelSheets(file: File | string): Promise<ExcelSheetData> {
@@ -71,6 +115,22 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
   const positiveLeads: Lead[] = [];
   const negativeLeads: Lead[] = [];
   let campaignDetails: CampaignDetails | undefined;
+  
+  // Try to extract campaign details from each sheet
+  const allCampaignDetails: CampaignDetails[] = [];
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const details = extractCampaignDetailsFromSheet(sheet);
+    if (details) {
+      console.log(`Detalhes de campanha encontrados na aba "${sheetName}":`, details);
+      allCampaignDetails.push(details);
+    }
+  }
+  
+  console.log(`Total de ${allCampaignDetails.length} campanhas encontradas no arquivo`);
+  if (allCampaignDetails.length > 0) {
+    console.log('Campanhas:', allCampaignDetails.map(d => d.campaignName).join(', '));
+  }
 
   // Parse Input sheet (campaign metrics)
   const inputSheetName = workbook.SheetNames.find(
@@ -218,6 +278,7 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
     campaignMetrics,
     positiveLeads,
     negativeLeads,
-    campaignDetails,
+    campaignDetails: allCampaignDetails.length > 0 ? allCampaignDetails[0] : undefined,
+    allCampaignDetails,
   };
 }
