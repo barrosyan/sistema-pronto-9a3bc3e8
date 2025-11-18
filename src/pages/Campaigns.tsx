@@ -414,8 +414,8 @@ export default function Campaigns() {
       {/* Campaign Selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Selecionar Campanhas para Análise</CardTitle>
-          <CardDescription>Selecione uma ou mais campanhas para visualizar e comparar</CardDescription>
+          <CardTitle>Campanhas Ativas</CardTitle>
+          <CardDescription>Campanhas encontradas nos dados importados</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -434,6 +434,45 @@ export default function Campaigns() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Campaign Details */}
+      {selectedCampaigns.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {selectedCampaigns.map(campaign => {
+            const details = campaignsData[campaign];
+            return (
+              <Card key={campaign}>
+                <CardHeader>
+                  <CardTitle className="text-base">{campaign}</CardTitle>
+                  <CardDescription>Detalhes da Campanha</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Empresa</p>
+                    <p className="text-sm font-medium">{details?.company || 'Não informado'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Perfil</p>
+                    <p className="text-sm font-medium">{details?.profile || 'Não informado'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Objetivo da Campanha</p>
+                    <p className="text-sm font-medium">{details?.objective || 'Não informado'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Cadência</p>
+                    <p className="text-sm font-medium">{details?.cadence || 'Não informado'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Cargos na Pesquisa</p>
+                    <p className="text-sm font-medium">{details?.jobTitles || 'Não informado'}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* Granularity and Calendar View Selection */}
       <Card>
