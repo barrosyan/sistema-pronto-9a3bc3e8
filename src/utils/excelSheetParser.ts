@@ -2,10 +2,20 @@ import * as XLSX from 'xlsx';
 import { CampaignMetrics, Lead } from '@/types/campaign';
 import { parseCampaignFile } from './campaignParser';
 
+export interface CampaignDetails {
+  company?: string;
+  profile?: string;
+  campaignName?: string;
+  objective?: string;
+  cadence?: string;
+  jobTitles?: string;
+}
+
 export interface ExcelSheetData {
   campaignMetrics: CampaignMetrics[];
   positiveLeads: Lead[];
   negativeLeads: Lead[];
+  campaignDetails?: CampaignDetails;
 }
 
 // Função para normalizar e validar strings
@@ -60,6 +70,7 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
   const campaignMetrics: CampaignMetrics[] = [];
   const positiveLeads: Lead[] = [];
   const negativeLeads: Lead[] = [];
+  let campaignDetails: CampaignDetails | undefined;
 
   // Parse Input sheet (campaign metrics)
   const inputSheetName = workbook.SheetNames.find(
@@ -69,6 +80,19 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
   if (inputSheetName) {
     const sheet = workbook.Sheets[inputSheetName];
     const data = XLSX.utils.sheet_to_json(sheet) as any[];
+    
+    // Extract campaign details from first row if available
+    if (data.length > 0) {
+      const firstRow = data[0];
+      campaignDetails = {
+        company: normalizeAndValidate(firstRow['Empresa'] || firstRow['Company']),
+        profile: normalizeAndValidate(firstRow['Perfil'] || firstRow['Profile'] || firstRow['Profile Name']),
+        campaignName: normalizeAndValidate(firstRow['Campanha'] || firstRow['Campaign'] || firstRow['Campaign Name']),
+        objective: normalizeAndValidate(firstRow['Objetivo da Campanha'] || firstRow['Campaign Objective'] || firstRow['Objective']),
+        cadence: normalizeAndValidate(firstRow['Cadência'] || firstRow['Cadence']),
+        jobTitles: normalizeAndValidate(firstRow['Cargos na Pesquisa'] || firstRow['Target Job Titles'] || firstRow['Job Titles']),
+      };
+    }
     
     data.forEach(row => {
       const campaignName = normalizeAndValidate(row['Campaign Name']);
@@ -194,5 +218,6 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
     campaignMetrics,
     positiveLeads,
     negativeLeads,
+    campaignDetails,
   };
 }
