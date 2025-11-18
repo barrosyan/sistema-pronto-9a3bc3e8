@@ -6,9 +6,10 @@ interface NavLinkProps {
   to: string;
   children: ReactNode;
   icon?: ReactNode;
+  subtitle?: string;
 }
 
-export const NavLink = ({ to, children, icon }: NavLinkProps) => {
+export const NavLink = ({ to, children, icon, subtitle }: NavLinkProps) => {
   const location = useLocation();
   const isActive = location.pathname === to;
 
@@ -23,7 +24,14 @@ export const NavLink = ({ to, children, icon }: NavLinkProps) => {
       )}
     >
       {icon}
-      {children}
+      <div className="flex flex-col">
+        <span>{children}</span>
+        {subtitle && (
+          <span className="text-xs font-normal opacity-70">
+            {subtitle}
+          </span>
+        )}
+      </div>
     </Link>
   );
 };
