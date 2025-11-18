@@ -214,6 +214,43 @@ export default function UserSettings() {
           // Parse file
           const parsedData = await parseExcelSheets(file);
 
+          // Insert or update campaign details if available
+          if (parsedData.campaignDetails && parsedData.campaignDetails.campaignName) {
+            const { data: existingCampaign } = await supabase
+              .from('campaigns')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('name', parsedData.campaignDetails.campaignName)
+              .single();
+
+            if (existingCampaign) {
+              // Update existing campaign
+              await supabase
+                .from('campaigns')
+                .update({
+                  company: parsedData.campaignDetails.company || null,
+                  profile_name: parsedData.campaignDetails.profile || null,
+                  objective: parsedData.campaignDetails.objective || null,
+                  cadence: parsedData.campaignDetails.cadence || null,
+                  job_titles: parsedData.campaignDetails.jobTitles || null,
+                })
+                .eq('id', existingCampaign.id);
+            } else {
+              // Insert new campaign
+              await supabase
+                .from('campaigns')
+                .insert({
+                  user_id: user.id,
+                  name: parsedData.campaignDetails.campaignName,
+                  company: parsedData.campaignDetails.company || null,
+                  profile_name: parsedData.campaignDetails.profile || null,
+                  objective: parsedData.campaignDetails.objective || null,
+                  cadence: parsedData.campaignDetails.cadence || null,
+                  job_titles: parsedData.campaignDetails.jobTitles || null,
+                });
+            }
+          }
+
           // Insert campaign metrics
           if (parsedData.campaignMetrics.length > 0) {
             const metricsToInsert = parsedData.campaignMetrics.map(metric => ({

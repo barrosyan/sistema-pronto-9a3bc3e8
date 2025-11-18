@@ -53,6 +53,7 @@ export type Database = {
       campaigns: {
         Row: {
           cadence: string | null
+          company: string | null
           created_at: string | null
           id: string
           job_titles: string | null
@@ -64,6 +65,7 @@ export type Database = {
         }
         Insert: {
           cadence?: string | null
+          company?: string | null
           created_at?: string | null
           id?: string
           job_titles?: string | null
@@ -75,6 +77,7 @@ export type Database = {
         }
         Update: {
           cadence?: string | null
+          company?: string | null
           created_at?: string | null
           id?: string
           job_titles?: string | null

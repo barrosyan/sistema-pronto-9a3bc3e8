@@ -10,7 +10,9 @@ import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { CampaignDetailsDialog } from '@/components/CampaignDetailsDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DailyData {
   date: string;
@@ -46,10 +48,34 @@ export default function Campaigns() {
   const [granularity, setGranularity] = useState<'daily' | 'weekly'>('weekly');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedCampaignDetails, setSelectedCampaignDetails] = useState<any>(null);
+  const [campaignsData, setCampaignsData] = useState<Record<string, any>>({});
 
   useEffect(() => {
     loadFromDatabase();
+    loadCampaignDetails();
   }, [loadFromDatabase]);
+
+  const loadCampaignDetails = async () => {
+    const { data, error } = await supabase
+      .from('campaigns')
+      .select('*');
+    
+    if (data && !error) {
+      const campaignsMap = data.reduce((acc, campaign) => {
+        acc[campaign.name] = {
+          company: campaign.company,
+          profile: campaign.profile_name,
+          objective: campaign.objective,
+          cadence: campaign.cadence,
+          jobTitles: campaign.job_titles,
+        };
+        return acc;
+      }, {} as Record<string, any>);
+      setCampaignsData(campaignsMap);
+    }
+  };
 
   // Extract unique campaigns
   const allCampaigns = Array.from(new Set(campaignMetrics.map(m => m.campaignName).filter(Boolean)));
@@ -691,6 +717,15 @@ export default function Campaigns() {
             </CardContent>
           </Card>
         </>
+      )}
+
+      {selectedCampaignDetails && (
+        <CampaignDetailsDialog
+          open={detailsDialogOpen}
+          onOpenChange={setDetailsDialogOpen}
+          campaignName={selectedCampaignDetails.name}
+          details={selectedCampaignDetails}
+        />
       )}
     </div>
   );
