@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { parseExcelSheets } from '@/utils/excelSheetParser';
 import DataImportPreview, { FilePreviewData } from '@/components/DataImportPreview';
+import { useCampaignData } from '@/hooks/useCampaignData';
 
 type FileUpload = {
   id: string;
@@ -19,6 +20,7 @@ type FileUpload = {
 };
 
 export default function UserSettings() {
+  const { loadFromDatabase } = useCampaignData();
   const [files, setFiles] = useState<FileUpload[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -483,6 +485,10 @@ export default function UserSettings() {
       console.log('=== Importação concluída ===');
       console.log('Total métricas:', totalMetrics);
       console.log('Total leads:', totalLeads);
+      
+      // Reload data in the frontend
+      await loadFromDatabase();
+      console.log('Dados recarregados no frontend');
       
       setShowPreview(false);
       setParsedFilesData([]);
