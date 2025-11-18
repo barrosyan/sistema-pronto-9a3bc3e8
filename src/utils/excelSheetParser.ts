@@ -79,7 +79,6 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
     const fileName = file.name.toLowerCase();
     if (fileName.endsWith('.csv')) {
       console.log('Detectado arquivo CSV, usando parser específico');
-      // Usar o parser de CSV que suporta formato Kontax
       const parsedData = await parseCampaignFile(file);
       console.log('Dados parseados do CSV:', {
         metrics: parsedData.metrics.length,
@@ -87,11 +86,9 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
         sampleLead: parsedData.leads[0]
       });
       
-      // Os leads do Kontax vêm com status 'pending', vamos classificá-los como positivos por padrão
-      // O usuário pode reclassificá-los depois
       return {
         campaignMetrics: parsedData.metrics,
-        positiveLeads: parsedData.leads, // Todos os leads importados vão para positivos por padrão
+        positiveLeads: parsedData.leads,
         negativeLeads: [],
       };
     }
@@ -101,178 +98,276 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
   let workbook: XLSX.WorkBook;
 
   if (typeof file === 'string') {
-    // Load from URL
     const response = await fetch(file);
     const arrayBuffer = await response.arrayBuffer();
     workbook = XLSX.read(arrayBuffer, { type: 'array' });
   } else {
-    // Load from File object
     const arrayBuffer = await file.arrayBuffer();
     workbook = XLSX.read(arrayBuffer, { type: 'array' });
   }
 
+  console.log('Abas encontradas no Excel:', workbook.SheetNames);
+
   const campaignMetrics: CampaignMetrics[] = [];
   const positiveLeads: Lead[] = [];
   const negativeLeads: Lead[] = [];
-  let campaignDetails: CampaignDetails | undefined;
-  
-  // Try to extract campaign details from each sheet
   const allCampaignDetails: CampaignDetails[] = [];
+  
+  // Process each sheet based on its name pattern
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName];
+    const normalizedName = sheetName.toLowerCase();
+    
+    console.log(`Processando aba: ${sheetName}`);
+    
+    // Extract campaign details from sheets with "Dados da campanha"
     const details = extractCampaignDetailsFromSheet(sheet);
     if (details) {
       console.log(`Detalhes de campanha encontrados na aba "${sheetName}":`, details);
       allCampaignDetails.push(details);
     }
-  }
-  
-  console.log(`Total de ${allCampaignDetails.length} campanhas encontradas no arquivo`);
-  if (allCampaignDetails.length > 0) {
-    console.log('Campanhas:', allCampaignDetails.map(d => d.campaignName).join(', '));
-  }
-
-  // Parse Input sheet (campaign metrics)
-  const inputSheetName = workbook.SheetNames.find(
-    name => name.toLowerCase() === 'input' || name.toLowerCase().includes('input')
-  );
-
-  if (inputSheetName) {
-    const sheet = workbook.Sheets[inputSheetName];
-    const data = XLSX.utils.sheet_to_json(sheet) as any[];
     
-    // Extract campaign details from first row if available
-    if (data.length > 0) {
-      const firstRow = data[0];
-      campaignDetails = {
-        company: normalizeAndValidate(firstRow['Empresa'] || firstRow['Company']),
-        profile: normalizeAndValidate(firstRow['Perfil'] || firstRow['Profile'] || firstRow['Profile Name']),
-        campaignName: normalizeAndValidate(firstRow['Campanha'] || firstRow['Campaign'] || firstRow['Campaign Name']),
-        objective: normalizeAndValidate(firstRow['Objetivo da Campanha'] || firstRow['Campaign Objective'] || firstRow['Objective']),
-        cadence: normalizeAndValidate(firstRow['Cadência'] || firstRow['Cadence']),
-        jobTitles: normalizeAndValidate(firstRow['Cargos na Pesquisa'] || firstRow['Target Job Titles'] || firstRow['Job Titles']),
-      };
+    // Parse "Input" sheet - campaign metrics
+    if (normalizedName === 'input' || normalizedName.includes('input')) {
+      console.log('Processando aba Input para métricas de campanha');
+      const data = XLSX.utils.sheet_to_json(sheet) as any[];
+      
+      data.forEach(row => {
+        const campaignName = normalizeAndValidate(row['Campaign Name']);
+        const eventType = normalizeAndValidate(row['Event Type']);
+        const profileName = normalizeAndValidate(row['Profile Name']);
+        
+        if (!isValidString(campaignName) || !isValidString(eventType) || !isValidString(profileName)) {
+          return;
+        }
+        
+        const dailyData: Record<string, number> = {};
+        Object.keys(row).forEach(key => {
+          if (key.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            dailyData[key] = Number(row[key]) || 0;
+          }
+        });
+        
+        campaignMetrics.push({
+          campaignName,
+          eventType,
+          profileName,
+          totalCount: Number(row['Total Count']) || 0,
+          dailyData,
+        });
+      });
     }
     
-    data.forEach(row => {
-      const campaignName = normalizeAndValidate(row['Campaign Name']);
-      const eventType = normalizeAndValidate(row['Event Type']);
-      const profileName = normalizeAndValidate(row['Profile Name']);
+    // Parse individual campaign sheets ([NAME] format)
+    // These sheets typically have "Dados da campanha" section and daily metrics
+    else if (!normalizedName.includes('diário') && 
+             !normalizedName.includes('positivo') && 
+             !normalizedName.includes('negativo') &&
+             !normalizedName.includes('compilado') &&
+             !normalizedName.includes('dados gerais')) {
       
-      // Skip rows with empty required fields
-      if (!isValidString(campaignName) || !isValidString(eventType) || !isValidString(profileName)) {
-        return;
-      }
+      console.log(`Processando aba de campanha individual: ${sheetName}`);
+      const data = XLSX.utils.sheet_to_json(sheet) as any[];
       
-      const dailyData: Record<string, number> = {};
-      
-      Object.keys(row).forEach(key => {
-        if (key.match(/^\d{4}-\d{2}-\d{2}$/)) {
-          dailyData[key] = Number(row[key]) || 0;
+      // Try to parse as campaign metrics if it has the right structure
+      data.forEach(row => {
+        const campaignName = normalizeAndValidate(row['Campaign Name'] || sheetName);
+        const eventType = normalizeAndValidate(row['Event Type']);
+        const profileName = normalizeAndValidate(row['Profile Name']);
+        
+        if (eventType && profileName) {
+          const dailyData: Record<string, number> = {};
+          Object.keys(row).forEach(key => {
+            if (key.match(/^\d{4}-\d{2}-\d{2}$/)) {
+              dailyData[key] = Number(row[key]) || 0;
+            }
+          });
+          
+          campaignMetrics.push({
+            campaignName,
+            eventType,
+            profileName,
+            totalCount: Number(row['Total Count']) || 0,
+            dailyData,
+          });
         }
       });
-      
-      campaignMetrics.push({
-        campaignName,
-        eventType,
-        profileName,
-        totalCount: Number(row['Total Count']) || 0,
-        dailyData,
-      });
-    });
-  }
-
-  // Parse Leads Positivos sheet
-  const positiveSheetName = workbook.SheetNames.find(
-    name => name.toLowerCase().includes('positivo')
-  );
-
-  if (positiveSheetName) {
-    const sheet = workbook.Sheets[positiveSheetName];
-    const data = XLSX.utils.sheet_to_json(sheet) as any[];
+    }
     
-    data.forEach((row, index) => {
-      const campaign = normalizeAndValidate(row['Campanha']);
-      const name = normalizeAndValidate(row['Nome']);
+    // Parse "Diário [NAME]" sheets - daily campaign data
+    else if (normalizedName.includes('diário')) {
+      console.log(`Processando aba diária: ${sheetName}`);
+      const campaignName = sheetName.replace(/diário\s*/i, '').trim();
+      const data = XLSX.utils.sheet_to_json(sheet) as any[];
       
-      // Skip rows with empty required fields
-      if (!isValidString(campaign) || !isValidString(name)) {
-        return;
-      }
-      
-      positiveLeads.push({
-        id: `positive-${index}-${Date.now()}`,
-        campaign,
-        linkedin: normalizeAndValidate(row['LinkedIn']),
-        name,
-        position: normalizeAndValidate(row['Cargo']),
-        company: normalizeAndValidate(row['Empresa']),
-        status: 'positive',
-        positiveResponseDate: row['Data Resposta Positiva'],
-        transferDate: row['Data Repasse'],
-        statusDetails: row['Status'],
-        comments: row['Comentários'],
-        followUp1Date: row['Data FU 1'],
-        followUp1Comments: row['Comentarios FU1'],
-        followUp2Date: row['Data FU 2'],
-        followUp2Comments: row['Comentarios FU2'],
-        followUp3Date: row['Data FU 3'],
-        followUp3Comments: row['Comentarios FU3'],
-        followUp4Date: row['Data FU 4'],
-        followUp4Comments: row['Comentarios FU4'],
-        observations: row['Observações'],
-        meetingScheduleDate: row['Data de agendamento da reunião'],
-        meetingDate: row['Data da Reunião'],
-        proposalDate: row['Data Proposta'],
-        proposalValue: row['Valor Proposta'] ? Number(row['Valor Proposta']) : undefined,
-        saleDate: row['Data Venda'],
-        saleValue: row['Valor Venda'] ? Number(row['Valor Venda']) : undefined,
-        profile: row['Perfil'],
-        classification: row['Classificação'],
-        attendedWebinar: row['Participou do Webnar'] === 'Sim',
-        whatsapp: row['WhatsApp'],
-        standDay: row['Dia do Stand'],
-        pavilion: row['Pavilhão'],
-        stand: row['Stand'],
+      data.forEach(row => {
+        const eventType = normalizeAndValidate(row['Event Type'] || row['Tipo de Evento']);
+        const profileName = normalizeAndValidate(row['Profile Name'] || row['Perfil']);
+        
+        if (eventType && profileName) {
+          const dailyData: Record<string, number> = {};
+          Object.keys(row).forEach(key => {
+            if (key.match(/^\d{4}-\d{2}-\d{2}$/)) {
+              dailyData[key] = Number(row[key]) || 0;
+            }
+          });
+          
+          campaignMetrics.push({
+            campaignName,
+            eventType,
+            profileName,
+            totalCount: Number(row['Total Count'] || row['Total']) || 0,
+            dailyData,
+          });
+        }
       });
-    });
-  }
-
-  // Parse Leads Negativos sheet
-  const negativeSheetName = workbook.SheetNames.find(
-    name => name.toLowerCase().includes('negativo')
-  );
-
-  if (negativeSheetName) {
-    const sheet = workbook.Sheets[negativeSheetName];
-    const data = XLSX.utils.sheet_to_json(sheet) as any[];
+    }
     
-    data.forEach((row, index) => {
-      const campaign = normalizeAndValidate(row['Campanha']);
-      const name = normalizeAndValidate(row['Nome']);
+    // Parse "Compilado" sheet - aggregated profile data
+    else if (normalizedName.includes('compilado')) {
+      console.log('Processando aba Compilado para dados de perfil');
+      const data = XLSX.utils.sheet_to_json(sheet) as any[];
       
-      // Skip rows with empty required fields
-      if (!isValidString(campaign) || !isValidString(name)) {
-        return;
-      }
-      
-      negativeLeads.push({
-        id: `negative-${index}-${Date.now()}`,
-        campaign,
-        linkedin: normalizeAndValidate(row['LinkedIn']),
-        name,
-        position: normalizeAndValidate(row['Cargo']),
-        company: normalizeAndValidate(row['Empresa']),
-        status: 'negative',
-        negativeResponseDate: row['Data Resposta Negativa'],
-        transferDate: row['Data Repasse'],
-        statusDetails: row['Status'],
-        observations: row['Observações'],
-        hadFollowUp: row['Teve FU? Porque?'] !== undefined && row['Teve FU? Porque?'] !== '',
-        followUpReason: row['Teve FU? Porque?'],
+      data.forEach(row => {
+        const campaignName = normalizeAndValidate(row['Campanha'] || row['Campaign']);
+        const eventType = normalizeAndValidate(row['Tipo'] || row['Event Type']);
+        const profileName = normalizeAndValidate(row['Perfil'] || row['Profile']);
+        
+        if (campaignName && eventType && profileName) {
+          const dailyData: Record<string, number> = {};
+          Object.keys(row).forEach(key => {
+            if (key.match(/^\d{4}-\d{2}-\d{2}$/)) {
+              dailyData[key] = Number(row[key]) || 0;
+            }
+          });
+          
+          campaignMetrics.push({
+            campaignName,
+            eventType,
+            profileName,
+            totalCount: Number(row['Total'] || row['Total Count']) || 0,
+            dailyData,
+          });
+        }
       });
-    });
+    }
+    
+    // Parse "Dados Gerais" sheet - general campaign data
+    else if (normalizedName.includes('dados gerais')) {
+      console.log('Processando aba Dados Gerais para campanhas');
+      const data = XLSX.utils.sheet_to_json(sheet) as any[];
+      
+      data.forEach(row => {
+        const campaignName = normalizeAndValidate(row['Campanha'] || row['Campaign']);
+        const eventType = normalizeAndValidate(row['Tipo'] || row['Event Type']);
+        const profileName = normalizeAndValidate(row['Perfil'] || row['Profile']);
+        
+        if (campaignName && eventType && profileName) {
+          const dailyData: Record<string, number> = {};
+          Object.keys(row).forEach(key => {
+            if (key.match(/^\d{4}-\d{2}-\d{2}$/)) {
+              dailyData[key] = Number(row[key]) || 0;
+            }
+          });
+          
+          campaignMetrics.push({
+            campaignName,
+            eventType,
+            profileName,
+            totalCount: Number(row['Total'] || row['Total Count']) || 0,
+            dailyData,
+          });
+        }
+      });
+    }
+    
+    // Parse "Leads Positivos" sheet
+    else if (normalizedName.includes('positivo')) {
+      console.log('Processando aba Leads Positivos');
+      const data = XLSX.utils.sheet_to_json(sheet) as any[];
+      
+      data.forEach((row, index) => {
+        const campaign = normalizeAndValidate(row['Campanha']);
+        const name = normalizeAndValidate(row['Nome']);
+        
+        if (!isValidString(campaign) || !isValidString(name)) {
+          return;
+        }
+        
+        positiveLeads.push({
+          id: `positive-${index}-${Date.now()}`,
+          campaign,
+          linkedin: normalizeAndValidate(row['LinkedIn']),
+          name,
+          position: normalizeAndValidate(row['Cargo']),
+          company: normalizeAndValidate(row['Empresa']),
+          status: 'positive',
+          positiveResponseDate: row['Data Resposta Positiva'],
+          transferDate: row['Data Repasse'],
+          statusDetails: row['Status'],
+          comments: row['Comentários'],
+          followUp1Date: row['Data FU 1'],
+          followUp1Comments: row['Comentarios FU1'],
+          followUp2Date: row['Data FU 2'],
+          followUp2Comments: row['Comentarios FU2'],
+          followUp3Date: row['Data FU 3'],
+          followUp3Comments: row['Comentarios FU3'],
+          followUp4Date: row['Data FU 4'],
+          followUp4Comments: row['Comentarios FU4'],
+          observations: row['Observações'],
+          meetingScheduleDate: row['Data de agendamento da reunião'],
+          meetingDate: row['Data da Reunião'],
+          proposalDate: row['Data Proposta'],
+          proposalValue: row['Valor Proposta'] ? Number(row['Valor Proposta']) : undefined,
+          saleDate: row['Data Venda'],
+          saleValue: row['Valor Venda'] ? Number(row['Valor Venda']) : undefined,
+          profile: row['Perfil'],
+          classification: row['Classificação'],
+          attendedWebinar: row['Participou do Webnar'] === 'Sim',
+          whatsapp: row['WhatsApp'],
+          standDay: row['Dia do Stand'],
+          pavilion: row['Pavilhão'],
+          stand: row['Stand'],
+        });
+      });
+    }
+    
+    // Parse "Leads Negativos" sheet
+    else if (normalizedName.includes('negativo')) {
+      console.log('Processando aba Leads Negativos');
+      const data = XLSX.utils.sheet_to_json(sheet) as any[];
+      
+      data.forEach((row, index) => {
+        const campaign = normalizeAndValidate(row['Campanha']);
+        const name = normalizeAndValidate(row['Nome']);
+        
+        if (!isValidString(campaign) || !isValidString(name)) {
+          return;
+        }
+        
+        negativeLeads.push({
+          id: `negative-${index}-${Date.now()}`,
+          campaign,
+          linkedin: normalizeAndValidate(row['LinkedIn']),
+          name,
+          position: normalizeAndValidate(row['Cargo']),
+          company: normalizeAndValidate(row['Empresa']),
+          status: 'negative',
+          negativeResponseDate: row['Data Resposta Negativa'],
+          transferDate: row['Data Repasse'],
+          statusDetails: row['Status'],
+          observations: row['Observações'],
+          hadFollowUp: row['Teve FU? Porque?'] !== undefined && row['Teve FU? Porque?'] !== '',
+          followUpReason: row['Teve FU? Porque?'],
+        });
+      });
+    }
   }
+
+  console.log(`Total de ${allCampaignDetails.length} campanhas encontradas no arquivo`);
+  console.log(`Total de ${campaignMetrics.length} métricas de campanha parseadas`);
+  console.log(`Total de ${positiveLeads.length} leads positivos parseados`);
+  console.log(`Total de ${negativeLeads.length} leads negativos parseados`);
 
   return {
     campaignMetrics,
