@@ -310,19 +310,22 @@ export default function UserSettings() {
         const campaignDetailsArray = parsedData.allCampaignDetails || 
           (parsedData.campaignDetails ? [parsedData.campaignDetails] : []);
 
-        // Extrair nomes únicos de campanhas das métricas também
+        // Extrair nomes únicos de campanhas das métricas e dos detalhes
         const uniqueCampaignNames = new Set<string>();
+        
+        // Adicionar campanhas das métricas
         parsedData.campaignMetrics.forEach(metric => {
           if (metric.campaignName) {
             uniqueCampaignNames.add(metric.campaignName);
           }
         });
 
-        // Criar mapa de detalhes por nome de campanha
+        // Criar mapa de detalhes por nome de campanha e adicionar ao Set
         const campaignDetailsMap = new Map<string, typeof campaignDetailsArray[0]>();
         campaignDetailsArray.forEach(detail => {
           if (detail.campaignName) {
             campaignDetailsMap.set(detail.campaignName, detail);
+            uniqueCampaignNames.add(detail.campaignName); // Adicionar ao Set também
           }
         });
 
