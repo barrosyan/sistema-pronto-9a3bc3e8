@@ -332,23 +332,9 @@ export default function UserSettings() {
           }
         }
 
-        // Delete existing metrics for these campaigns before inserting new ones
         if (parsedData.campaignMetrics.length > 0) {
           console.log('Processando métricas:', parsedData.campaignMetrics.length);
           
-          // Get unique campaign names from metrics
-          const campaignNames = Array.from(new Set(parsedData.campaignMetrics.map(m => m.campaignName))) as string[];
-          
-          // Delete existing metrics for these campaigns
-          for (const campaignName of campaignNames) {
-            await supabase
-              .from('campaign_metrics')
-              .delete()
-              .eq('user_id', user.id)
-              .eq('campaign_name', campaignName);
-          }
-          
-          // Now insert the new metrics
           const metricsToInsert = parsedData.campaignMetrics.map(metric => ({
             user_id: user.id,
             campaign_name: metric.campaignName,
@@ -363,25 +349,16 @@ export default function UserSettings() {
             .insert(metricsToInsert);
 
           if (metricsError) {
-            console.error('Erro ao inserir métricas:', metricsError);
-            throw metricsError;
-          }
-          console.log('Métricas inseridas com sucesso');
-          totalMetrics += parsedData.campaignMetrics.length;
-        }
-
-        // Delete existing leads for these campaigns before inserting new ones
-        if (parsedData.positiveLeads.length > 0 || parsedData.negativeLeads.length > 0) {
-          const allLeads = [...parsedData.positiveLeads, ...parsedData.negativeLeads];
-          const campaignNames = Array.from(new Set(allLeads.map(l => l.campaign))) as string[];
-          
-          // Delete existing leads for these campaigns
-          for (const campaignName of campaignNames) {
-            await supabase
-              .from('leads')
-              .delete()
-              .eq('user_id', user.id)
-              .eq('campaign', campaignName);
+            // Ignorar erros de duplicata (código 23505)
+            if (metricsError.code === '23505') {
+              console.log('Algumas métricas já existem e foram ignoradas');
+            } else {
+              console.error('Erro ao inserir métricas:', metricsError);
+              throw metricsError;
+            }
+          } else {
+            console.log('Métricas inseridas com sucesso');
+            totalMetrics += parsedData.campaignMetrics.length;
           }
         }
 
@@ -400,11 +377,17 @@ export default function UserSettings() {
             .insert(leadsToInsert);
 
           if (leadsError) {
-            console.error('Erro ao inserir leads positivos:', leadsError);
-            throw leadsError;
+            // Ignorar erros de duplicata (código 23505)
+            if (leadsError.code === '23505') {
+              console.log('Alguns leads positivos já existem e foram ignorados');
+            } else {
+              console.error('Erro ao inserir leads positivos:', leadsError);
+              throw leadsError;
+            }
+          } else {
+            console.log('Leads positivos inseridos com sucesso');
+            totalLeads += leadsToInsert.length;
           }
-          console.log('Leads positivos inseridos com sucesso');
-          totalLeads += leadsToInsert.length;
         }
 
 
@@ -422,11 +405,17 @@ export default function UserSettings() {
             .insert(leadsToInsert);
 
           if (leadsError) {
-            console.error('Erro ao inserir leads negativos:', leadsError);
-            throw leadsError;
+            // Ignorar erros de duplicata (código 23505)
+            if (leadsError.code === '23505') {
+              console.log('Alguns leads negativos já existem e foram ignorados');
+            } else {
+              console.error('Erro ao inserir leads negativos:', leadsError);
+              throw leadsError;
+            }
+          } else {
+            console.log('Leads negativos inseridos com sucesso');
+            totalLeads += leadsToInsert.length;
           }
-          console.log('Leads negativos inseridos com sucesso');
-          totalLeads += leadsToInsert.length;
         }
       }
 
