@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { parseExcelSheets } from '@/utils/excelSheetParser';
+import DataImportPreview, { FilePreviewData } from '@/components/DataImportPreview';
 
 type FileUpload = {
   id: string;
@@ -22,6 +23,9 @@ export default function UserSettings() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewData, setPreviewData] = useState<FilePreviewData[]>([]);
+  const [parsedFilesData, setParsedFilesData] = useState<any[]>([]);
 
   useEffect(() => {
     loadFiles();
@@ -48,16 +52,15 @@ export default function UserSettings() {
     }
   };
 
-  // Sanitize unsafe file names for storage keys (remove accents and special chars)
   const sanitizeFileName = (name: string) => {
     const parts = name.split('.');
     const ext = parts.length > 1 ? '.' + parts.pop()!.toLowerCase() : '';
     const base = parts.join('.');
     const ascii = base.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const cleaned = ascii
-      .replace(/[^a-zA-Z0-9._-]+/g, '-') // keep only safe chars
-      .replace(/-+/g, '-')               // collapse dashes
-      .replace(/^[-_.]+|[-_.]+$/g, '')   // trim leading/trailing
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^[-_.]+|[-_.]+$/g, '')
       .toLowerCase();
     return (cleaned || 'file') + ext;
   };
@@ -76,7 +79,6 @@ export default function UserSettings() {
       }
 
       for (const file of Array.from(selectedFiles)) {
-        // Validate file type
         const validTypes = [
           'text/csv',
           'application/vnd.ms-excel',
@@ -89,7 +91,6 @@ export default function UserSettings() {
           continue;
         }
 
-        // Upload to storage
         const safeOriginal = sanitizeFileName(file.name);
         const fileName = `${Date.now()}_${safeOriginal}`;
         const storagePath = `${user.id}/${fileName}`;
@@ -100,7 +101,6 @@ export default function UserSettings() {
 
         if (uploadError) throw uploadError;
 
-        // Save metadata to database
         const dbResult: any = await supabase
           .from('file_uploads' as any)
           .insert({
@@ -108,7 +108,7 @@ export default function UserSettings() {
             file_name: file.name,
             file_size: file.size,
             file_type: file.type,
-            storage_path: storagePath
+            storage_path: storagePath,
           });
 
         if (dbResult.error) throw dbResult.error;
@@ -127,14 +127,12 @@ export default function UserSettings() {
 
   const handleDelete = async (file: FileUpload) => {
     try {
-      // Delete from storage
       const { error: storageError } = await supabase.storage
         .from('user-uploads')
         .remove([file.storage_path]);
 
       if (storageError) throw storageError;
 
-      // Delete from database
       const dbResult: any = await supabase
         .from('file_uploads' as any)
         .delete()
@@ -189,8 +187,8 @@ export default function UserSettings() {
     }
 
     setProcessing(true);
-    let totalMetrics = 0;
-    let totalLeads = 0;
+    const previews: FilePreviewData[] = [];
+    const parsedDataArray: any[] = [];
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -201,164 +199,157 @@ export default function UserSettings() {
 
       for (const fileRecord of files) {
         try {
-          // Download file from storage
           const { data: fileData, error: downloadError } = await supabase.storage
             .from('user-uploads')
             .download(fileRecord.storage_path);
 
           if (downloadError) throw downloadError;
 
-          // Convert blob to File object
           const file = new File([fileData], fileRecord.file_name, { type: fileRecord.file_type });
-
-          // Parse file
           const parsedData = await parseExcelSheets(file);
 
-          // Insert or update all campaign details found in file
-          const campaignDetailsArray = parsedData.allCampaignDetails || 
-            (parsedData.campaignDetails ? [parsedData.campaignDetails] : []);
+          const campaignNames = Array.from(
+            new Set([
+              ...(parsedData.allCampaignDetails || []).map(d => d.campaignName).filter(Boolean),
+              ...parsedData.campaignMetrics.map(m => m.campaignName).filter(Boolean)
+            ])
+          ) as string[];
 
-          for (const campaignDetail of campaignDetailsArray) {
-            if (campaignDetail.campaignName) {
-              const { data: existingCampaign } = await supabase
-                .from('campaigns')
-                .select('id')
-                .eq('user_id', user.id)
-                .eq('name', campaignDetail.campaignName)
-                .single();
+          previews.push({
+            fileName: fileRecord.file_name,
+            campaignsCount: parsedData.allCampaignDetails?.length || 0,
+            metricsCount: parsedData.campaignMetrics.length,
+            positiveLeadsCount: parsedData.positiveLeads.length,
+            negativeLeadsCount: parsedData.negativeLeads.length,
+            campaignNames,
+          });
 
-              if (existingCampaign) {
-                // Update existing campaign
-                await supabase
-                  .from('campaigns')
-                  .update({
-                    company: campaignDetail.company || null,
-                    profile_name: campaignDetail.profile || null,
-                    objective: campaignDetail.objective || null,
-                    cadence: campaignDetail.cadence || null,
-                    job_titles: campaignDetail.jobTitles || null,
-                  })
-                  .eq('id', existingCampaign.id);
-              } else {
-                // Insert new campaign
-                await supabase
-                  .from('campaigns')
-                  .insert({
-                    user_id: user.id,
-                    name: campaignDetail.campaignName,
-                    company: campaignDetail.company || null,
-                    profile_name: campaignDetail.profile || null,
-                    objective: campaignDetail.objective || null,
-                    cadence: campaignDetail.cadence || null,
-                    job_titles: campaignDetail.jobTitles || null,
-                  });
-              }
-            }
-          }
+          parsedDataArray.push({
+            fileRecord,
+            parsedData,
+            user,
+          });
 
-          // Insert campaign metrics
-          if (parsedData.campaignMetrics.length > 0) {
-            const metricsToInsert = parsedData.campaignMetrics.map(metric => ({
-              user_id: user.id,
-              campaign_name: metric.campaignName,
-              event_type: metric.eventType,
-              profile_name: metric.profileName,
-              total_count: metric.totalCount,
-              daily_data: metric.dailyData,
-            }));
-
-            const { error: metricsError } = await supabase
-              .from('campaign_metrics')
-              .insert(metricsToInsert);
-
-            if (metricsError) throw metricsError;
-            totalMetrics += parsedData.campaignMetrics.length;
-          }
-
-          // Insert positive leads
-          if (parsedData.positiveLeads.length > 0) {
-            const leadsToInsert = parsedData.positiveLeads.map(lead => ({
-              user_id: user.id,
-              campaign: lead.campaign,
-              linkedin: lead.linkedin || null,
-              name: lead.name,
-              position: lead.position || null,
-              company: lead.company || null,
-              status: 'positive',
-              positive_response_date: lead.positiveResponseDate || null,
-              transfer_date: lead.transferDate || null,
-              status_details: lead.statusDetails || null,
-              comments: lead.comments || null,
-              follow_up_1_date: lead.followUp1Date || null,
-              follow_up_1_comments: lead.followUp1Comments || null,
-              follow_up_2_date: lead.followUp2Date || null,
-              follow_up_2_comments: lead.followUp2Comments || null,
-              follow_up_3_date: lead.followUp3Date || null,
-              follow_up_3_comments: lead.followUp3Comments || null,
-              follow_up_4_date: lead.followUp4Date || null,
-              follow_up_4_comments: lead.followUp4Comments || null,
-              observations: lead.observations || null,
-              meeting_schedule_date: lead.meetingScheduleDate || null,
-              meeting_date: lead.meetingDate || null,
-              proposal_date: lead.proposalDate || null,
-              proposal_value: lead.proposalValue || null,
-              sale_date: lead.saleDate || null,
-              sale_value: lead.saleValue || null,
-              profile: lead.profile || null,
-              classification: lead.classification || null,
-              attended_webinar: lead.attendedWebinar || false,
-              whatsapp: lead.whatsapp || null,
-              stand_day: lead.standDay || null,
-              pavilion: lead.pavilion || null,
-              stand: lead.stand || null,
-              connection_date: lead.connectionDate || null,
-            }));
-
-            const { error: leadsError } = await supabase
-              .from('leads')
-              .insert(leadsToInsert);
-
-            if (leadsError) throw leadsError;
-            totalLeads += parsedData.positiveLeads.length;
-          }
-
-          // Insert negative leads
-          if (parsedData.negativeLeads.length > 0) {
-            const leadsToInsert = parsedData.negativeLeads.map(lead => ({
-              user_id: user.id,
-              campaign: lead.campaign,
-              linkedin: lead.linkedin || null,
-              name: lead.name,
-              position: lead.position || null,
-              company: lead.company || null,
-              status: 'negative',
-              negative_response_date: lead.negativeResponseDate || null,
-              transfer_date: lead.transferDate || null,
-              status_details: lead.statusDetails || null,
-              observations: lead.observations || null,
-              had_follow_up: lead.hadFollowUp || false,
-              follow_up_reason: lead.followUpReason || null,
-            }));
-
-            const { error: leadsError } = await supabase
-              .from('leads')
-              .insert(leadsToInsert);
-
-            if (leadsError) throw leadsError;
-            totalLeads += parsedData.negativeLeads.length;
-          }
-
-          toast.success(`Arquivo ${fileRecord.file_name} processado com sucesso!`);
         } catch (error) {
-          console.error(`Erro ao processar ${fileRecord.file_name}:`, error);
-          toast.error(`Erro ao processar ${fileRecord.file_name}`);
+          console.error(`Error parsing file ${fileRecord.file_name}:`, error);
+          previews.push({
+            fileName: fileRecord.file_name,
+            campaignsCount: 0,
+            metricsCount: 0,
+            positiveLeadsCount: 0,
+            negativeLeadsCount: 0,
+            campaignNames: [],
+            error: error instanceof Error ? error.message : 'Erro ao processar arquivo',
+          });
         }
       }
 
-      toast.success(`Processamento concluído! ${totalMetrics} métricas e ${totalLeads} leads adicionados.`);
+      setPreviewData(previews);
+      setParsedFilesData(parsedDataArray);
+      setShowPreview(true);
+
     } catch (error) {
       console.error('Error processing files:', error);
       toast.error('Erro ao processar arquivos');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const confirmImport = async () => {
+    setProcessing(true);
+    let totalMetrics = 0;
+    let totalLeads = 0;
+
+    try {
+      for (const { parsedData, user } of parsedFilesData) {
+        const campaignDetailsArray = parsedData.allCampaignDetails || 
+          (parsedData.campaignDetails ? [parsedData.campaignDetails] : []);
+
+        for (const campaignDetail of campaignDetailsArray) {
+          if (campaignDetail.campaignName) {
+            const { data: existingCampaign } = await supabase
+              .from('campaigns')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('name', campaignDetail.campaignName)
+              .single();
+
+            if (existingCampaign) {
+              await supabase
+                .from('campaigns')
+                .update({
+                  company: campaignDetail.company || null,
+                  profile_name: campaignDetail.profile || null,
+                  objective: campaignDetail.objective || null,
+                  cadence: campaignDetail.cadence || null,
+                  job_titles: campaignDetail.jobTitles || null,
+                })
+                .eq('id', existingCampaign.id);
+            } else {
+              await supabase
+                .from('campaigns')
+                .insert({
+                  user_id: user.id,
+                  name: campaignDetail.campaignName,
+                  company: campaignDetail.company || null,
+                  profile_name: campaignDetail.profile || null,
+                  objective: campaignDetail.objective || null,
+                  cadence: campaignDetail.cadence || null,
+                  job_titles: campaignDetail.jobTitles || null,
+                });
+            }
+          }
+        }
+
+        if (parsedData.campaignMetrics.length > 0) {
+          const metricsToInsert = parsedData.campaignMetrics.map(metric => ({
+            user_id: user.id,
+            campaign_name: metric.campaignName,
+            event_type: metric.eventType,
+            profile_name: metric.profileName,
+            total_count: metric.totalCount,
+            daily_data: metric.dailyData,
+          }));
+
+          const { error: metricsError } = await supabase
+            .from('campaign_metrics')
+            .insert(metricsToInsert);
+
+          if (metricsError) throw metricsError;
+          totalMetrics += parsedData.campaignMetrics.length;
+        }
+
+        if (parsedData.positiveLeads.length > 0) {
+          const leadsToInsert = parsedData.positiveLeads.map(lead => ({
+            ...lead,
+            user_id: user.id,
+            id: undefined,
+          }));
+
+          await supabase.from('leads').insert(leadsToInsert);
+          totalLeads += leadsToInsert.length;
+        }
+
+        if (parsedData.negativeLeads.length > 0) {
+          const leadsToInsert = parsedData.negativeLeads.map(lead => ({
+            ...lead,
+            user_id: user.id,
+            id: undefined,
+          }));
+
+          await supabase.from('leads').insert(leadsToInsert);
+          totalLeads += leadsToInsert.length;
+        }
+      }
+
+      setShowPreview(false);
+      setParsedFilesData([]);
+      setPreviewData([]);
+      toast.success(`Importação concluída! ${totalMetrics} métricas e ${totalLeads} leads adicionados.`);
+    } catch (error) {
+      console.error('Error importing data:', error);
+      toast.error('Erro ao importar dados');
     } finally {
       setProcessing(false);
     }
@@ -484,6 +475,19 @@ export default function UserSettings() {
           </div>
         </CardContent>
       </Card>
+
+      <DataImportPreview
+        open={showPreview}
+        onOpenChange={setShowPreview}
+        previewData={previewData}
+        onConfirm={confirmImport}
+        onCancel={() => {
+          setShowPreview(false);
+          setParsedFilesData([]);
+          setPreviewData([]);
+        }}
+        loading={processing}
+      />
     </div>
   );
 }
