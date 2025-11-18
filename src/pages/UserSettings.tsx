@@ -285,7 +285,20 @@ export default function UserSettings() {
     let totalLeads = 0;
 
     try {
-      for (const { parsedData, user } of parsedFilesData) {
+      // CRITICAL: Clear all existing data before import
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Usuário não autenticado');
+        return;
+      }
+
+      console.log('Limpando dados existentes...');
+      await supabase.from('campaign_metrics').delete().eq('user_id', user.id);
+      await supabase.from('leads').delete().eq('user_id', user.id);
+      await supabase.from('campaigns').delete().eq('user_id', user.id);
+      console.log('Dados limpos com sucesso');
+
+      for (const { parsedData } of parsedFilesData) {
         console.log('Processando arquivo com dados:', {
           campanhas: parsedData.allCampaignDetails?.length,
           metricas: parsedData.campaignMetrics.length,
