@@ -312,9 +312,13 @@ export default function UserSettings() {
             daily_data: metric.dailyData,
           }));
 
+          // Use upsert to handle duplicates - update on conflict
           const { error: metricsError } = await supabase
             .from('campaign_metrics')
-            .insert(metricsToInsert);
+            .upsert(metricsToInsert, {
+              onConflict: 'user_id,campaign_name,event_type,profile_name',
+              ignoreDuplicates: false
+            });
 
           if (metricsError) throw metricsError;
           totalMetrics += parsedData.campaignMetrics.length;
@@ -327,7 +331,18 @@ export default function UserSettings() {
             id: undefined,
           }));
 
-          await supabase.from('leads').insert(leadsToInsert);
+          // Use upsert for leads - update if exists based on campaign + name
+          const { error: leadsError } = await supabase
+            .from('leads')
+            .upsert(leadsToInsert, {
+              onConflict: 'user_id,campaign,name',
+              ignoreDuplicates: false
+            });
+
+          if (leadsError) {
+            console.error('Error inserting positive leads:', leadsError);
+            throw leadsError;
+          }
           totalLeads += leadsToInsert.length;
         }
 
@@ -338,7 +353,18 @@ export default function UserSettings() {
             id: undefined,
           }));
 
-          await supabase.from('leads').insert(leadsToInsert);
+          // Use upsert for leads - update if exists based on campaign + name
+          const { error: leadsError } = await supabase
+            .from('leads')
+            .upsert(leadsToInsert, {
+              onConflict: 'user_id,campaign,name',
+              ignoreDuplicates: false
+            });
+
+          if (leadsError) {
+            console.error('Error inserting negative leads:', leadsError);
+            throw leadsError;
+          }
           totalLeads += leadsToInsert.length;
         }
       }
