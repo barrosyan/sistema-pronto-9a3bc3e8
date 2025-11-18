@@ -127,17 +127,20 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
       allCampaignDetails.push(details);
     }
     
-    // Parse "Input" sheet - campaign metrics
-    if (normalizedName === 'input' || normalizedName.includes('input')) {
-      console.log('Processando aba Input para métricas de campanha');
+    // Parse "Input" or "Inputs" sheet - campaign metrics
+    if (normalizedName === 'input' || normalizedName === 'inputs' || normalizedName.includes('input')) {
+      console.log('Processando aba Input/Inputs para métricas de campanha');
       const data = XLSX.utils.sheet_to_json(sheet) as any[];
       
-      data.forEach(row => {
-        const campaignName = normalizeAndValidate(row['Campaign Name']);
-        const eventType = normalizeAndValidate(row['Event Type']);
-        const profileName = normalizeAndValidate(row['Profile Name']);
+      console.log(`Encontradas ${data.length} linhas na aba Input`);
+      
+      data.forEach((row, index) => {
+        const campaignName = normalizeAndValidate(row['Campaign Name'] || row['Campanha']);
+        const eventType = normalizeAndValidate(row['Event Type'] || row['Tipo de Evento']);
+        const profileName = normalizeAndValidate(row['Profile Name'] || row['Perfil']);
         
         if (!isValidString(campaignName) || !isValidString(eventType) || !isValidString(profileName)) {
+          console.log(`Linha ${index} ignorada: dados incompletos`, { campaignName, eventType, profileName });
           return;
         }
         
@@ -148,11 +151,13 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
           }
         });
         
+        console.log(`Métrica adicionada: ${campaignName} - ${eventType} - ${profileName}`);
+        
         campaignMetrics.push({
           campaignName,
           eventType,
           profileName,
-          totalCount: Number(row['Total Count']) || 0,
+          totalCount: Number(row['Total Count'] || row['Total']) || 0,
           dailyData,
         });
       });
@@ -286,13 +291,18 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
       console.log('Processando aba Leads Positivos');
       const data = XLSX.utils.sheet_to_json(sheet) as any[];
       
+      console.log(`Encontrados ${data.length} leads positivos`);
+      
       data.forEach((row, index) => {
-        const campaign = normalizeAndValidate(row['Campanha']);
-        const name = normalizeAndValidate(row['Nome']);
+        const campaign = normalizeAndValidate(row['Campanha'] || row['Campaign']);
+        const name = normalizeAndValidate(row['Nome'] || row['Name']);
         
         if (!isValidString(campaign) || !isValidString(name)) {
+          console.log(`Lead positivo ${index} ignorado: dados incompletos`);
           return;
         }
+        
+        console.log(`Lead positivo adicionado: ${name} da campanha ${campaign}`);
         
         positiveLeads.push({
           id: `positive-${index}-${Date.now()}`,
@@ -337,13 +347,18 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
       console.log('Processando aba Leads Negativos');
       const data = XLSX.utils.sheet_to_json(sheet) as any[];
       
+      console.log(`Encontrados ${data.length} leads negativos`);
+      
       data.forEach((row, index) => {
-        const campaign = normalizeAndValidate(row['Campanha']);
-        const name = normalizeAndValidate(row['Nome']);
+        const campaign = normalizeAndValidate(row['Campanha'] || row['Campaign']);
+        const name = normalizeAndValidate(row['Nome'] || row['Name']);
         
         if (!isValidString(campaign) || !isValidString(name)) {
+          console.log(`Lead negativo ${index} ignorado: dados incompletos`);
           return;
         }
+        
+        console.log(`Lead negativo adicionado: ${name} da campanha ${campaign}`);
         
         negativeLeads.push({
           id: `negative-${index}-${Date.now()}`,
