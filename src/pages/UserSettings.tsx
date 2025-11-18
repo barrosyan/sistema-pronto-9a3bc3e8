@@ -332,9 +332,23 @@ export default function UserSettings() {
           }
         }
 
+        // Delete existing metrics for these campaigns before inserting new ones
         if (parsedData.campaignMetrics.length > 0) {
           console.log('Processando métricas:', parsedData.campaignMetrics.length);
           
+          // Get unique campaign names from metrics
+          const campaignNames = Array.from(new Set(parsedData.campaignMetrics.map(m => m.campaignName))) as string[];
+          
+          // Delete existing metrics for these campaigns
+          for (const campaignName of campaignNames) {
+            await supabase
+              .from('campaign_metrics')
+              .delete()
+              .eq('user_id', user.id)
+              .eq('campaign_name', campaignName);
+          }
+          
+          // Now insert the new metrics
           const metricsToInsert = parsedData.campaignMetrics.map(metric => ({
             user_id: user.id,
             campaign_name: metric.campaignName,
@@ -346,10 +360,7 @@ export default function UserSettings() {
 
           const { error: metricsError } = await supabase
             .from('campaign_metrics')
-            .upsert(metricsToInsert, {
-              onConflict: 'user_id,campaign_name,event_type,profile_name',
-              ignoreDuplicates: false
-            });
+            .insert(metricsToInsert);
 
           if (metricsError) {
             console.error('Erro ao inserir métricas:', metricsError);
@@ -358,6 +369,22 @@ export default function UserSettings() {
           console.log('Métricas inseridas com sucesso');
           totalMetrics += parsedData.campaignMetrics.length;
         }
+
+        // Delete existing leads for these campaigns before inserting new ones
+        if (parsedData.positiveLeads.length > 0 || parsedData.negativeLeads.length > 0) {
+          const allLeads = [...parsedData.positiveLeads, ...parsedData.negativeLeads];
+          const campaignNames = Array.from(new Set(allLeads.map(l => l.campaign))) as string[];
+          
+          // Delete existing leads for these campaigns
+          for (const campaignName of campaignNames) {
+            await supabase
+              .from('leads')
+              .delete()
+              .eq('user_id', user.id)
+              .eq('campaign', campaignName);
+          }
+        }
+
 
         if (parsedData.positiveLeads.length > 0) {
           console.log('Processando leads positivos:', parsedData.positiveLeads.length);
@@ -370,10 +397,7 @@ export default function UserSettings() {
 
           const { error: leadsError } = await supabase
             .from('leads')
-            .upsert(leadsToInsert, {
-              onConflict: 'user_id,campaign,name',
-              ignoreDuplicates: false
-            });
+            .insert(leadsToInsert);
 
           if (leadsError) {
             console.error('Erro ao inserir leads positivos:', leadsError);
@@ -382,6 +406,7 @@ export default function UserSettings() {
           console.log('Leads positivos inseridos com sucesso');
           totalLeads += leadsToInsert.length;
         }
+
 
         if (parsedData.negativeLeads.length > 0) {
           console.log('Processando leads negativos:', parsedData.negativeLeads.length);
@@ -394,10 +419,7 @@ export default function UserSettings() {
 
           const { error: leadsError } = await supabase
             .from('leads')
-            .upsert(leadsToInsert, {
-              onConflict: 'user_id,campaign,name',
-              ignoreDuplicates: false
-            });
+            .insert(leadsToInsert);
 
           if (leadsError) {
             console.error('Erro ao inserir leads negativos:', leadsError);
