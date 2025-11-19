@@ -217,12 +217,17 @@ export default function UserSettings() {
             ])
           ) as string[];
 
+          // Contar leads por status
+          const pendingLeads = parsedData.positiveLeads.filter((l: any) => l.status === 'pending').length;
+          const positiveLeads = parsedData.positiveLeads.filter((l: any) => l.status === 'positive').length;
+          const negativeLeads = parsedData.negativeLeads.filter((l: any) => l.status === 'negative').length;
+
           previews.push({
             fileName: fileRecord.file_name,
             campaignsCount: parsedData.allCampaignDetails?.length || 0,
             metricsCount: parsedData.campaignMetrics.length,
-            positiveLeadsCount: parsedData.positiveLeads.length,
-            negativeLeadsCount: parsedData.negativeLeads.length,
+            positiveLeadsCount: pendingLeads, // CSV leads são pendentes
+            negativeLeadsCount: negativeLeads,
             campaignNames,
           });
 

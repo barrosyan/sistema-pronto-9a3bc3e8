@@ -136,8 +136,8 @@ export default function DataImportPreview({
                             <span className="font-medium">{file.metricsCount}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Leads Positivos:</span>
-                            <span className="font-medium text-green-600">{file.positiveLeadsCount}</span>
+                            <span className="text-muted-foreground">Leads Pendentes:</span>
+                            <span className="font-medium text-yellow-600">{file.positiveLeadsCount}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Leads Negativos:</span>
