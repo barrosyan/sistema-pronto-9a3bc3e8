@@ -131,8 +131,14 @@ const Leads = () => {
       let bValue = b[sortField] || '';
       
       if (sortField === 'connectionDate') {
-        aValue = a.connectionDate ? new Date(a.connectionDate).getTime().toString() : '0';
-        bValue = b.connectionDate ? new Date(b.connectionDate).getTime().toString() : '0';
+        const aTime = a.connectionDate && !isNaN(new Date(a.connectionDate).getTime()) 
+          ? new Date(a.connectionDate).getTime() 
+          : 0;
+        const bTime = b.connectionDate && !isNaN(new Date(b.connectionDate).getTime()) 
+          ? new Date(b.connectionDate).getTime() 
+          : 0;
+        aValue = aTime.toString();
+        bValue = bTime.toString();
       }
       
       if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
@@ -317,7 +323,9 @@ const Leads = () => {
                       <TableCell>{getStatusBadge(lead.status)}</TableCell>
                       <TableCell>
                         {lead.connectionDate 
-                          ? new Date(lead.connectionDate).toLocaleDateString('pt-BR')
+                          ? (lead.connectionDate && !isNaN(new Date(lead.connectionDate).getTime())
+                              ? new Date(lead.connectionDate).toLocaleDateString('pt-BR')
+                              : 'Data inválida')
                           : '-'}
                       </TableCell>
                       <TableCell>

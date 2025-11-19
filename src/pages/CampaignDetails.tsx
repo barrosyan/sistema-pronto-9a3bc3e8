@@ -95,8 +95,12 @@ const CampaignDetails = () => {
   const getWeeklyMetrics = () => {
     if (sortedDates.length === 0) return [];
 
-    const startDate = new Date(sortedDates[0]);
-    const endDate = new Date(sortedDates[sortedDates.length - 1]);
+    // Validar datas antes de criar objetos Date
+    const validDates = sortedDates.filter(d => d && !isNaN(new Date(d).getTime()));
+    if (validDates.length === 0) return [];
+
+    const startDate = new Date(validDates[0]);
+    const endDate = new Date(validDates[validDates.length - 1]);
     
     const weeks = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 0 });
     
@@ -104,7 +108,7 @@ const CampaignDetails = () => {
       const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
       const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd })
         .map(day => format(day, 'yyyy-MM-dd'))
-        .filter(day => sortedDates.includes(day));
+        .filter(day => validDates.includes(day));
 
       const weekMetrics = {
         weekStart: format(weekStart, 'dd/MM/yyyy', { locale: ptBR }),

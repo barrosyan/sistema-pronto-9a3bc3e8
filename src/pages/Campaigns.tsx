@@ -143,6 +143,9 @@ export default function Campaigns() {
     const weeklyMap = new Map<string, WeeklyData>();
 
     dailyData.forEach(day => {
+      // Validar data antes de processar
+      if (!day.date || isNaN(new Date(day.date).getTime())) return;
+      
       const date = new Date(day.date);
       const weekStart = startOfWeek(date, { locale: ptBR });
       const weekEnd = endOfWeek(date, { locale: ptBR });
