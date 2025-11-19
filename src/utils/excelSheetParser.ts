@@ -150,42 +150,68 @@ function extractCampaignHeader(data: any[]): CampaignDetails | null {
     jobTitles: ''
   };
   
-  // Log first few rows to understand structure
-  console.log('[extractCampaignHeader] First 3 rows:', data.slice(0, 3));
+  console.log('[extractCampaignHeader] Sample row structure:', {
+    row0Keys: data[0] ? Object.keys(data[0]) : [],
+    row0: data[0]
+  });
   
   for (let i = 0; i < Math.min(data.length, 15); i++) {
     const row = data[i];
     if (!row || typeof row !== 'object') continue;
     
     const keys = Object.keys(row);
+    if (keys.length === 0) continue;
     
-    // Try multiple column positions for flexibility
-    const possibleFirstCols = [row['__EMPTY'], row['A'], row[keys[0]], row[keys[1]]];
-    const possibleSecondCols = [row['__EMPTY_1'], row['B'], row[keys[1]], row[keys[2]]];
-    
+    // Extract first and second column values more robustly
     let firstValue = null;
     let secondValue = null;
     
-    for (const val of possibleFirstCols) {
-      if (val && String(val).trim()) {
+    // Try all possible column names/indices
+    const allPossibleFirstCols = [
+      row['__EMPTY'], 
+      row['A'], 
+      row[keys[0]],
+      row[0]
+    ];
+    
+    const allPossibleSecondCols = [
+      row['__EMPTY_1'], 
+      row['B'], 
+      row[keys[1]],
+      row[1]
+    ];
+    
+    // Find first non-empty value for first column
+    for (const val of allPossibleFirstCols) {
+      if (val !== null && val !== undefined && String(val).trim()) {
         firstValue = val;
         break;
       }
     }
     
-    for (const val of possibleSecondCols) {
-      if (val && String(val).trim()) {
+    // Find first non-empty value for second column
+    for (const val of allPossibleSecondCols) {
+      if (val !== null && val !== undefined && String(val).trim()) {
         secondValue = val;
         break;
       }
     }
     
-    if (!firstValue || !secondValue) continue;
+    if (!firstValue || !secondValue) {
+      console.log(`[extractCampaignHeader] Row ${i}: skipped (first="${firstValue}", second="${secondValue}")`);
+      continue;
+    }
     
     const label = String(firstValue).toLowerCase().trim();
     const value = String(secondValue).trim();
     
     console.log(`[extractCampaignHeader] Row ${i}: "${label}" = "${value}"`);
+    
+    // Skip rows with numeric-only values (likely date rows)
+    if (/^\d+$/.test(value) || /^\d{5}$/.test(value)) {
+      console.log(`[extractCampaignHeader] Row ${i}: skipped (numeric value)`);
+      continue;
+    }
     
     if (label.includes('empresa') || label.includes('company')) {
       header.company = value;
@@ -203,11 +229,11 @@ function extractCampaignHeader(data: any[]): CampaignDetails | null {
   }
   
   if (header.campaignName) {
-    console.log(`[extractCampaignHeader] ✓ Extracted campaign: "${header.campaignName}"`);
+    console.log(`[extractCampaignHeader] ✓ Campaign header extracted:`, header);
     return header;
   }
   
-  console.log('[extractCampaignHeader] ✗ No campaign name found');
+  console.log('[extractCampaignHeader] ✗ No campaign name found in header');
   return null;
 }
 
