@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { Separator } from '@/components/ui/separator';
 
 export default function Profile() {
   const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
+  const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
 
   useEffect(() => {
     loadFromDatabase();
@@ -13,7 +15,17 @@ export default function Profile() {
   // Extract unique campaigns from database
   const uniqueCampaigns = Array.from(new Set(campaignMetrics.map(m => m.campaignName).filter(Boolean)));
 
-  // Calculate consolidated metrics from all campaigns
+  // Filter metrics and leads based on selected campaign
+  const filteredMetrics = selectedCampaign === 'all' 
+    ? campaignMetrics 
+    : campaignMetrics.filter(m => m.campaignName === selectedCampaign);
+  
+  const allLeads = getAllLeads();
+  const filteredLeads = selectedCampaign === 'all'
+    ? allLeads
+    : allLeads.filter(l => l.campaign === selectedCampaign);
+
+  // Calculate consolidated metrics from filtered campaigns
   const calculateMetrics = () => {
     const totals = {
       convitesEnviados: 0,
@@ -24,7 +36,7 @@ export default function Profile() {
       comentarios: 0
     };
 
-    campaignMetrics.forEach(metric => {
+    filteredMetrics.forEach(metric => {
       Object.values(metric.dailyData || {}).forEach(value => {
         if (metric.eventType === 'Connection Requests Sent') {
           totals.convitesEnviados += value;
@@ -42,8 +54,7 @@ export default function Profile() {
       });
     });
 
-    const allLeads = getAllLeads();
-    const positiveLeads = allLeads.filter(l => l.status === 'positive');
+    const positiveLeads = filteredLeads.filter(l => l.status === 'positive');
     const reunioes = positiveLeads.filter(l => l.meetingDate).length;
     const propostas = positiveLeads.filter(l => l.proposalDate).length;
     const vendas = positiveLeads.filter(l => l.saleDate).length;
@@ -114,9 +125,28 @@ export default function Profile() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Perfil de Campanhas</h1>
-        <p className="text-muted-foreground">Análise detalhada de performance e métricas</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Perfil de Campanhas</h1>
+          <p className="text-muted-foreground">Análise detalhada de performance e métricas</p>
+        </div>
+        
+        {/* Filtro de Campanha */}
+        <div className="w-64">
+          <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+            <SelectTrigger className="bg-background">
+              <SelectValue placeholder="Filtrar por campanha" />
+            </SelectTrigger>
+            <SelectContent className="bg-background z-50">
+              <SelectItem value="all">Todas as Campanhas</SelectItem>
+              {uniqueCampaigns.map(campaign => (
+                <SelectItem key={campaign} value={campaign}>
+                  {campaign}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Campanhas Ativas */}
@@ -142,7 +172,12 @@ export default function Profile() {
       <Card>
         <CardHeader>
           <CardTitle>Métricas Gerais</CardTitle>
-          <CardDescription>Totais consolidados de todas as campanhas</CardDescription>
+          <CardDescription>
+            {selectedCampaign === 'all' 
+              ? 'Totais consolidados de todas as campanhas' 
+              : `Métricas da campanha: ${selectedCampaign}`
+            }
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
