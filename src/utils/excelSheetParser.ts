@@ -25,6 +25,22 @@ function normalizeAndValidate(value: any): string {
   return value.trim();
 }
 
+// Função para normalizar nomes de campanha para consolidação
+function normalizeCampaignName(name: string): string {
+  if (!name || typeof name !== 'string') return '';
+  
+  // Trim whitespace
+  let normalized = name.trim();
+  
+  // Remove multiple spaces
+  normalized = normalized.replace(/\s+/g, ' ');
+  
+  // Remove trailing/leading special characters
+  normalized = normalized.replace(/^[,\s]+|[,\s]+$/g, '');
+  
+  return normalized;
+}
+
 // Função para verificar se uma string é válida (não vazia após trim)
 function isValidString(value: string): boolean {
   return value.length > 0;
@@ -456,7 +472,7 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
       console.log(`Encontradas ${data.length} linhas na aba Input`);
       
       data.forEach((row, index) => {
-        const campaignName = normalizeAndValidate(row['Campaign Name'] || row['Campanha']);
+        const campaignName = normalizeCampaignName(row['Campaign Name'] || row['Campanha']);
         const eventType = normalizeAndValidate(row['Event Type'] || row['Tipo de Evento']);
         const profileName = normalizeAndValidate(row['Profile Name'] || row['Perfil']);
         
@@ -562,7 +578,9 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
           headerRow.slice(1).forEach((cell: any) => {
             if (cell && typeof cell === 'string') {
               // Split by comma and trim each campaign name
-              const campaigns = cell.split(',').map(c => c.trim()).filter(c => c.length > 0);
+              const campaigns = cell.split(',')
+                .map(c => normalizeCampaignName(c))
+                .filter(c => c.length > 0);
               campaignNames.push(...campaigns);
             }
           });
@@ -630,7 +648,7 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
       const regularData = XLSX.utils.sheet_to_json(sheet) as any[];
       
       regularData.forEach(row => {
-        const campaignName = normalizeAndValidate(row['Campanha'] || row['Campaign']);
+        const campaignName = normalizeCampaignName(row['Campanha'] || row['Campaign']);
         const eventType = normalizeAndValidate(row['Tipo'] || row['Event Type']);
         const profileName = normalizeAndValidate(row['Perfil'] || row['Profile']);
         
@@ -685,7 +703,9 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
             weekRow.slice(1).forEach((cell: any, weekIdx: number) => {
               if (cell && typeof cell === 'string') {
                 // Split by comma and process each campaign
-                const campaigns = cell.split(',').map(c => c.trim()).filter(c => c.length > 0);
+                const campaigns = cell.split(',')
+                  .map(c => normalizeCampaignName(c))
+                  .filter(c => c.length > 0);
                 campaigns.forEach(campaignName => {
                   // Track this campaign name for later processing
                   if (!allCampaignNames.has(campaignName)) {
@@ -703,7 +723,7 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
       const data = XLSX.utils.sheet_to_json(sheet) as any[];
       
       data.forEach(row => {
-        const campaignName = normalizeAndValidate(row['Campanha'] || row['Campaign']);
+        const campaignName = normalizeCampaignName(row['Campanha'] || row['Campaign']);
         const eventType = normalizeAndValidate(row['Tipo'] || row['Event Type']);
         const profileName = normalizeAndValidate(row['Perfil'] || row['Profile']);
         
@@ -734,7 +754,7 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
       console.log(`Encontrados ${data.length} leads positivos`);
       
       data.forEach((row, index) => {
-        const campaign = normalizeAndValidate(row['Campanha'] || row['Campaign']);
+        const campaign = normalizeCampaignName(row['Campanha'] || row['Campaign']);
         const name = normalizeAndValidate(row['Nome'] || row['Name']);
         
         if (!isValidString(campaign) || !isValidString(name)) {
@@ -790,7 +810,7 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
       console.log(`Encontrados ${data.length} leads negativos`);
       
       data.forEach((row, index) => {
-        const campaign = normalizeAndValidate(row['Campanha'] || row['Campaign']);
+        const campaign = normalizeCampaignName(row['Campanha'] || row['Campaign']);
         const name = normalizeAndValidate(row['Nome'] || row['Name']);
         
         if (!isValidString(campaign) || !isValidString(name)) {

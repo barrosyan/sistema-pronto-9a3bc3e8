@@ -13,6 +13,22 @@ function normalizeAndValidate(value: any): string {
   return value.trim();
 }
 
+// Função para normalizar nomes de campanha para consolidação
+function normalizeCampaignName(name: string): string {
+  if (!name || typeof name !== 'string') return '';
+  
+  // Trim whitespace
+  let normalized = name.trim();
+  
+  // Remove multiple spaces
+  normalized = normalized.replace(/\s+/g, ' ');
+  
+  // Remove trailing/leading special characters
+  normalized = normalized.replace(/^[,\s]+|[,\s]+$/g, '');
+  
+  return normalized;
+}
+
 // Função para verificar se uma string é válida (não vazia após trim)
 function isValidString(value: string): boolean {
   return value.length > 0;
@@ -135,7 +151,8 @@ function extractConnectionDate(value: string): string | null {
 
 // Converte leads do formato Kontax para o formato do sistema
 function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Lead[] {
-  console.log(`Convertendo ${data.length} leads do formato Kontax para campanha: ${campaignName}`);
+  const normalizedCampaignName = normalizeCampaignName(campaignName);
+  console.log(`Convertendo ${data.length} leads do formato Kontax para campanha: ${normalizedCampaignName}`);
   const leads = data.map((row, index) => {
     const firstName = normalizeAndValidate(row['First Name']);
     const lastName = normalizeAndValidate(row['Last Name']);
@@ -186,7 +203,7 @@ function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Le
     
     return {
       id: `kontax-lead-${index}-${Date.now()}`,
-      campaign: campaignName,
+      campaign: normalizedCampaignName,
       linkedin: normalizeAndValidate(row.linkedin_url),
       name: fullName,
       position: normalizeAndValidate(row.Position),
@@ -242,7 +259,7 @@ function processCampaignData(data: any[]): ParsedCampaignData {
     // Check for campaign metrics format
     if ('Campaign Name' in firstRow && 'Event Type' in firstRow) {
       data.forEach((row, index) => {
-        const campaignName = normalizeAndValidate(row['Campaign Name']);
+        const campaignName = normalizeCampaignName(row['Campaign Name']);
         const eventType = normalizeAndValidate(row['Event Type']);
         const profileName = normalizeAndValidate(row['Profile Name']);
         
@@ -274,7 +291,7 @@ function processCampaignData(data: any[]): ParsedCampaignData {
       const isPositive = 'Data Resposta Positiva' in firstRow;
       
       data.forEach((row, index) => {
-        const campaign = normalizeAndValidate(row['Campanha']);
+        const campaign = normalizeCampaignName(row['Campanha']);
         const name = normalizeAndValidate(row['Nome']);
         
         // Skip rows with empty required fields
