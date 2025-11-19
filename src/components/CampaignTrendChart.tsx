@@ -37,11 +37,22 @@ export function CampaignTrendChart({ data, campaignName }: CampaignTrendChartPro
   const [selectedMetric, setSelectedMetric] = React.useState<MetricKey>('invitations');
 
   const chartData = useMemo(() => {
-    return data.map(item => ({
-      date: item.date,
-      formattedDate: format(parseISO(item.date), 'dd/MM/yyyy', { locale: ptBR }),
-      value: item[selectedMetric] || 0,
-    })).sort((a, b) => a.date.localeCompare(b.date));
+    return data
+      .filter(item => item.date && item.date.trim() !== '')
+      .map(item => {
+        try {
+          return {
+            date: item.date,
+            formattedDate: format(parseISO(item.date), 'dd/MM/yyyy', { locale: ptBR }),
+            value: item[selectedMetric] || 0,
+          };
+        } catch (error) {
+          console.warn('Invalid date format:', item.date);
+          return null;
+        }
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .sort((a, b) => a.date.localeCompare(b.date));
   }, [data, selectedMetric]);
 
   const selectedMetricConfig = metricOptions.find(m => m.value === selectedMetric);
