@@ -491,7 +491,11 @@ function parseDailyMetricsFromDiarioSheet(
         
         const metricLabel = String(metricRow['__EMPTY'] || metricRow['A'] || metricRow[Object.keys(metricRow)[0]] || '').toLowerCase().trim();
         
-        if (metricLabel.match(/semana\s+\d+/i)) break;
+        // Check if we've reached the next week
+        if (metricLabel.match(/semana\s+\d+/i)) {
+          // Don't increment i here, let the outer loop handle it
+          break;
+        }
         if (!metricLabel) {
           metricRowIdx++;
           continue;
@@ -503,30 +507,33 @@ function parseDailyMetricsFromDiarioSheet(
           continue;
         }
         
+        // Process all days for this metric, including zeros
         daysKeys.forEach((key, dayIdx) => {
           const value = metricRow[key];
           const count = typeof value === 'number' ? value : (value ? parseInt(String(value)) || 0 : 0);
           
-          if (count > 0) {
-            let metric = metrics.find(m => 
-              m.campaignName === campaignName && 
-              m.eventType === eventType &&
-              m.profileName === profileName
-            );
-            
-            if (!metric) {
-              metric = {
-                campaignName,
-                eventType,
-                profileName,
-                totalCount: 0,
-                dailyData: {}
-              };
-              metrics.push(metric);
-            }
-            
-            const dateKey = dates[dayIdx] || `week${weekNumber}-day${dayIdx + 1}`;
-            metric.dailyData[dateKey] = count;
+          let metric = metrics.find(m => 
+            m.campaignName === campaignName && 
+            m.eventType === eventType &&
+            m.profileName === profileName
+          );
+          
+          if (!metric) {
+            metric = {
+              campaignName,
+              eventType,
+              profileName,
+              totalCount: 0,
+              dailyData: {}
+            };
+            metrics.push(metric);
+          }
+          
+          const dateKey = dates[dayIdx] || `week${weekNumber}-day${dayIdx + 1}`;
+          
+          // Add to daily data (including zeros for proper weekly structure)
+          if (count >= 0) {
+            metric.dailyData[dateKey] = (metric.dailyData[dateKey] || 0) + count;
             metric.totalCount += count;
           }
         });
@@ -534,6 +541,7 @@ function parseDailyMetricsFromDiarioSheet(
         metricRowIdx++;
       }
       
+      // Move to the row where we stopped (either next week or end)
       i = metricRowIdx;
     } else {
       i++;
