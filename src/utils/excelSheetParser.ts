@@ -575,7 +575,15 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
             // Extract values for each campaign
             campaignNames.forEach((campaignName, idx) => {
               const value = metricRow[idx + 1]; // +1 because column 0 is the metric name
-              const numericValue = Number(value) || 0;
+              let numericValue = Number(value) || 0;
+              
+              // Taxa de Aceite vem como decimal (0.52 = 52%), converter para inteiro (porcentagem)
+              if (eventType === 'Connection Accept Rate' && numericValue > 0 && numericValue < 1) {
+                numericValue = Math.round(numericValue * 100);
+              } else {
+                // Garantir que outros valores sejam inteiros
+                numericValue = Math.round(numericValue);
+              }
               
               // Only add if there's a value
               if (numericValue > 0 || eventType === 'Active Days') {
