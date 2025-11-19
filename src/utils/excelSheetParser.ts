@@ -1,6 +1,8 @@
 import * as XLSX from 'xlsx';
 import { CampaignMetrics, Lead } from '@/types/campaign';
-import { parseCampaignFile } from './campaignParser';
+
+// Alias para compatibilidade
+export { parseExcelFile as parseExcelSheets };
 
 export interface CampaignDetails {
   company?: string;
@@ -16,16 +18,10 @@ export interface ExcelSheetData {
   positiveLeads: Lead[];
   negativeLeads: Lead[];
   campaignDetails?: CampaignDetails;
-  allCampaignDetails?: CampaignDetails[]; // Array com detalhes de todas as campanhas encontradas
+  allCampaignDetails?: CampaignDetails[];
 }
 
-// Função para normalizar e validar strings
-function normalizeAndValidate(value: any): string {
-  if (!value || typeof value !== 'string') return '';
-  return value.trim();
-}
-
-// Função para calcular distância de Levenshtein entre duas strings
+// Função para calcular distância de Levenshtein
 function levenshteinDistance(str1: string, str2: string): number {
   const matrix: number[][] = [];
   
@@ -54,7 +50,7 @@ function levenshteinDistance(str1: string, str2: string): number {
   return matrix[str2.length][str1.length];
 }
 
-// Função para verificar se duas campanhas devem ser consideradas iguais
+// Função para verificar se duas campanhas são similares
 function areCampaignsSimilar(name1: string, name2: string): boolean {
   if (!name1 || !name2) return false;
   if (name1 === name2) return true;
@@ -64,55 +60,44 @@ function areCampaignsSimilar(name1: string, name2: string): boolean {
   
   if (normalized1 === normalized2) return true;
   
-  // Extrair partes numéricas de ambos os nomes
   const numbers1 = normalized1.match(/\d+/g) || [];
   const numbers2 = normalized2.match(/\d+/g) || [];
   
-  // Se tiverem números diferentes, são campanhas diferentes
   if (numbers1.length !== numbers2.length) return false;
   if (numbers1.some((num, idx) => num !== numbers2[idx])) return false;
   
-  // Remover números para comparação textual
   const text1 = normalized1.replace(/\d+/g, '').replace(/\s+/g, ' ').trim();
   const text2 = normalized2.replace(/\d+/g, '').replace(/\s+/g, ' ').trim();
   
   if (text1 === text2) return true;
   
-  // Verificar se um nome está completamente contido no outro
   const shorter = text1.length < text2.length ? text1 : text2;
   const longer = text1.length < text2.length ? text2 : text1;
   
   if (longer.includes(shorter) && shorter.length > 0) {
-    // Só considera igual se o nome menor for significativo (>= 3 caracteres)
     return shorter.length >= 3;
   }
   
-  // Calcular similaridade por distância de Levenshtein
   const maxLength = Math.max(text1.length, text2.length);
   if (maxLength === 0) return true;
   
   const distance = levenshteinDistance(text1, text2);
   const similarity = 1 - (distance / maxLength);
   
-  // Considera similar se tiver 90% de similaridade ou mais
   return similarity >= 0.90;
 }
 
-// Função para normalizar nomes de campanha para consolidação
-// Retorna o nome canônico baseado em nomes similares já processados
+// Normalizar nomes de campanha
 function normalizeCampaignName(name: string, existingNames?: Set<string>): string {
   if (!name || typeof name !== 'string') return '';
   
-  // Limpeza básica
   let normalized = name.trim();
   normalized = normalized.replace(/\s+/g, ' ');
   normalized = normalized.replace(/^[,\s]+|[,\s]+$/g, '');
   
-  // Se temos uma lista de nomes existentes, procurar por similar
   if (existingNames && existingNames.size > 0) {
     for (const existingName of existingNames) {
       if (areCampaignsSimilar(normalized, existingName)) {
-        console.log(`Consolidando "${normalized}" em "${existingName}"`);
         return existingName;
       }
     }
@@ -121,12 +106,7 @@ function normalizeCampaignName(name: string, existingNames?: Set<string>): strin
   return normalized;
 }
 
-// Função para verificar se uma string é válida (não vazia após trim)
-function isValidString(value: string): boolean {
-  return value.length > 0;
-}
-
-// Lista de abas fixas que não são campanhas
+// Abas fixas
 const FIXED_SHEETS = [
   'campanha 0',
   'campaign 0', 
@@ -139,1087 +119,493 @@ const FIXED_SHEETS = [
   'dados gerais'
 ];
 
-// Função para verificar se uma aba é fixa (não é campanha)
 function isFixedSheet(sheetName: string): boolean {
   const normalized = sheetName.toLowerCase().trim();
   return FIXED_SHEETS.some(fixed => normalized.includes(fixed));
 }
 
-// Função para verificar se uma campanha deve ser ignorada
 function shouldIgnoreCampaign(campaignName: string): boolean {
   if (!campaignName) return true;
   
   const normalized = campaignName.toLowerCase().trim();
-  
-  // Lista de campanhas a ignorar
-  const ignoredCampaigns = [
-    'campanha 0',
-    'campaign 0',
-    'sent manually'
-  ];
+  const ignoredCampaigns = ['campanha 0', 'campaign 0', 'sent manually'];
   
   return ignoredCampaigns.includes(normalized);
 }
 
-// Helper function to extract campaign header info from the beginning of a campaign sheet
-function extractCampaignHeader(data: any[]): any {
-  if (!data || data.length < 6) {
-    console.log('Dados insuficientes para extrair header');
-    return null;
-  }
+// Extrair header da aba de campanha
+function extractCampaignHeader(data: any[]): CampaignDetails | null {
+  if (!data || data.length < 6) return null;
   
-  const header: any = {
+  const header: CampaignDetails = {
     company: '',
-    profileName: '',
+    profile: '',
     campaignName: '',
     objective: '',
     cadence: '',
     jobTitles: ''
   };
   
-  console.log('Primeiras 10 linhas dos dados para debug:', data.slice(0, 10));
-  
-  // Extract header fields from first rows (typically first 7-8 rows)
   for (let i = 0; i < Math.min(data.length, 10); i++) {
     const row = data[i];
     if (!row || typeof row !== 'object') continue;
     
-    // Get all possible keys for the row
     const keys = Object.keys(row);
-    console.log(`Linha ${i} - Keys:`, keys);
-    
-    // Try to access first and second columns with different possible keys
-    let firstValue = null;
-    let secondValue = null;
-    
-    // Try common patterns for first column
-    if (row['__EMPTY']) firstValue = row['__EMPTY'];
-    else if (row['A']) firstValue = row['A'];
-    else if (keys[0]) firstValue = row[keys[0]];
-    
-    // Try common patterns for second column
-    if (row['__EMPTY_1']) secondValue = row['__EMPTY_1'];
-    else if (row['B']) secondValue = row['B'];
-    else if (keys[1]) secondValue = row[keys[1]];
-    
-    console.log(`Linha ${i} - Primeira coluna: "${firstValue}" | Segunda coluna: "${secondValue}"`);
+    const firstValue = row['__EMPTY'] || row['A'] || row[keys[0]];
+    const secondValue = row['__EMPTY_1'] || row['B'] || row[keys[1]];
     
     if (!firstValue || !secondValue) continue;
     
     const label = String(firstValue).toLowerCase().trim();
     const value = String(secondValue).trim();
     
-    console.log(`Linha ${i} - Label: "${label}" | Value: "${value}"`);
-    
     if (label.includes('empresa') || label.includes('company')) {
       header.company = value;
-      console.log('✓ Empresa encontrada:', value);
     } else if (label.includes('perfil') || label.includes('profile')) {
-      header.profileName = value;
-      console.log('✓ Perfil encontrado:', value);
+      header.profile = value;
     } else if ((label.includes('campanha') || label.includes('campaign')) && !label.includes('objetivo')) {
       header.campaignName = value;
-      console.log('✓ Nome da campanha encontrado:', value);
     } else if (label.includes('objetivo') || label.includes('objective')) {
       header.objective = value;
-      console.log('✓ Objetivo encontrado:', value);
     } else if (label.includes('cadência') || label.includes('cadence')) {
       header.cadence = value;
-      console.log('✓ Cadência encontrada:', value);
     } else if (label.includes('cargos') || label.includes('job')) {
       header.jobTitles = value;
-      console.log('✓ Cargos encontrados:', value);
     }
   }
   
-  console.log('Header final extraído:', header);
-  
-  if (!header.campaignName) {
-    console.log('❌ ERRO: Nome da campanha não foi encontrado no header!');
-    return null;
-  }
-  
-  return header;
+  return header.campaignName ? header : null;
 }
 
-// Função para encontrar índice da linha de métricas
-function findMetricsStartRow(data: any[]): number {
-  for (let i = 0; i < data.length; i++) {
-    const row = data[i];
-    const firstCell = String(row['__EMPTY'] || row['A'] || row[Object.keys(row)[0]] || '').toLowerCase();
-    
-    if (firstCell.includes('tipo do dado') || firstCell.includes('período')) {
-      return i;
-    }
-  }
-  return -1;
-}
-
-// Função para processar métricas semanais de aba de campanha
-function parseWeeklyMetrics(data: any[], campaignHeader: any, campaignNameConsolidation: Set<string>): CampaignMetrics[] {
+// Parsear métricas semanais da aba de campanha
+function parseWeeklyMetricsFromCampaignSheet(
+  data: any[], 
+  campaignHeader: CampaignDetails, 
+  campaignNameConsolidation: Set<string>
+): CampaignMetrics[] {
   const metrics: CampaignMetrics[] = [];
-  const startRow = findMetricsStartRow(data);
   
-  console.log(`Procurando métricas. Start row: ${startRow}`);
-  
-  if (startRow === -1) {
-    console.log('❌ Linha de início das métricas não encontrada');
-    return metrics;
-  }
-  
+  if (!data || data.length === 0 || !campaignHeader.campaignName) return metrics;
+
   const campaignName = normalizeCampaignName(campaignHeader.campaignName, campaignNameConsolidation);
-  if (shouldIgnoreCampaign(campaignName)) {
-    console.log(`Campanha ${campaignName} está na lista de ignorados`);
-    return metrics;
-  }
+  const profileName = campaignHeader.profile || '';
+  
+  if (shouldIgnoreCampaign(campaignName)) return metrics;
   
   campaignNameConsolidation.add(campaignName);
+
+  // Encontrar linha "Tipo do dado / Período"
+  let metricsStartIndex = -1;
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    if (!row) continue;
+    
+    const firstCol = String(row['__EMPTY'] || row['A'] || row[Object.keys(row)[0]] || '').toLowerCase();
+    if (firstCol.includes('tipo do dado') || firstCol.includes('período')) {
+      metricsStartIndex = i;
+      break;
+    }
+  }
   
-  // Mapeamento de métricas em português/inglês
+  if (metricsStartIndex === -1) return metrics;
+  
+  const headerRow = data[metricsStartIndex];
+  if (!headerRow) return metrics;
+  
+  const headerKeys = Object.keys(headerRow);
+  
+  // Mapear colunas para semanas
+  const weekColumns: { key: string; weekNumber: number; startDate?: string; endDate?: string }[] = [];
+  
+  headerKeys.forEach((key, idx) => {
+    if (idx === 0) return;
+    
+    const value = String(headerRow[key] || '').toLowerCase().trim();
+    const weekMatch = value.match(/(\d+)[ªº]\s*semana/i);
+    
+    if (weekMatch) {
+      const weekNum = parseInt(weekMatch[1]);
+      weekColumns.push({ key, weekNumber: weekNum });
+    }
+  });
+  
+  // Extrair datas de início e fim
+  if (metricsStartIndex + 1 < data.length) {
+    const startRow = data[metricsStartIndex + 1];
+    if (startRow) {
+      const firstCol = String(startRow['__EMPTY'] || startRow['A'] || startRow[Object.keys(startRow)[0]] || '').toLowerCase();
+      if (firstCol.includes('início') || firstCol.includes('inicio')) {
+        weekColumns.forEach(col => {
+          const dateValue = startRow[col.key];
+          if (dateValue) col.startDate = String(dateValue);
+        });
+      }
+    }
+  }
+  
+  if (metricsStartIndex + 2 < data.length) {
+    const endRow = data[metricsStartIndex + 2];
+    if (endRow) {
+      const firstCol = String(endRow['__EMPTY'] || endRow['A'] || endRow[Object.keys(endRow)[0]] || '').toLowerCase();
+      if (firstCol.includes('fim')) {
+        weekColumns.forEach(col => {
+          const dateValue = endRow[col.key];
+          if (dateValue) col.endDate = String(dateValue);
+        });
+      }
+    }
+  }
+  
+  // Mapa de métricas
   const metricMap: Record<string, string> = {
     'convites enviados': 'Connection Requests Sent',
-    'conexões realizadas': 'Connection Requests Accepted',
+    'conexões realizadas': 'Connections Made',
+    'conexoes realizadas': 'Connections Made',
     'mensagens enviadas': 'Messages Sent',
     'visitas': 'Profile Visits',
     'likes': 'Post Likes',
     'comentários': 'Comments Done',
-    'respostas positivas': 'Positive Responses',
-    'reuniões': 'Meetings',
-    'propostas': 'Proposals',
-    'vendas': 'Sales',
+    'comentarios': 'Comments Done',
     'total de atividades': 'Total Activities',
-    'leads processados': 'Leads Processed'
+    'respostas positivas': 'Positive Responses',
+    'leads processados': 'Processed Leads',
+    'reuniões': 'Meetings',
+    'reunioes': 'Meetings',
+    'propostas': 'Proposals',
+    'vendas': 'Sales'
   };
   
-  console.log(`Processando métricas a partir da linha ${startRow + 1}`);
-  console.log('Amostra da linha de header:', data[startRow]);
-  
-  // Processar cada linha de métrica
-  for (let i = startRow + 1; i < data.length; i++) {
-    const row = data[i];
-    if (!row) break;
+  // Processar linhas de métricas
+  for (let rowIdx = metricsStartIndex + 3; rowIdx < data.length; rowIdx++) {
+    const row = data[rowIdx];
+    if (!row) continue;
     
-    // Get all keys to understand the structure
-    const keys = Object.keys(row);
+    const metricLabel = String(row['__EMPTY'] || row['A'] || row[Object.keys(row)[0]] || '').toLowerCase().trim();
     
-    // Try to get metric name from first column
-    let metricNameRaw = null;
-    if (row['__EMPTY']) metricNameRaw = row['__EMPTY'];
-    else if (row['A']) metricNameRaw = row['A'];
-    else if (keys[0]) metricNameRaw = row[keys[0]];
-    
-    if (!metricNameRaw) {
-      console.log(`Linha ${i}: Nome da métrica vazio, pulando`);
-      continue;
-    }
-    
-    const metricName = String(metricNameRaw).toLowerCase().trim();
-    console.log(`Linha ${i}: Métrica encontrada: "${metricName}"`);
-    
-    // Stop at conversion rates or other section markers
-    if (metricName.includes('taxas de conversão') || 
-        metricName.includes('detalhamento') ||
-        metricName.includes('observações') ||
-        metricName.includes('problemas técnicos')) {
-      console.log(`Encontrado marcador de fim de métricas: "${metricName}"`);
+    if (metricLabel.includes('taxas de conversão') || 
+        metricLabel.includes('detalhamento') ||
+        metricLabel.includes('observações')) {
       break;
     }
     
-    const eventType = metricMap[metricName];
-    if (!eventType) {
-      console.log(`Métrica "${metricName}" não mapeada, pulando`);
-      continue;
-    }
-    
-    // Extrair dados de todas as colunas (semanas/períodos)
-    const dailyData: Record<string, number> = {};
-    let totalCount = 0;
-    
-    // Iterar sobre todas as keys (colunas) exceto a primeira
-    keys.slice(1).forEach((key, idx) => {
-      const value = Number(row[key]) || 0;
-      if (value > 0) {
-        totalCount += value;
-        console.log(`  Coluna ${idx + 1} (${key}): ${value}`);
-      }
-    });
-    
-    console.log(`✓ Métrica adicionada: ${campaignName} - ${eventType} - Total: ${totalCount}`);
-    
-    metrics.push({
-      campaignName,
-      eventType,
-      profileName: campaignHeader.profileName || 'Unknown',
-      totalCount,
-      dailyData
-    });
-  }
-  
-  console.log(`Total de ${metrics.length} métricas extraídas da campanha ${campaignName}`);
-  return metrics;
-}
-
-// Helper function to extract campaign details from a sheet looking for "Dados da campanha" section
-function extractCampaignDetailsFromSheet(sheet: XLSX.WorkSheet): { details: CampaignDetails | null; endRow: number } {
-  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-  
-  // Find the row with "Dados da campanha"
-  const campaignDataRowIndex = data.findIndex(row => 
-    row && row.some((cell: any) => 
-      typeof cell === 'string' && cell.toLowerCase().includes('dados da campanha')
-    )
-  );
-  
-  if (campaignDataRowIndex === -1) return { details: null, endRow: 0 };
-  
-  // Extract details from rows after "Dados da campanha"
-  const details: CampaignDetails = {};
-  let lastDetailRow = campaignDataRowIndex + 1;
-  
-  for (let i = campaignDataRowIndex + 1; i < Math.min(campaignDataRowIndex + 10, data.length); i++) {
-    const row = data[i];
-    if (!row || row.length < 2) continue;
-    
-    const label = String(row[0] || '').trim();
-    const value = String(row[1] || '').trim();
-    
-    if (!label || !value) continue;
-    
-    lastDetailRow = i + 1; // Track the last row with detail data
-    
-    if (label.toLowerCase().includes('empresa') || label.toLowerCase() === 'company') {
-      details.company = value;
-    } else if (label.toLowerCase().includes('perfil') || label.toLowerCase() === 'profile') {
-      details.profile = value;
-    } else if (label.toLowerCase().includes('campanha') && !label.toLowerCase().includes('objetivo')) {
-      details.campaignName = value;
-    } else if (label.toLowerCase().includes('objetivo')) {
-      details.objective = value;
-    } else if (label.toLowerCase().includes('cadência') || label.toLowerCase().includes('cadence')) {
-      details.cadence = value;
-    } else if (label.toLowerCase().includes('cargos')) {
-      details.jobTitles = value;
-    }
-  }
-  
-  return { 
-    details: Object.keys(details).length > 0 ? details : null, 
-    endRow: lastDetailRow 
-  };
-}
-
-// Mapeamento de nomes de métricas em português para event types
-const metricNameMapping: Record<string, string> = {
-  'convites enviados': 'Connection Requests Sent',
-  'invites': 'Connection Requests Sent',
-  'conexões realizadas': 'Connection Requests Accepted',
-  'aceite': 'Connection Requests Accepted',
-  'mensagens enviadas': 'Messages Sent',
-  'fu 1': 'Messages Sent', // Follow-up 1
-  'fu 2': 'Messages Sent', // Follow-up 2
-  'fu 3': 'Messages Sent', // Follow-up 3
-  'visitas': 'Profile Visits',
-  'likes': 'Post Likes',
-  'comentários': 'Comments Done',
-  'respostas positivas': 'Positive Responses',
-  'reuniões marcadas': 'Meetings Scheduled',
-  'leads processados': 'Leads Processed',
-};
-
-// Helper function to normalize metric names
-function normalizeMetricName(name: string): string | null {
-  const normalized = name.toLowerCase().trim();
-  return metricNameMapping[normalized] || null;
-}
-
-// Helper function to parse date from DD/MM/YYYY to YYYY-MM-DD
-function parseDateDDMMYYYY(dateStr: string): string | null {
-  if (!dateStr || typeof dateStr !== 'string') return null;
-  const match = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-  if (match) {
-    const [, day, month, year] = match;
-    return `${year}-${month}-${day}`;
-  }
-  return null;
-}
-
-// Extract weekly metrics from campaign sheets (non-daily format)
-function extractWeeklyMetricsFromSheet(
-  sheet: XLSX.WorkSheet,
-  campaignName: string,
-  profileName: string
-): CampaignMetrics[] {
-  const metrics: CampaignMetrics[] = [];
-  const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-  
-  // Find "Tipo do dado / Período" row
-  let headerRowIndex = -1;
-  for (let i = 0; i < rawData.length; i++) {
-    const row = rawData[i];
-    if (row && row[0] && String(row[0]).toLowerCase().includes('tipo do dado')) {
-      headerRowIndex = i;
-      break;
-    }
-  }
-  
-  if (headerRowIndex === -1) {
-    console.log(`Formato semanal não encontrado na aba ${campaignName}`);
-    return metrics;
-  }
-  
-  // Get week headers (1ª Semana, 2ª Semana, etc.)
-  const weekHeaders = rawData[headerRowIndex].slice(1);
-  
-  // Find "Início do Período" row to get start dates
-  const startDateRowIndex = headerRowIndex + 1;
-  const startDateRow = rawData[startDateRowIndex];
-  if (!startDateRow || String(startDateRow[0]).toLowerCase() !== 'início do período') {
-    console.log(`Linha "Início do Período" não encontrada na aba ${campaignName}`);
-    return metrics;
-  }
-  const startDates = startDateRow.slice(1);
-  
-  // Find "Fim do Período" row (optional for validation)
-  const endDateRowIndex = headerRowIndex + 2;
-  
-  // Skip "Dias Ativos" row
-  // Metrics start after this
-  const firstMetricRowIndex = headerRowIndex + 4;
-  
-  // Process metric rows
-  for (let i = firstMetricRowIndex; i < rawData.length; i++) {
-    const row = rawData[i];
-    if (!row || !row[0]) continue;
-    
-    const metricLabel = String(row[0]).trim();
     if (!metricLabel) continue;
     
-    // Stop at "Taxas de Conversão" or similar sections
-    if (metricLabel.toLowerCase().includes('taxas de conversão') ||
-        metricLabel.toLowerCase().includes('detalhamento') ||
-        metricLabel.toLowerCase().includes('observações') ||
-        metricLabel.toLowerCase().includes('problemas técnicos') ||
-        metricLabel.toLowerCase().includes('ajustes na pesquisa') ||
-        metricLabel.toLowerCase().includes('análise comparativa')) {
-      break;
-    }
+    const eventType = metricMap[metricLabel];
+    if (!eventType) continue;
     
-    const eventType = normalizeMetricName(metricLabel);
-    if (!eventType) {
-      console.log(`Métrica não reconhecida: "${metricLabel}"`);
-      continue;
-    }
-    
-    // Build daily data from weekly values
-    const dailyData: Record<string, number> = {};
-    let totalCount = 0;
-    
-    for (let weekIdx = 0; weekIdx < weekHeaders.length; weekIdx++) {
-      const value = row[weekIdx + 1];
-      const numericValue = Number(value) || 0;
-      const startDate = startDates[weekIdx];
+    // Processar cada semana
+    weekColumns.forEach(({ key, weekNumber, startDate, endDate }) => {
+      const value = row[key];
+      const count = typeof value === 'number' ? value : (value ? parseInt(String(value)) || 0 : 0);
       
-      if (startDate && numericValue > 0) {
-        const parsedDate = parseDateDDMMYYYY(String(startDate));
-        if (parsedDate) {
-          dailyData[parsedDate] = numericValue;
-          totalCount += numericValue;
-        }
-      }
-    }
-    
-    // Only add metric if there's actual data
-    if (totalCount > 0 || Object.keys(dailyData).length > 0) {
-      metrics.push({
-        campaignName,
-        eventType,
-        profileName,
-        totalCount,
-        dailyData,
-      });
-      console.log(`Métrica adicionada: ${campaignName} - ${eventType} - Total: ${totalCount}`);
-    }
-  }
-  
-  console.log(`Extraídas ${metrics.length} métricas semanais da aba ${campaignName}`);
-  return metrics;
-}
-
-// Extract daily metrics from "Diário [NAME]" sheets
-function extractDailyMetricsFromSheet(
-  sheet: XLSX.WorkSheet,
-  campaignName: string,
-  profileName: string
-): CampaignMetrics[] {
-  const metrics: CampaignMetrics[] = [];
-  const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-  
-  // Track metrics across all weeks
-  const metricAccumulator: Map<string, Record<string, number>> = new Map();
-  
-  // Find all "Semana X" blocks
-  for (let i = 0; i < rawData.length; i++) {
-    const row = rawData[i];
-    if (!row || !row[0]) continue;
-    
-    const cellValue = String(row[0]).toLowerCase().trim();
-    
-    // Check if this is a week header
-    if (cellValue.startsWith('semana ')) {
-      // Next row should be "Dias da Semana" with dates
-      const dateRow = rawData[i + 1];
-      if (!dateRow || String(dateRow[0]).toLowerCase() !== 'dias da semana') continue;
+      let metric = metrics.find(m => 
+        m.campaignName === campaignName && 
+        m.eventType === eventType &&
+        m.profileName === profileName
+      );
       
-      const dates = dateRow.slice(1, 8); // 7 days
-      const parsedDates = dates.map((d: any) => parseDateDDMMYYYY(String(d))).filter(Boolean);
-      
-      // Process metric rows for this week
-      for (let j = i + 3; j < i + 20 && j < rawData.length; j++) {
-        const metricRow = rawData[j];
-        if (!metricRow || !metricRow[0]) continue;
-        
-        const metricLabel = String(metricRow[0]).trim();
-        if (!metricLabel) continue;
-        
-        // Check if we've hit the next week
-        if (metricLabel.toLowerCase().startsWith('semana ')) break;
-        
-        const eventType = normalizeMetricName(metricLabel);
-        if (!eventType) continue;
-        
-        // Initialize accumulator for this metric if needed
-        if (!metricAccumulator.has(eventType)) {
-          metricAccumulator.set(eventType, {});
-        }
-        
-        const dailyData = metricAccumulator.get(eventType)!;
-        
-        // Add daily values
-        for (let dayIdx = 0; dayIdx < parsedDates.length; dayIdx++) {
-          const date = parsedDates[dayIdx];
-          const value = Number(metricRow[dayIdx + 1]) || 0;
-          if (date) {
-            dailyData[date] = (dailyData[date] || 0) + value;
-          }
-        }
-      }
-    }
-  }
-  
-  // Convert accumulated metrics to CampaignMetrics array
-  for (const [eventType, dailyData] of metricAccumulator.entries()) {
-    const totalCount = Object.values(dailyData).reduce((sum, val) => sum + val, 0);
-    
-    metrics.push({
-      campaignName,
-      eventType,
-      profileName,
-      totalCount,
-      dailyData,
-    });
-  }
-  
-  console.log(`Extraídas ${metrics.length} métricas diárias da aba ${campaignName}`);
-  return metrics;
-}
-
-// Helper function to extract metrics from a sheet, optionally starting after campaign details
-function extractMetricsFromSheet(
-  sheet: XLSX.WorkSheet, 
-  campaignName: string, 
-  startRow?: number
-): CampaignMetrics[] {
-  const metrics: CampaignMetrics[] = [];
-  
-  // Get the raw data as 2D array
-  const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-  
-  // Find the header row (contains "Event Type" or similar)
-  let headerRowIndex = startRow || 0;
-  for (let i = headerRowIndex; i < rawData.length; i++) {
-    const row = rawData[i];
-    if (row && row.some((cell: any) => {
-      const cellStr = String(cell || '').toLowerCase();
-      return cellStr.includes('event type') || 
-             cellStr.includes('tipo de evento') || 
-             cellStr.includes('profile name') ||
-             cellStr.includes('perfil');
-    })) {
-      headerRowIndex = i;
-      break;
-    }
-  }
-  
-  if (headerRowIndex >= rawData.length - 1) {
-    console.log(`Nenhuma linha de header encontrada na aba ${campaignName}`);
-    return metrics;
-  }
-  
-  // Extract headers
-  const headers = rawData[headerRowIndex].map((h: any) => String(h || '').trim());
-  
-  // Find column indices with safe toLowerCase
-  const eventTypeCol = headers.findIndex(h => {
-    if (!h || typeof h !== 'string') return false;
-    const lower = h.toLowerCase();
-    return lower.includes('event type') || lower.includes('tipo de evento');
-  });
-  
-  const profileCol = headers.findIndex(h => {
-    if (!h || typeof h !== 'string') return false;
-    const lower = h.toLowerCase();
-    return lower.includes('profile name') || lower === 'perfil';
-  });
-  
-  const totalCol = headers.findIndex(h => {
-    if (!h || typeof h !== 'string') return false;
-    const lower = h.toLowerCase();
-    return lower.includes('total count') || lower === 'total';
-  });
-  
-  if (eventTypeCol === -1 || profileCol === -1) {
-    console.log(`Colunas necessárias não encontradas na aba ${campaignName}`);
-    return metrics;
-  }
-  
-  // Find date columns (formato YYYY-MM-DD)
-  const dateColumns: { index: number; date: string }[] = [];
-  headers.forEach((header, index) => {
-    if (header && typeof header === 'string' && header.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      dateColumns.push({ index, date: header });
-    }
-  });
-  
-  // Process data rows
-  for (let i = headerRowIndex + 1; i < rawData.length; i++) {
-    const row = rawData[i];
-    if (!row || row.length === 0) continue;
-    
-    const eventType = normalizeAndValidate(row[eventTypeCol]);
-    const profileName = normalizeAndValidate(row[profileCol]);
-    
-    if (!isValidString(eventType) || !isValidString(profileName)) continue;
-    
-    const dailyData: Record<string, number> = {};
-    dateColumns.forEach(({ index, date }) => {
-      dailyData[date] = Number(row[index]) || 0;
-    });
-    
-    const totalCount = totalCol !== -1 ? Number(row[totalCol]) || 0 : 
-      Object.values(dailyData).reduce((sum, val) => sum + val, 0);
-    
-    metrics.push({
-      campaignName,
-      eventType,
-      profileName,
-      totalCount,
-      dailyData,
-    });
-  }
-  
-  console.log(`Extraídas ${metrics.length} métricas da aba ${campaignName}`);
-  return metrics;
-}
-
-export async function parseExcelSheets(file: File | string): Promise<ExcelSheetData> {
-  // Se for um arquivo File, verificar se é CSV e usar o parser apropriado
-  if (file instanceof File) {
-    const fileName = file.name.toLowerCase();
-    if (fileName.endsWith('.csv')) {
-      console.log('Detectado arquivo CSV, usando parser específico');
-      const parsedData = await parseCampaignFile(file);
-      console.log('Dados parseados do CSV:', {
-        metrics: parsedData.metrics.length,
-        leads: parsedData.leads.length,
-        sampleLead: parsedData.leads[0]
-      });
-      
-      return {
-        campaignMetrics: parsedData.metrics,
-        positiveLeads: parsedData.leads,
-        negativeLeads: [],
-      };
-    }
-  }
-
-  // Para arquivos Excel ou URLs, continuar com o fluxo original
-  let workbook: XLSX.WorkBook;
-
-  if (typeof file === 'string') {
-    const response = await fetch(file);
-    const arrayBuffer = await response.arrayBuffer();
-    workbook = XLSX.read(arrayBuffer, { type: 'array' });
-  } else {
-    const arrayBuffer = await file.arrayBuffer();
-    workbook = XLSX.read(arrayBuffer, { type: 'array' });
-  }
-
-  console.log('Abas encontradas no Excel:', workbook.SheetNames);
-
-  const campaignMetrics: CampaignMetrics[] = [];
-  const positiveLeads: Lead[] = [];
-  const negativeLeads: Lead[] = [];
-  const allCampaignDetails: CampaignDetails[] = [];
-  const allCampaignNames = new Set<string>(); // Track all campaign names found in Dados Gerais
-  const campaignNameConsolidation = new Set<string>(); // Track canonical campaign names for consolidation
-  
-  
-  // Process each sheet based on its name pattern
-  for (const sheetName of workbook.SheetNames) {
-    const sheet = workbook.Sheets[sheetName];
-    const normalizedName = sheetName.toLowerCase();
-    
-    console.log(`Processando aba: ${sheetName}`);
-    
-    // Extract campaign details from sheets with "Dados da campanha"
-    const { details, endRow } = extractCampaignDetailsFromSheet(sheet);
-    if (details) {
-      console.log(`Detalhes de campanha encontrados na aba "${sheetName}":`, details);
-      allCampaignDetails.push(details);
-    }
-    
-    // Parse "Input" or "Inputs" sheet - campaign metrics
-    if (normalizedName === 'input' || normalizedName === 'inputs' || normalizedName.includes('input')) {
-      console.log('Processando aba Input/Inputs para métricas de campanha');
-      const data = XLSX.utils.sheet_to_json(sheet) as any[];
-      
-      console.log(`Encontradas ${data.length} linhas na aba Input`);
-      
-      data.forEach((row, index) => {
-        const campaignName = normalizeCampaignName(row['Campaign Name'] || row['Campanha'], campaignNameConsolidation);
-        const eventType = normalizeAndValidate(row['Event Type'] || row['Tipo de Evento']);
-        const profileName = normalizeAndValidate(row['Profile Name'] || row['Perfil']);
-        
-        if (!isValidString(campaignName) || !isValidString(eventType) || !isValidString(profileName)) {
-          console.log(`Linha ${index} ignorada: dados incompletos`, { campaignName, eventType, profileName });
-          return;
-        }
-        
-        if (shouldIgnoreCampaign(campaignName)) {
-          console.log(`Campanha ignorada: ${campaignName}`);
-          return;
-        }
-        
-        campaignNameConsolidation.add(campaignName);
-        
-        const dailyData: Record<string, number> = {};
-        Object.keys(row).forEach(key => {
-          if (key.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            dailyData[key] = Number(row[key]) || 0;
-          }
-        });
-        
-        console.log(`Métrica adicionada: ${campaignName} - ${eventType} - ${profileName}`);
-        
-        campaignMetrics.push({
+      if (!metric) {
+        metric = {
           campaignName,
           eventType,
           profileName,
-          totalCount: Number(row['Total Count'] || row['Total']) || 0,
-          dailyData,
-        });
-      });
-    }
-    
-    // Parse campaign-specific sheets (not Inputs, Leads, Compilado, or Dados Gerais)
-    else if (!isFixedSheet(sheetName)) {
-      console.log(`Processando aba de campanha: ${sheetName}`);
-      const data = XLSX.utils.sheet_to_json(sheet) as any[];
-      
-      // CRÍTICO: Extrair header de DENTRO da aba, NÃO usar o nome da aba
-      const campaignHeader = extractCampaignHeader(data);
-      if (campaignHeader) {
-        console.log(`Header de campanha encontrado na aba ${sheetName}:`, campaignHeader);
-        console.log(`Nome REAL da campanha extraído de dentro da aba: ${campaignHeader.campaignName}`);
-        
-        // Store campaign details usando o nome de DENTRO da aba
-        const campaignDetails: CampaignDetails = {
-          company: campaignHeader.company,
-          profile: campaignHeader.profileName,
-          campaignName: campaignHeader.campaignName, // Nome de DENTRO da aba
-          objective: campaignHeader.objective,
-          cadence: campaignHeader.cadence,
-          jobTitles: campaignHeader.jobTitles
+          totalCount: 0,
+          dailyData: {}
         };
-        
-        allCampaignDetails.push(campaignDetails);
-        
-        // Extract weekly metrics usando o nome de DENTRO da aba
-        const weeklyMetrics = parseWeeklyMetrics(data, campaignHeader, campaignNameConsolidation);
-        if (weeklyMetrics.length > 0) {
-          console.log(`Adicionadas ${weeklyMetrics.length} métricas semanais da campanha ${campaignHeader.campaignName}`);
-          campaignMetrics.push(...weeklyMetrics);
-        } else {
-          console.log(`Nenhuma métrica semanal encontrada para campanha ${campaignHeader.campaignName}`);
-        }
-      } else {
-        console.log(`Nenhum detalhe de campanha encontrado na aba ${sheetName} - aba ignorada`);
+        metrics.push(metric);
       }
+      
+      const weekKey = `week-${weekNumber}`;
+      metric.dailyData[weekKey] = count;
+      metric.totalCount += count;
+    });
+  }
+  
+  return metrics;
+}
+
+// Parsear métricas diárias da aba "Diário"
+function parseDailyMetricsFromDiarioSheet(
+  data: any[], 
+  campaignHeader: CampaignDetails, 
+  campaignNameConsolidation: Set<string>
+): CampaignMetrics[] {
+  const metrics: CampaignMetrics[] = [];
+  
+  if (!data || data.length === 0 || !campaignHeader.campaignName) return metrics;
+
+  const campaignName = normalizeCampaignName(campaignHeader.campaignName, campaignNameConsolidation);
+  const profileName = campaignHeader.profile || '';
+  
+  if (shouldIgnoreCampaign(campaignName)) return metrics;
+
+  const metricMap: Record<string, string> = {
+    'invites': 'Connection Requests Sent',
+    'aceite': 'Connections Made',
+    'visitas': 'Profile Visits',
+    'likes': 'Post Likes',
+    'comentários': 'Comments Done',
+    'comentarios': 'Comments Done',
+    'fu 1': 'Follow Up 1',
+    'fu 2': 'Follow Up 2',
+    'fu 3': 'Follow Up 3',
+    'respostas gerais': 'General Responses',
+    'respostas positivas': 'Positive Responses',
+    'reuniões marcadas': 'Meetings Scheduled',
+    'reunioes marcadas': 'Meetings Scheduled',
+    'leads processados': 'Processed Leads'
+  };
+  
+  let i = 0;
+  while (i < data.length) {
+    const row = data[i];
+    if (!row) {
+      i++;
+      continue;
     }
     
-    // Parse "Diário [NAME]" sheets - daily campaign data organized by week
-    else if (normalizedName.includes('diário')) {
-      console.log(`Processando aba diária: ${sheetName}`);
-      const data = XLSX.utils.sheet_to_json(sheet) as any[];
-      
-      // CRÍTICO: Extrair nome da campanha de DENTRO da aba, NÃO usar o nome da aba
-      const campaignHeader = extractCampaignHeader(data);
-      
-      if (campaignHeader) {
-        const campaignName = campaignHeader.campaignName;
-        const profileName = campaignHeader.profileName;
-        
-        console.log(`Nome REAL da campanha extraído de dentro da aba diária: ${campaignName}`);
-        
-        // Extract daily metrics organized by week usando o nome de DENTRO da aba
-        const dailyMetrics = extractDailyMetricsFromSheet(sheet, campaignName, profileName);
-        if (dailyMetrics.length > 0) {
-          console.log(`Adicionadas ${dailyMetrics.length} métricas diárias da campanha ${campaignName}`);
-          campaignMetrics.push(...dailyMetrics);
-        } else {
-          console.log(`Nenhuma métrica diária encontrada para campanha ${campaignName}`);
-        }
-      } else {
-        console.log(`Nenhum header encontrado na aba diária ${sheetName} - aba ignorada`);
-      }
-    }
+    const firstCol = String(row['__EMPTY'] || row['A'] || row[Object.keys(row)[0]] || '').toLowerCase().trim();
+    const weekMatch = firstCol.match(/semana\s+(\d+)/i);
     
-    // Parse "Compilado" sheet - aggregated profile data AND Campanhas Ativas section
-    else if (normalizedName.includes('compilado')) {
-      console.log('Processando aba Compilado');
-      const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+    if (weekMatch) {
+      const weekNumber = parseInt(weekMatch[1]);
       
-      // Find "Campanhas Ativas" section
-      const activeCampaignsIndex = rawData.findIndex(row => 
-        row && row.some((cell: any) => 
-          typeof cell === 'string' && cell.toLowerCase().includes('campanhas ativas')
-        )
-      );
-      
-      if (activeCampaignsIndex !== -1) {
-        console.log('Encontrada seção Campanhas Ativas no Compilado');
-        
-        // Next row should contain campaign names (possibly separated by commas)
-        const headerRow = rawData[activeCampaignsIndex + 1];
-        if (!headerRow) {
-          console.log('Linha de header de campanhas não encontrada');
-        } else {
-          // Extract campaign names, handling comma-separated campaigns
-          const campaignNames: string[] = [];
-          headerRow.slice(1).forEach((cell: any) => {
-            if (cell && typeof cell === 'string') {
-              // Split by comma and trim each campaign name
-              const campaigns = cell.split(',')
-                .map(c => {
-                  const normalized = normalizeCampaignName(c, campaignNameConsolidation);
-                  if (normalized && !shouldIgnoreCampaign(normalized)) {
-                    campaignNameConsolidation.add(normalized);
-                    return normalized;
-                  }
-                  return '';
-                })
-                .filter(c => c.length > 0);
-              campaignNames.push(...campaigns);
-            }
-          });
-          
-          console.log(`Campanhas encontradas na aba Compilado: ${campaignNames.join(', ')}`);
-          
-          // Map metric labels to event types
-          const metricLabelMapping: Record<string, string> = {
-            'convites enviados': 'Connection Requests Sent',
-            'conexões realizadas': 'Connection Requests Accepted',
-            'taxa de aceite': 'Connection Accept Rate',
-            'mensagens enviadas': 'Messages Sent',
-            'visitas': 'Profile Visits',
-            'likes': 'Post Likes',
-            'comentários': 'Comments Done',
-            'total de atividades': 'Total Activities',
-            'respostas positivas': 'Positive Responses',
-            'leads processados': 'Leads Processed',
-            'reuniões': 'Meetings',
-            'propostas': 'Proposals',
-            'vendas': 'Sales',
-            'dias ativos': 'Active Days',
-          };
-          
-          // Process metric rows
-          rawData.slice(activeCampaignsIndex + 2).forEach(metricRow => {
-            if (!metricRow || !metricRow[0]) return;
-            
-            const metricLabel = String(metricRow[0]).toLowerCase().trim();
-            const eventType = metricLabelMapping[metricLabel];
-            
-            if (!eventType) return;
-            
-            // For each campaign, extract the value
-            campaignNames.forEach((campaignName, idx) => {
-              const value = metricRow[idx + 1]; // +1 because column 0 is the metric name
-              let numericValue = Number(value) || 0;
-              
-              // Taxa de Aceite vem como decimal (0.52 = 52%), converter para inteiro (porcentagem)
-              if (eventType === 'Connection Accept Rate' && numericValue > 0 && numericValue < 1) {
-                numericValue = Math.round(numericValue * 100);
-              } else {
-                // Garantir que outros valores sejam inteiros
-                numericValue = Math.round(numericValue);
-              }
-              
-              // Only add if there's a value
-              if (numericValue > 0 || eventType === 'Active Days') {
-                campaignMetrics.push({
-                  campaignName,
-                  eventType,
-                  profileName: 'Compilado', // Usando 'Compilado' como profile para distinguir
-                  totalCount: numericValue,
-                  dailyData: {},
-                });
-                
-                console.log(`Métrica adicionada de Campanhas Ativas: ${campaignName} - ${eventType}: ${numericValue}`);
-              }
-            });
-          });
-        }
+      if (i + 1 >= data.length) break;
+      const daysRow = data[i + 1];
+      if (!daysRow) {
+        i++;
+        continue;
       }
       
-      // Also process regular Compilado data (if exists)
-      const regularData = XLSX.utils.sheet_to_json(sheet) as any[];
+      const daysLabel = String(daysRow['__EMPTY'] || daysRow['A'] || daysRow[Object.keys(daysRow)[0]] || '').toLowerCase();
+      if (!daysLabel.includes('dias da semana')) {
+        i++;
+        continue;
+      }
       
-      regularData.forEach(row => {
-        const campaignName = normalizeCampaignName(row['Campanha'] || row['Campaign'], campaignNameConsolidation);
-        const eventType = normalizeAndValidate(row['Tipo'] || row['Event Type']);
-        const profileName = normalizeAndValidate(row['Perfil'] || row['Profile']);
-        
-        if (campaignName && eventType && profileName) {
-          if (shouldIgnoreCampaign(campaignName)) {
-            console.log(`Campanha ignorada no Compilado: ${campaignName}`);
-            return;
-          }
-          
-          campaignNameConsolidation.add(campaignName);
-          const dailyData: Record<string, number> = {};
-          Object.keys(row).forEach(key => {
-            if (key.match(/^\d{4}-\d{2}-\d{2}$/)) {
-              dailyData[key] = Number(row[key]) || 0;
-            }
-          });
-          
-          campaignMetrics.push({
-            campaignName,
-            eventType,
-            profileName,
-            totalCount: Number(row['Total'] || row['Total Count']) || 0,
-            dailyData,
-          });
-        }
+      const daysKeys = Object.keys(daysRow).slice(1, 8);
+      const dates: string[] = [];
+      
+      daysKeys.forEach(key => {
+        const dateValue = daysRow[key];
+        if (dateValue) dates.push(String(dateValue));
       });
-    }
-    
-    // Parse "Dados Gerais" sheet - general campaign data
-    else if (normalizedName.includes('dados gerais')) {
-      console.log('Processando aba Dados Gerais para campanhas');
-      const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
       
-      // Find "Campanhas Ativas por Semana" section
-      const weeklyActiveCampaignsIndex = rawData.findIndex(row => 
-        row && row.some((cell: any) => 
-          typeof cell === 'string' && cell.toLowerCase().includes('campanhas ativas')
-        )
-      );
-      
-      if (weeklyActiveCampaignsIndex !== -1) {
-        console.log('Encontrada seção Campanhas Ativas na aba Dados Gerais');
+      let metricRowIdx = i + 2;
+      while (metricRowIdx < data.length) {
+        const metricRow = data[metricRowIdx];
+        if (!metricRow) break;
         
-        // Next row should contain week headers
-        const weekHeaderRow = rawData[weeklyActiveCampaignsIndex + 1];
-        if (!weekHeaderRow) {
-          console.log('Linha de header de semanas não encontrada');
-        } else {
-          const weekHeaders = weekHeaderRow.slice(1);
-          console.log(`Semanas encontradas: ${weekHeaders.length}`);
+        const metricLabel = String(metricRow['__EMPTY'] || metricRow['A'] || metricRow[Object.keys(metricRow)[0]] || '').toLowerCase().trim();
+        
+        if (metricLabel.match(/semana\s+\d+/i)) break;
+        if (!metricLabel) {
+          metricRowIdx++;
+          continue;
+        }
+        
+        const eventType = metricMap[metricLabel.replace(':', '')];
+        if (!eventType) {
+          metricRowIdx++;
+          continue;
+        }
+        
+        daysKeys.forEach((key, dayIdx) => {
+          const value = metricRow[key];
+          const count = typeof value === 'number' ? value : (value ? parseInt(String(value)) || 0 : 0);
           
-          // Process each week row - each cell may contain comma-separated campaign names
-          for (let i = weeklyActiveCampaignsIndex + 2; i < rawData.length; i++) {
-            const weekRow = rawData[i];
-            if (!weekRow || weekRow.length === 0) break;
+          if (count > 0) {
+            let metric = metrics.find(m => 
+              m.campaignName === campaignName && 
+              m.eventType === eventType &&
+              m.profileName === profileName
+            );
             
-            // Extract campaigns from each week column
-            weekRow.slice(1).forEach((cell: any, weekIdx: number) => {
-              if (cell && typeof cell === 'string') {
-                // Split by comma and process each campaign
-                const campaigns = cell.split(',')
-                  .map(c => {
-                    const normalized = normalizeCampaignName(c, campaignNameConsolidation);
-                    if (normalized && !shouldIgnoreCampaign(normalized)) {
-                      campaignNameConsolidation.add(normalized);
-                      return normalized;
-                    }
-                    return '';
-                  })
-                  .filter(c => c.length > 0);
-                campaigns.forEach(campaignName => {
-                  // Track this campaign name for later processing
-                  if (!allCampaignNames.has(campaignName)) {
-                    allCampaignNames.add(campaignName);
-                    console.log(`Campanha encontrada em Dados Gerais: ${campaignName}`);
-                  }
-                });
-              }
-            });
-          }
-        }
-      }
-      
-      // Also process regular Dados Gerais data (if exists in traditional format)
-      const data = XLSX.utils.sheet_to_json(sheet) as any[];
-      
-      data.forEach(row => {
-        const campaignName = normalizeCampaignName(row['Campanha'] || row['Campaign'], campaignNameConsolidation);
-        const eventType = normalizeAndValidate(row['Tipo'] || row['Event Type']);
-        const profileName = normalizeAndValidate(row['Perfil'] || row['Profile']);
-        
-        if (campaignName && eventType && profileName) {
-          if (shouldIgnoreCampaign(campaignName)) {
-            console.log(`Campanha ignorada em Dados Gerais: ${campaignName}`);
-            return;
-          }
-          
-          campaignNameConsolidation.add(campaignName);
-          const dailyData: Record<string, number> = {};
-          Object.keys(row).forEach(key => {
-            if (key.match(/^\d{4}-\d{2}-\d{2}$/)) {
-              dailyData[key] = Number(row[key]) || 0;
+            if (!metric) {
+              metric = {
+                campaignName,
+                eventType,
+                profileName,
+                totalCount: 0,
+                dailyData: {}
+              };
+              metrics.push(metric);
             }
-          });
-          
-          campaignMetrics.push({
-            campaignName,
-            eventType,
-            profileName,
-            totalCount: Number(row['Total'] || row['Total Count']) || 0,
-            dailyData,
-          });
-        }
-      });
-    }
-    
-    // Parse "Leads Positivos" sheet
-    else if (normalizedName.includes('positivo')) {
-      console.log('Processando aba Leads Positivos');
-      const data = XLSX.utils.sheet_to_json(sheet) as any[];
-      
-      console.log(`Encontrados ${data.length} leads positivos`);
-      
-      data.forEach((row, index) => {
-        const campaign = normalizeCampaignName(row['Campanha'] || row['Campaign'], campaignNameConsolidation);
-        const name = normalizeAndValidate(row['Nome'] || row['Name']);
-        
-        if (!isValidString(campaign) || !isValidString(name)) {
-          console.log(`Lead positivo ${index} ignorado: dados incompletos`);
-          return;
-        }
-        
-        if (shouldIgnoreCampaign(campaign)) {
-          console.log(`Lead ignorado - campanha não permitida: ${campaign}`);
-          return;
-        }
-        
-        campaignNameConsolidation.add(campaign);
-        
-        console.log(`Lead positivo adicionado: ${name} da campanha ${campaign}`);
-        
-        positiveLeads.push({
-          id: `positive-${index}-${Date.now()}`,
-          campaign,
-          linkedin: normalizeAndValidate(row['LinkedIn']),
-          name,
-          position: normalizeAndValidate(row['Cargo']),
-          company: normalizeAndValidate(row['Empresa']),
-          status: 'positive',
-          positiveResponseDate: row['Data Resposta Positiva'],
-          transferDate: row['Data Repasse'],
-          statusDetails: row['Status'],
-          comments: row['Comentários'],
-          followUp1Date: row['Data FU 1'],
-          followUp1Comments: row['Comentarios FU1'],
-          followUp2Date: row['Data FU 2'],
-          followUp2Comments: row['Comentarios FU2'],
-          followUp3Date: row['Data FU 3'],
-          followUp3Comments: row['Comentarios FU3'],
-          followUp4Date: row['Data FU 4'],
-          followUp4Comments: row['Comentarios FU4'],
-          observations: row['Observações'],
-          meetingScheduleDate: row['Data de agendamento da reunião'],
-          meetingDate: row['Data da Reunião'],
-          proposalDate: row['Data Proposta'],
-          proposalValue: row['Valor Proposta'] ? Number(row['Valor Proposta']) : null,
-          saleDate: row['Data Venda'],
-          saleValue: row['Valor Venda'] ? Number(row['Valor Venda']) : null,
-          profile: row['Perfil'],
-          classification: row['Classificação'],
-          attendedWebinar: row['Participou do Webnar'] === 'Sim',
-          whatsapp: row['WhatsApp'],
-          standDay: row['Dia do Stand'],
-          pavilion: row['Pavilhão'],
-          stand: row['Stand'],
+            
+            const dateKey = dates[dayIdx] || `week${weekNumber}-day${dayIdx + 1}`;
+            metric.dailyData[dateKey] = count;
+            metric.totalCount += count;
+          }
         });
-      });
-    }
-    
-    // Parse "Leads Negativos" sheet
-    else if (normalizedName.includes('negativo')) {
-      console.log('Processando aba Leads Negativos');
-      const data = XLSX.utils.sheet_to_json(sheet) as any[];
+        
+        metricRowIdx++;
+      }
       
-      console.log(`Encontrados ${data.length} leads negativos`);
-      
-      data.forEach((row, index) => {
-        const campaign = normalizeCampaignName(row['Campanha'] || row['Campaign'], campaignNameConsolidation);
-        const name = normalizeAndValidate(row['Nome'] || row['Name']);
-        
-        if (!isValidString(campaign) || !isValidString(name)) {
-          console.log(`Lead negativo ${index} ignorado: dados incompletos`);
-          return;
-        }
-        
-        if (shouldIgnoreCampaign(campaign)) {
-          console.log(`Lead ignorado - campanha não permitida: ${campaign}`);
-          return;
-        }
-        
-        campaignNameConsolidation.add(campaign);
-        
-        console.log(`Lead negativo adicionado: ${name} da campanha ${campaign}`);
-        
-        negativeLeads.push({
-          id: `negative-${index}-${Date.now()}`,
-          campaign,
-          linkedin: normalizeAndValidate(row['LinkedIn']),
-          name,
-          position: normalizeAndValidate(row['Cargo']),
-          company: normalizeAndValidate(row['Empresa']),
-          status: 'negative',
-          negativeResponseDate: row['Data Resposta Negativa'],
-          transferDate: row['Data Repasse'],
-          statusDetails: row['Status'],
-          observations: row['Observações'],
-          hadFollowUp: row['Teve FU? Porque?'] !== undefined && row['Teve FU? Porque?'] !== '',
-          followUpReason: row['Teve FU? Porque?'],
-        });
-      });
+      i = metricRowIdx;
+    } else {
+      i++;
     }
   }
+  
+  return metrics;
+}
 
-  console.log(`Total de ${allCampaignDetails.length} campanhas encontradas no arquivo`);
-  console.log(`Total de ${campaignMetrics.length} métricas de campanha parseadas`);
-  console.log(`Total de ${positiveLeads.length} leads positivos parseados`);
-  console.log(`Total de ${negativeLeads.length} leads negativos parseados`);
+// Parsear leads positivos
+function parsePositiveLeads(data: any[]): Lead[] {
+  const leads: Lead[] = [];
+  if (!data || data.length < 2) return leads;
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row) continue;
+    
+    const name = String(row['Nome'] || row['Name'] || '').trim();
+    const campaign = String(row['Campanha'] || row['Campaign'] || '').trim();
+    
+    if (!name || !campaign) continue;
+    
+    leads.push({
+      id: `lead-${i}`,
+      name,
+      campaign,
+      company: String(row['Empresa'] || row['Company'] || ''),
+      position: String(row['Cargo'] || row['Position'] || ''),
+      linkedin: String(row['LinkedIn'] || ''),
+      whatsapp: String(row['WhatsApp'] || ''),
+      status: 'positive',
+      source: 'Kontax',
+      positiveResponseDate: String(row['Data Resposta Positiva'] || ''),
+      transferDate: String(row['Data Repasse'] || ''),
+      comments: String(row['Comentários'] || row['Comments'] || ''),
+      profile: String(row['Perfil'] || row['Profile'] || ''),
+      classification: String(row['Classificação'] || row['Classification'] || '')
+    });
+  }
+  
+  return leads;
+}
 
-  return {
-    campaignMetrics,
-    positiveLeads,
-    negativeLeads,
-    campaignDetails: allCampaignDetails.length > 0 ? allCampaignDetails[0] : undefined,
-    allCampaignDetails,
-  };
+// Parsear leads negativos
+function parseNegativeLeads(data: any[]): Lead[] {
+  const leads: Lead[] = [];
+  if (!data || data.length < 2) return leads;
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row) continue;
+    
+    const name = String(row['Nome'] || row['Name'] || '').trim();
+    const campaign = String(row['Campanha'] || row['Campaign'] || '').trim();
+    
+    if (!name || !campaign) continue;
+    
+    leads.push({
+      id: `lead-neg-${i}`,
+      name,
+      campaign,
+      company: String(row['Empresa'] || row['Company'] || ''),
+      position: String(row['Cargo'] || row['Position'] || ''),
+      linkedin: String(row['LinkedIn'] || ''),
+      status: 'negative',
+      source: 'Kontax',
+      negativeResponseDate: String(row['Data Resposta Negativa'] || ''),
+      transferDate: String(row['Data Repasse'] || ''),
+      observations: String(row['Observações'] || row['Observations'] || ''),
+      hadFollowUp: row['Teve FU?'] === 'Sim' || row['Teve FU?'] === 'Yes',
+      followUpReason: String(row['Porque?'] || row['Why?'] || '')
+    });
+  }
+  
+  return leads;
+}
+
+// Função principal
+export function parseExcelFile(file: File): Promise<ExcelSheetData> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        
+        const result: ExcelSheetData = {
+          campaignMetrics: [],
+          positiveLeads: [],
+          negativeLeads: [],
+          allCampaignDetails: []
+        };
+        
+        const campaignNameConsolidation = new Set<string>();
+        
+        workbook.SheetNames.forEach((sheetName) => {
+          const sheet = workbook.Sheets[sheetName];
+          const sheetData = XLSX.utils.sheet_to_json(sheet);
+          const normalizedName = sheetName.toLowerCase().trim();
+          
+          if (normalizedName.includes('leads positivos')) {
+            result.positiveLeads = parsePositiveLeads(sheetData);
+            return;
+          }
+          
+          if (normalizedName.includes('leads negativos')) {
+            result.negativeLeads = parseNegativeLeads(sheetData);
+            return;
+          }
+          
+          if (isFixedSheet(sheetName)) return;
+          
+          const campaignHeader = extractCampaignHeader(sheetData);
+          if (!campaignHeader || !campaignHeader.campaignName) return;
+          
+          result.allCampaignDetails?.push(campaignHeader);
+          
+          if (normalizedName.includes('diário') || normalizedName.includes('diario')) {
+            const dailyMetrics = parseDailyMetricsFromDiarioSheet(sheetData, campaignHeader, campaignNameConsolidation);
+            result.campaignMetrics.push(...dailyMetrics);
+          } else {
+            const weeklyMetrics = parseWeeklyMetricsFromCampaignSheet(sheetData, campaignHeader, campaignNameConsolidation);
+            result.campaignMetrics.push(...weeklyMetrics);
+          }
+        });
+        
+        // Consolidar métricas
+        const consolidatedMetrics: Record<string, CampaignMetrics> = {};
+        
+        result.campaignMetrics.forEach(metric => {
+          const key = `${metric.campaignName}|${metric.eventType}|${metric.profileName}`;
+          
+          if (!consolidatedMetrics[key]) {
+            consolidatedMetrics[key] = { ...metric };
+          } else {
+            Object.entries(metric.dailyData).forEach(([date, count]) => {
+              if (typeof count === 'number') {
+                if (typeof consolidatedMetrics[key].dailyData[date] === 'number') {
+                  consolidatedMetrics[key].dailyData[date] = (consolidatedMetrics[key].dailyData[date] as number) + count;
+                } else {
+                  consolidatedMetrics[key].dailyData[date] = count;
+                }
+              } else {
+                consolidatedMetrics[key].dailyData[date] = count;
+              }
+            });
+            
+            consolidatedMetrics[key].totalCount = Object.values(consolidatedMetrics[key].dailyData)
+              .filter(v => typeof v === 'number')
+              .reduce((sum, val) => sum + (val as number), 0);
+          }
+        });
+        
+        result.campaignMetrics = Object.values(consolidatedMetrics);
+        
+        resolve(result);
+      } catch (error) {
+        console.error('Erro ao processar Excel:', error);
+        reject(error);
+      }
+    };
+    
+    reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+    reader.readAsBinaryString(file);
+  });
 }
