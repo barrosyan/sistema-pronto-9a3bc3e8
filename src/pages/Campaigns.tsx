@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { CampaignDetailsDialog } from '@/components/CampaignDetailsDialog';
+import { CampaignFunnelChart } from '@/components/CampaignFunnelChart';
 import { supabase } from '@/integrations/supabase/client';
 
 interface DailyData {
@@ -254,14 +255,21 @@ export default function Campaigns() {
       likes: campaignData.find(m => m.eventType === 'Post Likes')?.totalCount || 0,
       comments: campaignData.find(m => m.eventType === 'Comments Done')?.totalCount || 0,
       positiveResponses: campaignData.find(m => m.eventType === 'Positive Responses')?.totalCount || 0,
-      meetings: campaignData.find(m => m.eventType === 'Meetings')?.totalCount || 0
+      meetings: campaignData.find(m => m.eventType === 'Meetings')?.totalCount || 0,
+      proposals: campaignData.find(m => m.eventType === 'Proposals')?.totalCount || 0,
+      sales: campaignData.find(m => m.eventType === 'Sales')?.totalCount || 0
     };
 
     const acceptanceRate = totals.invitations > 0 
       ? ((totals.connections / totals.invitations) * 100).toFixed(1)
       : '0.0';
 
-    return { ...totals, acceptanceRate };
+    // Calculate financial totals from leads
+    const campaignLeads = getAllLeads().filter(l => l.campaign === campaignName);
+    const proposalValue = campaignLeads.reduce((sum, lead) => sum + (lead.proposalValue || 0), 0);
+    const salesValue = campaignLeads.reduce((sum, lead) => sum + (lead.saleValue || 0), 0);
+
+    return { ...totals, acceptanceRate, proposalValue, salesValue };
   };
 
   // Get data organized by week number for comparison
@@ -523,6 +531,23 @@ export default function Campaigns() {
 
       {selectedCampaigns.length > 0 && (
         <>
+          {/* Campaign Conversion Funnels */}
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Funil de Conversão</h2>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {selectedCampaigns.map(campaign => {
+                const summary = getCampaignSummary(campaign);
+                return (
+                  <CampaignFunnelChart
+                    key={campaign}
+                    campaignName={campaign}
+                    data={summary}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
           {/* Campaign Summaries */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {selectedCampaigns.map(campaign => {

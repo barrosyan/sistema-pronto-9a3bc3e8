@@ -335,6 +335,8 @@ function parseWeeklyMetricsFromCampaignSheet(
   // Mapa de métricas
   const metricMap: Record<string, string> = {
     'dias ativos': 'Active Days',
+    'taxa de aceite de conexão': 'Connection Acceptance Rate',
+    'taxa de aceite de conexao': 'Connection Acceptance Rate',
     'convites enviados': 'Connection Requests Sent',
     'conexões realizadas': 'Connections Made',
     'conexoes realizadas': 'Connections Made',
