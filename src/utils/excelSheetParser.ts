@@ -126,6 +126,25 @@ function isValidString(value: string): boolean {
   return value.length > 0;
 }
 
+// Lista de abas fixas que não são campanhas
+const FIXED_SHEETS = [
+  'campanha 0',
+  'campaign 0', 
+  'inputs',
+  'leads positivos',
+  'leads negativos',
+  'ssi',
+  'posts',
+  'compilado',
+  'dados gerais'
+];
+
+// Função para verificar se uma aba é fixa (não é campanha)
+function isFixedSheet(sheetName: string): boolean {
+  const normalized = sheetName.toLowerCase().trim();
+  return FIXED_SHEETS.some(fixed => normalized.includes(fixed));
+}
+
 // Função para verificar se uma campanha deve ser ignorada
 function shouldIgnoreCampaign(campaignName: string): boolean {
   if (!campaignName) return true;
@@ -140,6 +159,103 @@ function shouldIgnoreCampaign(campaignName: string): boolean {
   ];
   
   return ignoredCampaigns.includes(normalized);
+}
+
+// Função para extrair cabeçalho de campanha das abas individuais
+function extractCampaignHeader(data: any[]): any {
+  const header: any = {};
+  
+  for (let i = 0; i < Math.min(10, data.length); i++) {
+    const row = data[i];
+    const firstCell = row['__EMPTY'] || row['A'] || row[Object.keys(row)[0]];
+    const secondCell = row['__EMPTY_1'] || row['B'] || row[Object.keys(row)[1]];
+    
+    if (!firstCell) continue;
+    
+    const key = String(firstCell).toLowerCase().trim();
+    
+    if (key.includes('empresa')) header.company = secondCell;
+    if (key.includes('perfil')) header.profileName = secondCell;
+    if (key.includes('campanha')) header.campaignName = secondCell;
+    if (key.includes('objetivo')) header.objective = secondCell;
+    if (key.includes('cadência') || key.includes('cadencia')) header.cadence = secondCell;
+    if (key.includes('cargos')) header.jobTitles = secondCell;
+  }
+  
+  return header;
+}
+
+// Função para encontrar índice da linha de métricas
+function findMetricsStartRow(data: any[]): number {
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    const firstCell = String(row['__EMPTY'] || row['A'] || row[Object.keys(row)[0]] || '').toLowerCase();
+    
+    if (firstCell.includes('tipo do dado') || firstCell.includes('período')) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+// Função para processar métricas semanais de aba de campanha
+function parseWeeklyMetrics(data: any[], campaignHeader: any, campaignNameConsolidation: Set<string>): CampaignMetrics[] {
+  const metrics: CampaignMetrics[] = [];
+  const startRow = findMetricsStartRow(data);
+  
+  if (startRow === -1) return metrics;
+  
+  const campaignName = normalizeCampaignName(campaignHeader.campaignName, campaignNameConsolidation);
+  if (shouldIgnoreCampaign(campaignName)) return metrics;
+  
+  campaignNameConsolidation.add(campaignName);
+  
+  // Mapeamento de métricas em português/inglês
+  const metricMap: Record<string, string> = {
+    'convites enviados': 'Connection Requests Sent',
+    'conexões realizadas': 'Connection Requests Accepted',
+    'mensagens enviadas': 'Messages Sent',
+    'visitas': 'Profile Visits',
+    'likes': 'Post Likes',
+    'comentários': 'Comments Done',
+    'respostas positivas': 'Positive Responses',
+    'reuniões': 'Meetings',
+    'propostas': 'Proposals',
+    'vendas': 'Sales'
+  };
+  
+  // Processar cada linha de métrica
+  for (let i = startRow + 1; i < data.length; i++) {
+    const row = data[i];
+    const metricName = String(row['__EMPTY'] || row['A'] || row[Object.keys(row)[0]] || '').toLowerCase().trim();
+    
+    if (!metricName || metricName.includes('taxas de conversão') || metricName.includes('detalhamento')) break;
+    
+    const eventType = metricMap[metricName];
+    if (!eventType) continue;
+    
+    // Extrair dados diários de cada coluna de semana
+    const dailyData: Record<string, number> = {};
+    let totalCount = 0;
+    
+    // Iterar sobre as colunas (semanas)
+    Object.keys(row).forEach(key => {
+      if (key.startsWith('__EMPTY')) {
+        const value = Number(row[key]) || 0;
+        totalCount += value;
+      }
+    });
+    
+    metrics.push({
+      campaignName,
+      eventType,
+      profileName: campaignHeader.profileName || 'Unknown',
+      totalCount,
+      dailyData
+    });
+  }
+  
+  return metrics;
 }
 
 // Helper function to extract campaign details from a sheet looking for "Dados da campanha" section
