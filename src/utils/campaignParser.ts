@@ -194,7 +194,7 @@ function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Le
       connectionDate: connectionDate, // Data de conexão extraída
       positiveResponseDate: connectionDate, // Data de conexão extraída
       transferDate: null,
-      status: 'positive' as const, // Importados como positivos por padrão
+      status: 'pending' as const, // Leads importados via CSV começam como Pendente
       statusDetails: normalizeAndValidate(row.Status),
       comments: '',
       followUp1Date: null,
@@ -289,7 +289,7 @@ function processCampaignData(data: any[]): ParsedCampaignData {
           name,
           position: normalizeAndValidate(row['Cargo']),
           company: normalizeAndValidate(row['Empresa']),
-          status: isPositive ? 'positive' : 'negative',
+          status: isPositive ? ('pending' as const) : ('negative' as const), // Leads importados via CSV começam como Pendente
         };
         
         if (isPositive) {
