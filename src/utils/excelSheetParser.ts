@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { CampaignMetrics, Lead } from '@/types/campaign';
+import { parseCampaignFile } from './campaignParser';
 
 // Alias para compatibilidade
 export { parseExcelFile as parseExcelSheets };
@@ -521,7 +522,26 @@ function parseNegativeLeads(data: any[]): Lead[] {
 
 // Função principal
 export function parseExcelFile(file: File): Promise<ExcelSheetData> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    // Verificar se é CSV primeiro
+    const fileName = file.name.toLowerCase();
+    if (fileName.endsWith('.csv')) {
+      try {
+        const campaignData = await parseCampaignFile(file);
+        resolve({
+          campaignMetrics: campaignData.metrics,
+          positiveLeads: campaignData.leads,
+          negativeLeads: [],
+          allCampaignDetails: []
+        });
+        return;
+      } catch (error) {
+        console.error('Erro ao processar CSV:', error);
+        reject(error);
+        return;
+      }
+    }
+    
     const reader = new FileReader();
     
     reader.onload = (e) => {
