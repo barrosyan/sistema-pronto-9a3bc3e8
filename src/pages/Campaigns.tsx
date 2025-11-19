@@ -110,16 +110,13 @@ export default function Campaigns() {
 
     return Array.from(allDates).sort().map(date => {
       const invitations = campaignData.find(m => m.eventType === 'Connection Requests Sent')?.dailyData?.[date] || 0;
-      const connections = campaignData.find(m => m.eventType === 'Connection Requests Accepted')?.dailyData?.[date] || 0;
+      const connections = campaignData.find(m => m.eventType === 'Connections Made')?.dailyData?.[date] || 0;
       const messages = campaignData.find(m => m.eventType === 'Messages Sent')?.dailyData?.[date] || 0;
       const visits = campaignData.find(m => m.eventType === 'Profile Visits')?.dailyData?.[date] || 0;
       const likes = campaignData.find(m => m.eventType === 'Post Likes')?.dailyData?.[date] || 0;
       const comments = campaignData.find(m => m.eventType === 'Comments Done')?.dailyData?.[date] || 0;
-
-      const leads = getAllLeads().filter(l => l.campaign === campaignName);
-      const positiveResponses = leads.filter(l => 
-        l.status === 'positive' && l.positiveResponseDate === date
-      ).length;
+      const positiveResponses = campaignData.find(m => m.eventType === 'Positive Responses')?.dailyData?.[date] || 0;
+      const meetings = campaignData.find(m => m.eventType === 'Meetings')?.dailyData?.[date] || 0;
 
       const isActive = invitations > 0 || connections > 0 || messages > 0 || 
                        visits > 0 || likes > 0 || comments > 0;
