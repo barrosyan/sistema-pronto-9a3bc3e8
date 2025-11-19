@@ -14,6 +14,7 @@ import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { CampaignDetailsDialog } from '@/components/CampaignDetailsDialog';
 import { CampaignFunnelChart } from '@/components/CampaignFunnelChart';
 import { CampaignFunnelComparison } from '@/components/CampaignFunnelComparison';
+import { CampaignTrendChart } from '@/components/CampaignTrendChart';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { supabase } from '@/integrations/supabase/client';
@@ -688,6 +689,15 @@ export default function Campaigns() {
                   );
                 })}
               </div>
+
+              {selectedCampaigns.length === 1 && (
+                <div className="mt-6">
+                  <CampaignTrendChart
+                    campaignName={selectedCampaigns[0]}
+                    data={getDailyDataForCampaign(selectedCampaigns[0])}
+                  />
+                </div>
+              )}
             </div>
           )}
 
