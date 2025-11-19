@@ -59,9 +59,13 @@ export default function Campaigns() {
   }, [loadFromDatabase]);
 
   const loadCampaignDetails = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
     const { data, error } = await supabase
       .from('campaigns')
-      .select('*');
+      .select('*')
+      .eq('user_id', user.id);
     
     if (data && !error) {
       const campaignsMap = data.reduce((acc, campaign) => {
@@ -863,6 +867,7 @@ export default function Campaigns() {
           onOpenChange={setDetailsDialogOpen}
           campaignName={selectedCampaignDetails.name}
           details={selectedCampaignDetails}
+          onUpdate={loadCampaignDetails}
         />
       )}
     </div>
