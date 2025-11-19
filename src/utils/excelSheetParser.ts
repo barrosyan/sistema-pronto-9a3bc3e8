@@ -627,14 +627,24 @@ function parseNegativeLeads(data: any[]): Lead[] {
   const leads: Lead[] = [];
   if (!data || data.length < 2) return leads;
   
+  console.log(`[parseNegativeLeads] Starting parse, total rows: ${data.length}`);
+  
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    if (!row) continue;
+    if (!row) {
+      console.log(`[parseNegativeLeads] Row ${i}: empty, skipping`);
+      continue;
+    }
     
     const name = String(row['Nome'] || row['Name'] || '').trim();
     const campaign = String(row['Campanha'] || row['Campaign'] || '').trim();
     
-    if (!name || !campaign) continue;
+    if (!name || !campaign) {
+      console.log(`[parseNegativeLeads] Row ${i}: missing name or campaign (name="${name}", campaign="${campaign}"), skipping`);
+      continue;
+    }
+    
+    console.log(`[parseNegativeLeads] Row ${i}: Processing lead "${name}" from campaign "${campaign}"`);
     
     leads.push({
       id: `lead-neg-${i}`,
@@ -651,7 +661,11 @@ function parseNegativeLeads(data: any[]): Lead[] {
       hadFollowUp: row['Teve FU?'] === 'Sim' || row['Teve FU?'] === 'Yes',
       followUpReason: String(row['Porque?'] || row['Why?'] || '')
     });
+    
+    console.log(`[parseNegativeLeads] Row ${i}: Lead "${name}" added successfully`);
   }
+  
+  console.log(`[parseNegativeLeads] ✅ Parsed ${leads.length} negative leads from ${data.length - 1} data rows`);
   
   return leads;
 }
