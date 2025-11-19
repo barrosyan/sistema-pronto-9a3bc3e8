@@ -831,14 +831,19 @@ export function parseExcelFile(file: File): Promise<ExcelSheetData> {
         });
         
         // Consolidar métricas
+        console.log('[Consolidation] Starting metrics consolidation...');
         const consolidatedMetrics: Record<string, CampaignMetrics> = {};
         
         result.campaignMetrics.forEach(metric => {
           const key = `${metric.campaignName}|${metric.eventType}|${metric.profileName}`;
           
           if (!consolidatedMetrics[key]) {
-            consolidatedMetrics[key] = { ...metric };
+            consolidatedMetrics[key] = { ...metric, dailyData: { ...metric.dailyData } };
+            console.log(`[Consolidation] New entry: ${key}, total=${metric.totalCount}`);
           } else {
+            console.log(`[Consolidation] Merging duplicate: ${key}, existing total=${consolidatedMetrics[key].totalCount}, new total=${metric.totalCount}`);
+            
+            // Merge dailyData
             Object.entries(metric.dailyData).forEach(([date, count]) => {
               if (typeof count === 'number') {
                 if (typeof consolidatedMetrics[key].dailyData[date] === 'number') {
@@ -851,9 +856,12 @@ export function parseExcelFile(file: File): Promise<ExcelSheetData> {
               }
             });
             
+            // CRITICAL FIX: Recalculate totalCount by summing all dailyData values
             consolidatedMetrics[key].totalCount = Object.values(consolidatedMetrics[key].dailyData)
               .filter(v => typeof v === 'number')
               .reduce((sum, val) => sum + (val as number), 0);
+              
+            console.log(`[Consolidation] After merge: total=${consolidatedMetrics[key].totalCount}`);
           }
         });
         
