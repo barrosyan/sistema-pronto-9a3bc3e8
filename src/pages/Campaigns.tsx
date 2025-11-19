@@ -139,6 +139,11 @@ export default function Campaigns() {
     const dailyData = getDailyDataForCampaign(campaignName);
     const weeklyMap = new Map<string, WeeklyData>();
 
+    // Get Active Days from database for this campaign
+    const activeDaysMetric = campaignMetrics.find(
+      m => m.campaignName === campaignName && m.eventType === 'Active Days'
+    );
+
     dailyData.forEach(day => {
       // Validar data antes de processar
       if (!day.date || isNaN(new Date(day.date).getTime())) return;
@@ -175,7 +180,11 @@ export default function Campaigns() {
       weekData.comments += day.comments;
       weekData.positiveResponses += day.positiveResponses;
       weekData.totalDays += 1;
-      if (day.isActive) {
+      
+      // Check if this specific day is active based on daily data from database
+      const dateKey = format(date, 'yyyy-MM-dd');
+      const dayActiveDays = activeDaysMetric?.dailyData?.[dateKey] || 0;
+      if (dayActiveDays > 0 || day.isActive) {
         weekData.activeDays += 1;
       }
     });

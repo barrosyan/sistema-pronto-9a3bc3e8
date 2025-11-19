@@ -334,6 +334,7 @@ function parseWeeklyMetricsFromCampaignSheet(
   
   // Mapa de métricas
   const metricMap: Record<string, string> = {
+    'dias ativos': 'Active Days',
     'convites enviados': 'Connection Requests Sent',
     'conexões realizadas': 'Connections Made',
     'conexoes realizadas': 'Connections Made',
@@ -471,7 +472,7 @@ function parseDailyMetricsFromDiarioSheet(
       }
       
       const daysLabel = String(daysRow['__EMPTY'] || daysRow['A'] || daysRow[Object.keys(daysRow)[0]] || '').toLowerCase();
-      if (!daysLabel.includes('dias da semana')) {
+      if (!daysLabel.includes('dias da semana') && !daysLabel.includes('semana/dia da semana')) {
         i++;
         continue;
       }
@@ -483,6 +484,55 @@ function parseDailyMetricsFromDiarioSheet(
         const dateValue = daysRow[key];
         if (dateValue) dates.push(String(dateValue));
       });
+      
+      // Check for activity status row (contains "Ativo"/"Inativo" for each day)
+      const activeDaysData: number[] = new Array(7).fill(0);
+      if (i + 2 < data.length) {
+        const nextRow = data[i + 2];
+        if (nextRow) {
+          const nextLabel = String(nextRow['__EMPTY'] || nextRow['A'] || nextRow[Object.keys(nextRow)[0]] || '').toLowerCase().trim();
+          
+          // This row contains status (Ativo/Inativo) for each day
+          if (nextLabel === '' || nextLabel.includes('ativo') || nextLabel.includes('inativo')) {
+            daysKeys.forEach((key, dayIdx) => {
+              const statusValue = String(nextRow[key] || '').toLowerCase().trim();
+              if (statusValue.includes('ativo') && !statusValue.includes('inativo')) {
+                activeDaysData[dayIdx] = 1; // Mark as active
+              }
+            });
+          }
+        }
+      }
+      
+      // Save Active Days metric if any day is active
+      const totalActiveDays = activeDaysData.reduce((sum, val) => sum + val, 0);
+      if (totalActiveDays > 0) {
+        let activeDaysMetric = metrics.find(m => 
+          m.campaignName === campaignName && 
+          m.eventType === 'Active Days' &&
+          m.profileName === profileName
+        );
+        
+        if (!activeDaysMetric) {
+          activeDaysMetric = {
+            campaignName,
+            eventType: 'Active Days',
+            profileName,
+            totalCount: 0,
+            dailyData: {}
+          };
+          metrics.push(activeDaysMetric);
+        }
+        
+        // Add active days to daily data
+        daysKeys.forEach((key, dayIdx) => {
+          if (activeDaysData[dayIdx] > 0) {
+            const dateKey = dates[dayIdx] || `week${weekNumber}-day${dayIdx + 1}`;
+            activeDaysMetric!.dailyData[dateKey] = 1;
+            activeDaysMetric!.totalCount += 1;
+          }
+        });
+      }
       
       let metricRowIdx = i + 2;
       while (metricRowIdx < data.length) {
