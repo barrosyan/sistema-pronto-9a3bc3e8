@@ -126,6 +126,22 @@ function isValidString(value: string): boolean {
   return value.length > 0;
 }
 
+// Função para verificar se uma campanha deve ser ignorada
+function shouldIgnoreCampaign(campaignName: string): boolean {
+  if (!campaignName) return true;
+  
+  const normalized = campaignName.toLowerCase().trim();
+  
+  // Lista de campanhas a ignorar
+  const ignoredCampaigns = [
+    'campanha 0',
+    'campaign 0',
+    'sent manually'
+  ];
+  
+  return ignoredCampaigns.includes(normalized);
+}
+
 // Helper function to extract campaign details from a sheet looking for "Dados da campanha" section
 function extractCampaignDetailsFromSheet(sheet: XLSX.WorkSheet): { details: CampaignDetails | null; endRow: number } {
   const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
@@ -562,6 +578,11 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
           return;
         }
         
+        if (shouldIgnoreCampaign(campaignName)) {
+          console.log(`Campanha ignorada: ${campaignName}`);
+          return;
+        }
+        
         campaignNameConsolidation.add(campaignName);
         
         const dailyData: Record<string, number> = {};
@@ -664,8 +685,11 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
               const campaigns = cell.split(',')
                 .map(c => {
                   const normalized = normalizeCampaignName(c, campaignNameConsolidation);
-                  if (normalized) campaignNameConsolidation.add(normalized);
-                  return normalized;
+                  if (normalized && !shouldIgnoreCampaign(normalized)) {
+                    campaignNameConsolidation.add(normalized);
+                    return normalized;
+                  }
+                  return '';
                 })
                 .filter(c => c.length > 0);
               campaignNames.push(...campaigns);
@@ -740,6 +764,11 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
         const profileName = normalizeAndValidate(row['Perfil'] || row['Profile']);
         
         if (campaignName && eventType && profileName) {
+          if (shouldIgnoreCampaign(campaignName)) {
+            console.log(`Campanha ignorada no Compilado: ${campaignName}`);
+            return;
+          }
+          
           campaignNameConsolidation.add(campaignName);
           const dailyData: Record<string, number> = {};
           Object.keys(row).forEach(key => {
@@ -794,8 +823,11 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
                 const campaigns = cell.split(',')
                   .map(c => {
                     const normalized = normalizeCampaignName(c, campaignNameConsolidation);
-                    if (normalized) campaignNameConsolidation.add(normalized);
-                    return normalized;
+                    if (normalized && !shouldIgnoreCampaign(normalized)) {
+                      campaignNameConsolidation.add(normalized);
+                      return normalized;
+                    }
+                    return '';
                   })
                   .filter(c => c.length > 0);
                 campaigns.forEach(campaignName => {
@@ -820,6 +852,11 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
         const profileName = normalizeAndValidate(row['Perfil'] || row['Profile']);
         
         if (campaignName && eventType && profileName) {
+          if (shouldIgnoreCampaign(campaignName)) {
+            console.log(`Campanha ignorada em Dados Gerais: ${campaignName}`);
+            return;
+          }
+          
           campaignNameConsolidation.add(campaignName);
           const dailyData: Record<string, number> = {};
           Object.keys(row).forEach(key => {
@@ -852,6 +889,11 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
         
         if (!isValidString(campaign) || !isValidString(name)) {
           console.log(`Lead positivo ${index} ignorado: dados incompletos`);
+          return;
+        }
+        
+        if (shouldIgnoreCampaign(campaign)) {
+          console.log(`Lead ignorado - campanha não permitida: ${campaign}`);
           return;
         }
         
@@ -910,6 +952,11 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
         
         if (!isValidString(campaign) || !isValidString(name)) {
           console.log(`Lead negativo ${index} ignorado: dados incompletos`);
+          return;
+        }
+        
+        if (shouldIgnoreCampaign(campaign)) {
+          console.log(`Lead ignorado - campanha não permitida: ${campaign}`);
           return;
         }
         

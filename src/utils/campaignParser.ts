@@ -113,6 +113,22 @@ function isValidString(value: string): boolean {
   return value.length > 0;
 }
 
+// Função para verificar se uma campanha deve ser ignorada
+function shouldIgnoreCampaign(campaignName: string): boolean {
+  if (!campaignName) return true;
+  
+  const normalized = campaignName.toLowerCase().trim();
+  
+  // Lista de campanhas a ignorar
+  const ignoredCampaigns = [
+    'campanha 0',
+    'campaign 0',
+    'sent manually'
+  ];
+  
+  return ignoredCampaigns.includes(normalized);
+}
+
 export function parseCampaignFile(file: File): Promise<ParsedCampaignData> {
   return new Promise((resolve, reject) => {
     const fileName = file.name.toLowerCase();
@@ -232,6 +248,12 @@ function extractConnectionDate(value: string): string | null {
 function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Lead[] {
   const campaignNameConsolidation = new Set<string>();
   const normalizedCampaignName = normalizeCampaignName(campaignName, campaignNameConsolidation);
+  
+  if (shouldIgnoreCampaign(normalizedCampaignName)) {
+    console.log(`Campanha ignorada: ${normalizedCampaignName}`);
+    return [];
+  }
+  
   console.log(`Convertendo ${data.length} leads do formato Kontax para campanha: ${normalizedCampaignName}`);
   const leads = data.map((row, index) => {
     const firstName = normalizeAndValidate(row['First Name']);
@@ -349,6 +371,11 @@ function processCampaignData(data: any[]): ParsedCampaignData {
         return;
       }
       
+      if (shouldIgnoreCampaign(campaignName)) {
+        console.log(`Campanha ignorada: ${campaignName}`);
+        return;
+      }
+      
       campaignNameConsolidation.add(campaignName);
         
         const dailyData: Record<string, number> = {};
@@ -379,6 +406,11 @@ function processCampaignData(data: any[]): ParsedCampaignData {
       
       // Skip rows with empty required fields
       if (!isValidString(campaign) || !isValidString(name)) {
+        return;
+      }
+      
+      if (shouldIgnoreCampaign(campaign)) {
+        console.log(`Lead ignorado - campanha não permitida: ${campaign}`);
         return;
       }
       
