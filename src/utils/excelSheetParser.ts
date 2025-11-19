@@ -136,7 +136,10 @@ function shouldIgnoreCampaign(campaignName: string): boolean {
 
 // Extrair header da aba de campanha
 function extractCampaignHeader(data: any[]): CampaignDetails | null {
-  if (!data || data.length < 6) return null;
+  if (!data || data.length < 6) {
+    console.log(`[extractCampaignHeader] Not enough rows: ${data?.length || 0}`);
+    return null;
+  }
   
   const header: CampaignDetails = {
     company: '',
@@ -147,18 +150,42 @@ function extractCampaignHeader(data: any[]): CampaignDetails | null {
     jobTitles: ''
   };
   
-  for (let i = 0; i < Math.min(data.length, 10); i++) {
+  // Log first few rows to understand structure
+  console.log('[extractCampaignHeader] First 3 rows:', data.slice(0, 3));
+  
+  for (let i = 0; i < Math.min(data.length, 15); i++) {
     const row = data[i];
     if (!row || typeof row !== 'object') continue;
     
     const keys = Object.keys(row);
-    const firstValue = row['__EMPTY'] || row['A'] || row[keys[0]];
-    const secondValue = row['__EMPTY_1'] || row['B'] || row[keys[1]];
+    
+    // Try multiple column positions for flexibility
+    const possibleFirstCols = [row['__EMPTY'], row['A'], row[keys[0]], row[keys[1]]];
+    const possibleSecondCols = [row['__EMPTY_1'], row['B'], row[keys[1]], row[keys[2]]];
+    
+    let firstValue = null;
+    let secondValue = null;
+    
+    for (const val of possibleFirstCols) {
+      if (val && String(val).trim()) {
+        firstValue = val;
+        break;
+      }
+    }
+    
+    for (const val of possibleSecondCols) {
+      if (val && String(val).trim()) {
+        secondValue = val;
+        break;
+      }
+    }
     
     if (!firstValue || !secondValue) continue;
     
     const label = String(firstValue).toLowerCase().trim();
     const value = String(secondValue).trim();
+    
+    console.log(`[extractCampaignHeader] Row ${i}: "${label}" = "${value}"`);
     
     if (label.includes('empresa') || label.includes('company')) {
       header.company = value;
@@ -175,7 +202,13 @@ function extractCampaignHeader(data: any[]): CampaignDetails | null {
     }
   }
   
-  return header.campaignName ? header : null;
+  if (header.campaignName) {
+    console.log(`[extractCampaignHeader] ✓ Extracted campaign: "${header.campaignName}"`);
+    return header;
+  }
+  
+  console.log('[extractCampaignHeader] ✗ No campaign name found');
+  return null;
 }
 
 // Parsear métricas semanais da aba de campanha
