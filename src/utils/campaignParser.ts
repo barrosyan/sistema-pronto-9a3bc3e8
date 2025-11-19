@@ -210,9 +210,9 @@ function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Le
       meetingScheduleDate: null,
       meetingDate: null,
       proposalDate: null,
-      proposalValue: undefined,
+      proposalValue: null,
       saleDate: null,
-      saleValue: undefined,
+      saleValue: null,
       profile: '',
       classification: 'positive', // Classificação inicial como positivo
       attendedWebinar: false,
@@ -309,9 +309,9 @@ function processCampaignData(data: any[]): ParsedCampaignData {
           lead.meetingScheduleDate = row['Data de agendamento da reunião'];
           lead.meetingDate = row['Data da Reunião'];
           lead.proposalDate = row['Data Proposta'];
-          lead.proposalValue = row['Valor Proposta'] ? Number(row['Valor Proposta']) : undefined;
+          lead.proposalValue = row['Valor Proposta'] ? Number(row['Valor Proposta']) : null;
           lead.saleDate = row['Data Venda'];
-          lead.saleValue = row['Valor Venda'] ? Number(row['Valor Venda']) : undefined;
+          lead.saleValue = row['Valor Venda'] ? Number(row['Valor Venda']) : null;
           lead.profile = row['Perfil'];
           lead.classification = row['Classificação'];
           lead.attendedWebinar = row['Participou do Webnar'] === 'Sim';
