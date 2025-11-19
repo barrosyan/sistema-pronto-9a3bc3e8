@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { CampaignDetailsDialog } from '@/components/CampaignDetailsDialog';
 import { CampaignFunnelChart } from '@/components/CampaignFunnelChart';
+import { CampaignFunnelComparison } from '@/components/CampaignFunnelComparison';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { supabase } from '@/integrations/supabase/client';
@@ -56,6 +57,9 @@ export default function Campaigns() {
   const [campaignsData, setCampaignsData] = useState<Record<string, any>>({});
   const [calendarView, setCalendarView] = useState<'dates' | 'week-numbers'>('dates');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [compareMode, setCompareMode] = useState(false);
+  const [period1Range, setPeriod1Range] = useState<DateRange | undefined>(undefined);
+  const [period2Range, setPeriod2Range] = useState<DateRange | undefined>(undefined);
 
   useEffect(() => {
     loadFromDatabase();
@@ -551,7 +555,24 @@ export default function Campaigns() {
       {/* Granularity and Calendar View Selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Opções de Visualização</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Opções de Visualização</CardTitle>
+            <Button
+              variant={compareMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setCompareMode(!compareMode);
+                if (!compareMode) {
+                  setDateRange(undefined);
+                } else {
+                  setPeriod1Range(undefined);
+                  setPeriod2Range(undefined);
+                }
+              }}
+            >
+              {compareMode ? 'Modo Simples' : 'Comparar Períodos'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -568,23 +589,36 @@ export default function Campaigns() {
               </Select>
             </div>
 
-            <div>
-              <Label className="mb-2 block">Filtro de Período</Label>
-              <DateRangePicker date={dateRange} onDateChange={setDateRange} />
-              {dateRange && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="mt-2 h-8 text-xs"
-                  onClick={() => setDateRange(undefined)}
-                >
-                  Limpar filtro
-                </Button>
-              )}
-            </div>
+            {!compareMode ? (
+              <div>
+                <Label className="mb-2 block">Filtro de Período</Label>
+                <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+                {dateRange && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="mt-2 h-8 text-xs"
+                    onClick={() => setDateRange(undefined)}
+                  >
+                    Limpar filtro
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <Label className="mb-2 block">Período 1</Label>
+                  <DateRangePicker date={period1Range} onDateChange={setPeriod1Range} />
+                </div>
+                <div>
+                  <Label className="mb-2 block">Período 2</Label>
+                  <DateRangePicker date={period2Range} onDateChange={setPeriod2Range} />
+                </div>
+              </div>
+            )}
           </div>
           
-          {selectedCampaigns.length > 1 && granularity === 'weekly' && (
+          {selectedCampaigns.length > 1 && granularity === 'weekly' && !compareMode && (
             <div>
               <Label className="mb-2 block">Visualização de Calendário</Label>
               <Select value={calendarView} onValueChange={(v) => setCalendarView(v as 'dates' | 'week-numbers')}>
@@ -609,29 +643,53 @@ export default function Campaigns() {
       {selectedCampaigns.length > 0 && (
         <>
           {/* Campaign Conversion Funnels */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold">Funil de Conversão</h2>
-              {dateRange?.from && (
-                <Badge variant="outline" className="text-sm">
-                  {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })}
-                  {dateRange.to && ` - ${format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}`}
-                </Badge>
-              )}
+          {compareMode && period1Range?.from && period2Range?.from ? (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold">Comparação de Funil entre Períodos</h2>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {selectedCampaigns.map(campaign => {
+                  const period1Summary = getCampaignSummary(campaign, period1Range);
+                  const period2Summary = getCampaignSummary(campaign, period2Range);
+                  return (
+                    <CampaignFunnelComparison
+                      key={campaign}
+                      campaignName={campaign}
+                      period1Data={period1Summary}
+                      period2Data={period2Summary}
+                      period1={period1Range}
+                      period2={period2Range}
+                    />
+                  );
+                })}
+              </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {selectedCampaigns.map(campaign => {
-                const summary = getCampaignSummary(campaign, dateRange);
-                return (
-                  <CampaignFunnelChart
-                    key={campaign}
-                    campaignName={campaign}
-                    data={summary}
-                  />
-                );
-              })}
+          ) : (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold">Funil de Conversão</h2>
+                {dateRange?.from && (
+                  <Badge variant="outline" className="text-sm">
+                    {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })}
+                    {dateRange.to && ` - ${format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}`}
+                  </Badge>
+                )}
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {selectedCampaigns.map(campaign => {
+                  const summary = getCampaignSummary(campaign, dateRange);
+                  return (
+                    <CampaignFunnelChart
+                      key={campaign}
+                      campaignName={campaign}
+                      data={summary}
+                    />
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Campaign Summaries */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
