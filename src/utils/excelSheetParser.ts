@@ -511,12 +511,93 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
       }
     }
     
-    // Parse "Compilado" sheet - aggregated profile data
+    // Parse "Compilado" sheet - aggregated profile data AND Campanhas Ativas section
     else if (normalizedName.includes('compilado')) {
-      console.log('Processando aba Compilado para dados de perfil');
-      const data = XLSX.utils.sheet_to_json(sheet) as any[];
+      console.log('Processando aba Compilado para dados de perfil e Campanhas Ativas');
       
-      data.forEach(row => {
+      const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+      
+      // Find "Campanhas Ativas" section
+      const campanhasAtivasRowIndex = rawData.findIndex(row => 
+        row && row[0] && String(row[0]).toLowerCase().includes('campanhas ativas')
+      );
+      
+      if (campanhasAtivasRowIndex !== -1) {
+        console.log(`Seção "Campanhas Ativas" encontrada na linha ${campanhasAtivasRowIndex}`);
+        
+        // Find metrics rows after "Campanhas Ativas"
+        // Row after "Campanhas Ativas" contains campaign names
+        const campaignNamesRow = rawData[campanhasAtivasRowIndex];
+        const campaignNames: string[] = [];
+        
+        // Extract campaign names from columns (starting from column B/index 1)
+        for (let col = 1; col < campaignNamesRow.length; col++) {
+          const cellValue = campaignNamesRow[col];
+          if (cellValue && String(cellValue).trim()) {
+            campaignNames.push(String(cellValue).trim());
+          } else {
+            break; // Stop when we hit an empty cell
+          }
+        }
+        
+        console.log(`Campanhas encontradas em Campanhas Ativas:`, campaignNames);
+        
+        // Find metric rows (Dias Ativos, Convites Enviados, etc.)
+        const metricRows = [
+          { rowName: 'dias ativos', eventType: 'Active Days' },
+          { rowName: 'convites enviados', eventType: 'Connection Requests Sent' },
+          { rowName: 'conexões realizadas', eventType: 'Connection Requests Accepted' },
+          { rowName: 'taxa de aceite', eventType: 'Connection Accept Rate' },
+          { rowName: 'mensagens enviadas', eventType: 'Messages Sent' },
+          { rowName: 'visitas', eventType: 'Profile Visits' },
+          { rowName: 'likes', eventType: 'Post Likes' },
+          { rowName: 'comentários', eventType: 'Comments Done' },
+          { rowName: 'total de atividades', eventType: 'Total Activities' },
+          { rowName: 'respostas positivas', eventType: 'Positive Responses' },
+          { rowName: 'leads processados', eventType: 'Leads Processed' },
+          { rowName: 'reuniões', eventType: 'Meetings Scheduled' },
+          { rowName: 'propostas', eventType: 'Proposals' },
+          { rowName: 'vendas', eventType: 'Sales' }
+        ];
+        
+        // Process each metric row
+        metricRows.forEach(({ rowName, eventType }) => {
+          // Find the row with this metric
+          const metricRowIndex = rawData.findIndex((row, idx) => 
+            idx > campanhasAtivasRowIndex &&
+            row && row[0] && 
+            String(row[0]).toLowerCase().trim().includes(rowName)
+          );
+          
+          if (metricRowIndex !== -1) {
+            const metricRow = rawData[metricRowIndex];
+            
+            // Extract values for each campaign
+            campaignNames.forEach((campaignName, idx) => {
+              const value = metricRow[idx + 1]; // +1 because column 0 is the metric name
+              const numericValue = Number(value) || 0;
+              
+              // Only add if there's a value
+              if (numericValue > 0 || eventType === 'Active Days') {
+                campaignMetrics.push({
+                  campaignName,
+                  eventType,
+                  profileName: 'Compilado', // Usando 'Compilado' como profile para distinguir
+                  totalCount: numericValue,
+                  dailyData: {},
+                });
+                
+                console.log(`Métrica adicionada de Campanhas Ativas: ${campaignName} - ${eventType}: ${numericValue}`);
+              }
+            });
+          }
+        });
+      }
+      
+      // Also process regular Compilado data (if exists)
+      const regularData = XLSX.utils.sheet_to_json(sheet) as any[];
+      
+      regularData.forEach(row => {
         const campaignName = normalizeAndValidate(row['Campanha'] || row['Campaign']);
         const eventType = normalizeAndValidate(row['Tipo'] || row['Event Type']);
         const profileName = normalizeAndValidate(row['Perfil'] || row['Profile']);
