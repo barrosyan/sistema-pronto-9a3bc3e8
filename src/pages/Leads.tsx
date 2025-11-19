@@ -154,7 +154,7 @@ const Leads = () => {
     total: allLeads.length,
     positive: positiveLeads.length,
     negative: negativeLeads.length,
-    pending: allLeads.filter(l => l.status === 'pending').length
+    pending: pendingLeads.length
   };
 
   return (
