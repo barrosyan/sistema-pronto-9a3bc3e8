@@ -150,12 +150,22 @@ function extractCampaignHeader(data: any[]): CampaignDetails | null {
     jobTitles: ''
   };
   
-  console.log('[extractCampaignHeader] Sample row structure:', {
-    row0Keys: data[0] ? Object.keys(data[0]) : [],
-    row0: data[0]
-  });
+  // Check if first row is "Dados da campanha" header (common in daily sheets)
+  let startRowIndex = 0;
+  if (data[0]) {
+    const firstRow = data[0];
+    const keys = Object.keys(firstRow);
+    const firstCellValue = String(firstRow[keys[0]] || firstRow['__EMPTY'] || firstRow['A'] || '').toLowerCase().trim();
+    
+    if (firstCellValue.includes('dados da campanha') || firstCellValue.includes('campaign data')) {
+      console.log('[extractCampaignHeader] Detected "Dados da campanha" header row, skipping to row 1');
+      startRowIndex = 1;
+    }
+  }
   
-  for (let i = 0; i < Math.min(data.length, 15); i++) {
+  console.log('[extractCampaignHeader] Starting extraction from row:', startRowIndex);
+  
+  for (let i = startRowIndex; i < Math.min(data.length, startRowIndex + 15); i++) {
     const row = data[i];
     if (!row || typeof row !== 'object') continue;
     
@@ -207,9 +217,15 @@ function extractCampaignHeader(data: any[]): CampaignDetails | null {
     
     console.log(`[extractCampaignHeader] Row ${i}: "${label}" = "${value}"`);
     
-    // Skip rows with numeric-only values (likely date rows)
+    // Skip rows with numeric-only values (likely date rows like "45824")
     if (/^\d+$/.test(value) || /^\d{5}$/.test(value)) {
       console.log(`[extractCampaignHeader] Row ${i}: skipped (numeric value)`);
+      continue;
+    }
+    
+    // Skip "Semana X" rows
+    if (label.includes('semana') && /^\d+$/.test(value)) {
+      console.log(`[extractCampaignHeader] Row ${i}: skipped (week number)`);
       continue;
     }
     
