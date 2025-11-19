@@ -672,17 +672,22 @@ function parseNegativeLeads(data: any[]): Lead[] {
     const name = String(row['Nome'] || row['Name'] || '').trim();
     const campaign = String(row['Campanha'] || row['Campaign'] || '').trim();
     
-    if (!name || !campaign) {
-      console.log(`[parseNegativeLeads] Row ${i}: missing name or campaign (name="${name}", campaign="${campaign}"), skipping`);
+    // Only require name - campaign can be empty (will default to 'Unknown')
+    if (!name) {
+      console.log(`[parseNegativeLeads] Row ${i}: missing name, skipping`);
       continue;
     }
     
-    console.log(`[parseNegativeLeads] Row ${i}: Processing lead "${name}" from campaign "${campaign}"`);
+    if (!campaign) {
+      console.log(`[parseNegativeLeads] Row ${i}: Lead "${name}" has no campaign - using "Unknown"`);
+    } else {
+      console.log(`[parseNegativeLeads] Row ${i}: Processing lead "${name}" from campaign "${campaign}"`);
+    }
     
     leads.push({
       id: `lead-neg-${i}`,
       name,
-      campaign,
+      campaign: campaign || 'Unknown',
       company: String(row['Empresa'] || row['Company'] || ''),
       position: String(row['Cargo'] || row['Position'] || ''),
       linkedin: String(row['LinkedIn'] || ''),
