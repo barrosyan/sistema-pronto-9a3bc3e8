@@ -10,8 +10,9 @@ import { format, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, Plus } from 'lucide-react';
 import { CampaignDetailsDialog } from '@/components/CampaignDetailsDialog';
+import { CampaignDialog } from '@/components/CampaignDialog';
 import { CampaignFunnelChart } from '@/components/CampaignFunnelChart';
 import { CampaignFunnelComparison } from '@/components/CampaignFunnelComparison';
 import { CampaignTrendChart } from '@/components/CampaignTrendChart';
@@ -61,6 +62,7 @@ export default function Campaigns() {
   const [compareMode, setCompareMode] = useState(false);
   const [period1Range, setPeriod1Range] = useState<DateRange | undefined>(undefined);
   const [period2Range, setPeriod2Range] = useState<DateRange | undefined>(undefined);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   useEffect(() => {
     loadFromDatabase();
@@ -88,6 +90,33 @@ export default function Campaigns() {
         return acc;
       }, {} as Record<string, any>);
       setCampaignsData(campaignsMap);
+    }
+  };
+
+  const handleCreateCampaign = async (campaignData: {
+    name: string;
+    profile: string;
+    objective: string;
+    cadence: string;
+    positions: string;
+  }) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('campaigns')
+      .insert({
+        name: campaignData.name,
+        profile_name: campaignData.profile,
+        objective: campaignData.objective,
+        cadence: campaignData.cadence,
+        job_titles: campaignData.positions,
+        user_id: user.id,
+      });
+
+    if (!error) {
+      await loadCampaignDetails();
+      setCreateDialogOpen(false);
     }
   };
 
@@ -485,9 +514,15 @@ export default function Campaigns() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Campanhas</h1>
-        <p className="text-muted-foreground">Análise detalhada e comparativa de campanhas</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Campanhas</h1>
+          <p className="text-muted-foreground">Análise detalhada e comparativa de campanhas</p>
+        </div>
+        <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Nova Campanha
+        </Button>
       </div>
 
       {/* Campaign Selection */}
@@ -1050,6 +1085,12 @@ export default function Campaigns() {
           onUpdate={loadCampaignDetails}
         />
       )}
+
+      <CampaignDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onSave={handleCreateCampaign}
+      />
     </div>
   );
 }
