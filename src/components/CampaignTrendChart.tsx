@@ -38,7 +38,7 @@ export function CampaignTrendChart({ data, campaignName }: CampaignTrendChartPro
 
   const chartData = useMemo(() => {
     return data
-      .filter(item => item.date && item.date.trim() !== '')
+      .filter(item => item.date && item.date.trim() !== '' && /^\d{4}-\d{2}-\d{2}$/.test(item.date))
       .map(item => {
         try {
           return {

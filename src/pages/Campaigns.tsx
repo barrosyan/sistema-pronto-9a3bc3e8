@@ -146,7 +146,12 @@ export default function Campaigns() {
     const allDates = new Set<string>();
     
     campaignData.forEach(metric => {
-      Object.keys(metric.dailyData || {}).forEach(date => allDates.add(date));
+      Object.keys(metric.dailyData || {}).forEach(date => {
+        // Only add valid dates in YYYY-MM-DD format
+        if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          allDates.add(date);
+        }
+      });
     });
 
     return Array.from(allDates).sort().map(date => {
@@ -224,10 +229,8 @@ export default function Campaigns() {
       weekData.positiveResponses += day.positiveResponses;
       weekData.totalDays += 1;
       
-      // Check if this specific day is active based on daily data from database
-      const dateKey = format(date, 'yyyy-MM-dd');
-      const dayActiveDays = activeDaysMetric?.dailyData?.[dateKey] || 0;
-      if (dayActiveDays > 0 || day.isActive) {
+      // Count active days: a day is active if it has any activity
+      if (day.isActive) {
         weekData.activeDays += 1;
       }
     });
@@ -455,7 +458,7 @@ export default function Campaigns() {
       });
       
       return Array.from(allDatesSet).sort().map(date => {
-        const row: any = { date };
+        const row: any = { date: format(parseISO(date), 'dd/MM/yyyy', { locale: ptBR }) };
         selectedCampaigns.forEach(campaign => {
           const campaignData = getDailyDataForCampaign(campaign).find(d => d.date === date);
           row[`${campaign}_status`] = campaignData?.isActive ? 'Ativo' : 'Inativo';
