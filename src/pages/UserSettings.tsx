@@ -300,10 +300,42 @@ export default function UserSettings() {
       }
 
       console.log('Limpando dados existentes...');
-      await supabase.from('campaign_metrics').delete().eq('user_id', user.id);
-      await supabase.from('leads').delete().eq('user_id', user.id);
-      await supabase.from('campaigns').delete().eq('user_id', user.id);
-      console.log('Dados limpos com sucesso');
+      
+      // Delete in correct order to respect foreign keys: leads and metrics first, then campaigns
+      const { error: metricsDeleteError } = await supabase
+        .from('campaign_metrics')
+        .delete()
+        .eq('user_id', user.id);
+      
+      if (metricsDeleteError) {
+        console.error('Erro ao deletar métricas:', metricsDeleteError);
+        throw new Error('Falha ao limpar métricas: ' + metricsDeleteError.message);
+      }
+      console.log('Métricas deletadas');
+
+      const { error: leadsDeleteError } = await supabase
+        .from('leads')
+        .delete()
+        .eq('user_id', user.id);
+      
+      if (leadsDeleteError) {
+        console.error('Erro ao deletar leads:', leadsDeleteError);
+        throw new Error('Falha ao limpar leads: ' + leadsDeleteError.message);
+      }
+      console.log('Leads deletados');
+
+      const { error: campaignsDeleteError } = await supabase
+        .from('campaigns')
+        .delete()
+        .eq('user_id', user.id);
+      
+      if (campaignsDeleteError) {
+        console.error('Erro ao deletar campanhas:', campaignsDeleteError);
+        throw new Error('Falha ao limpar campanhas: ' + campaignsDeleteError.message);
+      }
+      console.log('Campanhas deletadas');
+      
+      console.log('✅ Todos os dados foram limpos com sucesso');
 
       for (const { parsedData } of parsedFilesData) {
         console.log('Processando arquivo com dados:', {
