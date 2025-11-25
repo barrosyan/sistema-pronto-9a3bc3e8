@@ -21,6 +21,7 @@ import { WeeklyPerformanceChart } from '@/components/WeeklyPerformanceChart';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { supabase } from '@/integrations/supabase/client';
+import { UploadManager } from '@/components/UploadManager';
 
 interface DailyData {
   date: string;
@@ -572,6 +573,8 @@ export default function Campaigns() {
 
   return (
     <div className="space-y-6">
+      <UploadManager />
+      
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Campanhas</h1>
