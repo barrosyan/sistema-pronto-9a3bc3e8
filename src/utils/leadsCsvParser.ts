@@ -96,7 +96,7 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
       // Positive lead
       positiveLeads.push({
         ...baseLead,
-        status: 'Pendente',
+        status: 'pending',
         positiveResponseDate: row['Data Resposta Positiva'] || row['Positive Response Date'] || null,
         transferDate: row['Data Repasse'] || row['Transfer Date'] || null,
         statusDetails: row['Status'] || null,
@@ -138,7 +138,7 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
       // For new format CSVs without positive/negative response indicators, treat as pending leads
       positiveLeads.push({
         ...baseLead,
-        status: 'Pendente',
+        status: 'pending',
         positiveResponseDate: null,
         transferDate: null,
         statusDetails: null,
