@@ -627,30 +627,67 @@ function parseDailyMetricsFromDiarioSheet(
       
       dateColumns.forEach((key, idx) => {
         const dateValue = daysRow[key];
-        console.log(`[parseDailyMetricsFromDiarioSheet] Column ${key} (${idx}): raw value = "${dateValue}"`);
+        console.log(`[parseDailyMetricsFromDiarioSheet] Column ${key} (${idx}): raw value = "${dateValue}", type = ${typeof dateValue}`);
         
-        if (dateValue) {
+        if (dateValue !== undefined && dateValue !== null && dateValue !== '') {
           let dateStr = String(dateValue).trim();
           
           // Se é número (formato Excel serial date), converter
-          if (/^\d+$/.test(dateStr)) {
-            const excelDate = parseInt(dateStr);
+          if (typeof dateValue === 'number') {
+            // Excel serial date: número de dias desde 01/01/1900
+            const excelDate = dateValue;
             const jsDate = new Date((excelDate - 25569) * 86400 * 1000);
             dateStr = jsDate.toISOString().split('T')[0]; // YYYY-MM-DD
-            console.log(`[parseDailyMetricsFromDiarioSheet]   Excel date ${excelDate} -> ${dateStr}`);
+            console.log(`[parseDailyMetricsFromDiarioSheet]   Excel serial date ${excelDate} -> ${dateStr}`);
+          }
+          // Se é string numérica (formato Excel como string), converter
+          else if (/^\d+(\.\d+)?$/.test(dateStr)) {
+            const excelDate = parseFloat(dateStr);
+            const jsDate = new Date((excelDate - 25569) * 86400 * 1000);
+            dateStr = jsDate.toISOString().split('T')[0]; // YYYY-MM-DD
+            console.log(`[parseDailyMetricsFromDiarioSheet]   Excel date string ${excelDate} -> ${dateStr}`);
           }
           // Se está em formato DD/MM/YYYY, converter para YYYY-MM-DD
-          else if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+          else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
             const parts = dateStr.split('/');
-            dateStr = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            const year = parts[2];
+            dateStr = `${year}-${month}-${day}`;
             console.log(`[parseDailyMetricsFromDiarioSheet]   DD/MM/YYYY format -> ${dateStr}`);
           }
+          // Se está em formato YYYY-MM-DD, usar direto
+          else if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            console.log(`[parseDailyMetricsFromDiarioSheet]   Already in YYYY-MM-DD format: ${dateStr}`);
+          }
+          // Se é uma string de data reconhecível, tentar parsear
+          else {
+            try {
+              const parsed = new Date(dateStr);
+              if (!isNaN(parsed.getTime())) {
+                dateStr = parsed.toISOString().split('T')[0];
+                console.log(`[parseDailyMetricsFromDiarioSheet]   Parsed date string -> ${dateStr}`);
+              } else {
+                console.log(`[parseDailyMetricsFromDiarioSheet]   ⚠️ Could not parse date: "${dateValue}"`);
+                dateStr = ''; // Marcar como inválido
+              }
+            } catch (e) {
+              console.log(`[parseDailyMetricsFromDiarioSheet]   ⚠️ Error parsing date: "${dateValue}"`);
+              dateStr = ''; // Marcar como inválido
+            }
+          }
           
-          dates.push(dateStr);
+          // Validar se a data final está em formato correto
+          if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            dates.push(dateStr);
+          } else {
+            console.log(`[parseDailyMetricsFromDiarioSheet]   ⚠️ Final date string invalid, skipping day ${idx + 1}`);
+            // Não adicionar data inválida - pular este dia
+            dates.push(''); // Placeholder vazio
+          }
         } else {
-          const fallbackDate = `week${weekNumber}-day${idx + 1}`;
-          dates.push(fallbackDate);
-          console.log(`[parseDailyMetricsFromDiarioSheet]   No date, using fallback: ${fallbackDate}`);
+          console.log(`[parseDailyMetricsFromDiarioSheet]   ⚠️ No date value in column, skipping day ${idx + 1}`);
+          dates.push(''); // Placeholder vazio
         }
       });
       
@@ -697,6 +734,13 @@ function parseDailyMetricsFromDiarioSheet(
         
         // Extrair valores para cada dia (mesmas colunas das datas)
         dateColumns.forEach((key, dayIdx) => {
+          const dateKey = dates[dayIdx];
+          
+          // Pular dias sem data válida
+          if (!dateKey || !dateKey.trim()) {
+            return;
+          }
+          
           const value = metricRow[key];
           let count = 0;
           
@@ -713,7 +757,7 @@ function parseDailyMetricsFromDiarioSheet(
           }
           
           if (count > 0) {
-            console.log(`[parseDailyMetricsFromDiarioSheet]   ${eventType} on ${dates[dayIdx]}: ${count}`);
+            console.log(`[parseDailyMetricsFromDiarioSheet]   ${eventType} on ${dateKey}: ${count}`);
           }
           
           // Encontrar ou criar a métrica
@@ -733,8 +777,6 @@ function parseDailyMetricsFromDiarioSheet(
             };
             metrics.push(metric);
           }
-          
-          const dateKey = dates[dayIdx];
           
           // Acumular valores (caso haja múltiplas semanas)
           if (count > 0) {
