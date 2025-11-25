@@ -465,9 +465,21 @@ export default function UserSettings() {
               stand: lead.stand,
             }));
 
+            // Deduplicate leads by unique key (user_id, campaign, name)
+            const uniqueLeads = leadsToInsert.reduce((acc, lead) => {
+              const key = `${lead.user_id}-${lead.campaign}-${lead.name}`;
+              if (!acc.has(key)) {
+                acc.set(key, lead);
+              }
+              return acc;
+            }, new Map<string, typeof leadsToInsert[0]>());
+
+            const deduplicatedLeads = Array.from(uniqueLeads.values());
+            console.log(`📊 Deduplicated ${leadsToInsert.length} leads to ${deduplicatedLeads.length} unique leads`);
+
             const { error: leadsError } = await supabase
               .from('leads')
-              .upsert(leadsToInsert, {
+              .upsert(deduplicatedLeads as any[], {
                 onConflict: 'user_id,campaign,name',
                 ignoreDuplicates: false
               });
@@ -498,9 +510,21 @@ export default function UserSettings() {
               observations: lead.observations,
             }));
 
+            // Deduplicate leads by unique key (user_id, campaign, name)
+            const uniqueLeads = leadsToInsert.reduce((acc, lead) => {
+              const key = `${lead.user_id}-${lead.campaign}-${lead.name}`;
+              if (!acc.has(key)) {
+                acc.set(key, lead);
+              }
+              return acc;
+            }, new Map<string, typeof leadsToInsert[0]>());
+
+            const deduplicatedLeads = Array.from(uniqueLeads.values());
+            console.log(`📊 Deduplicated ${leadsToInsert.length} negative leads to ${deduplicatedLeads.length} unique leads`);
+
             const { error: leadsError } = await supabase
               .from('leads')
-              .upsert(leadsToInsert, {
+              .upsert(deduplicatedLeads as any[], {
                 onConflict: 'user_id,campaign,name',
                 ignoreDuplicates: false
               });
