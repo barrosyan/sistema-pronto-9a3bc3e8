@@ -299,43 +299,49 @@ export default function UserSettings() {
         return;
       }
 
-      console.log('Limpando dados existentes...');
+      console.log('🗑️ Limpando dados existentes do usuário:', user.id);
       
-      // Delete in correct order to respect foreign keys: leads and metrics first, then campaigns
-      const { error: metricsDeleteError } = await supabase
+      // Delete in correct order to respect foreign keys: metrics and leads first, then campaigns
+      const { data: metricsData, error: metricsDeleteError } = await supabase
         .from('campaign_metrics')
         .delete()
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select('id');
       
       if (metricsDeleteError) {
-        console.error('Erro ao deletar métricas:', metricsDeleteError);
+        console.error('❌ Erro ao deletar métricas:', metricsDeleteError);
         throw new Error('Falha ao limpar métricas: ' + metricsDeleteError.message);
       }
-      console.log('Métricas deletadas');
+      console.log(`✅ ${metricsData?.length || 0} métricas deletadas`);
 
-      const { error: leadsDeleteError } = await supabase
+      const { data: leadsData, error: leadsDeleteError } = await supabase
         .from('leads')
         .delete()
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select('id');
       
       if (leadsDeleteError) {
-        console.error('Erro ao deletar leads:', leadsDeleteError);
+        console.error('❌ Erro ao deletar leads:', leadsDeleteError);
         throw new Error('Falha ao limpar leads: ' + leadsDeleteError.message);
       }
-      console.log('Leads deletados');
+      console.log(`✅ ${leadsData?.length || 0} leads deletados`);
 
-      const { error: campaignsDeleteError } = await supabase
+      const { data: campaignsData, error: campaignsDeleteError } = await supabase
         .from('campaigns')
         .delete()
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select('id');
       
       if (campaignsDeleteError) {
-        console.error('Erro ao deletar campanhas:', campaignsDeleteError);
+        console.error('❌ Erro ao deletar campanhas:', campaignsDeleteError);
         throw new Error('Falha ao limpar campanhas: ' + campaignsDeleteError.message);
       }
-      console.log('Campanhas deletadas');
+      console.log(`✅ ${campaignsData?.length || 0} campanhas deletadas`);
       
       console.log('✅ Todos os dados foram limpos com sucesso');
+      
+      // Aguardar um pouco para garantir que o banco processou as deleções
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // STEP 1: Consolidate ALL data from ALL files BEFORE inserting
       console.log('=== CONSOLIDANDO DADOS DE TODOS OS ARQUIVOS ===');
