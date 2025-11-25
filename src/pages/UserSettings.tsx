@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { parseCampaignCsv } from '@/utils/campaignCsvParser';
+import { parseLeadsCsv } from '@/utils/leadsCsvParser';
+import { detectCsvType, parseCsvHeaders } from '@/utils/csvDetector';
 import DataImportPreview, { FilePreviewData } from '@/components/DataImportPreview';
 import { useCampaignData } from '@/hooks/useCampaignData';
 
@@ -210,31 +212,67 @@ export default function UserSettings() {
           const isCsv = fileRecord.file_name.toLowerCase().endsWith('.csv');
           
           if (isCsv) {
-            // Process campaign CSV
+            // Detect CSV type automatically
             const text = await fileData.text();
-            const parsedData = parseCampaignCsv(text);
+            const headers = parseCsvHeaders(text);
+            const detection = detectCsvType(headers);
             
-            const profileNames = Array.from(new Set(parsedData.map(d => d.profileName)));
-            const campaignNames = Array.from(new Set(parsedData.map(d => d.campaignName)));
+            console.log(`📋 Detected CSV type: ${detection.type} (confidence: ${detection.confidence})`);
             
-            previews.push({
-              fileName: fileRecord.file_name,
-              campaignsCount: campaignNames.length,
-              metricsCount: parsedData.reduce((sum, d) => sum + d.metrics.length, 0),
-              positiveLeadsCount: 0,
-              negativeLeadsCount: 0,
-              campaignNames,
-            });
+            if (detection.type === 'campaign-input') {
+              // Process campaign input CSV
+              const parsedData = parseCampaignCsv(text);
+              
+              const profileNames = Array.from(new Set(parsedData.map(d => d.profileName)));
+              const campaignNames = Array.from(new Set(parsedData.map(d => d.campaignName)));
+              
+              previews.push({
+                fileName: fileRecord.file_name,
+                campaignsCount: campaignNames.length,
+                metricsCount: parsedData.reduce((sum, d) => sum + d.metrics.length, 0),
+                positiveLeadsCount: 0,
+                negativeLeadsCount: 0,
+                campaignNames,
+              });
 
-            parsedDataArray.push({
-              fileRecord,
-              parsedData,
-              user,
-              type: 'csv',
-            });
+              parsedDataArray.push({
+                fileRecord,
+                parsedData,
+                user,
+                type: 'campaign-input',
+              });
+            } else if (detection.type === 'leads') {
+              // Process leads CSV
+              const parsedData = parseLeadsCsv(text);
+              
+              const campaignNames = Array.from(
+                new Set([
+                  ...parsedData.positiveLeads.map(l => l.campaign),
+                  ...parsedData.negativeLeads.map(l => l.campaign)
+                ])
+              ).filter(Boolean);
+              
+              previews.push({
+                fileName: fileRecord.file_name,
+                campaignsCount: 0,
+                metricsCount: 0,
+                positiveLeadsCount: parsedData.positiveLeads.length,
+                negativeLeadsCount: parsedData.negativeLeads.length,
+                campaignNames,
+              });
+
+              parsedDataArray.push({
+                fileRecord,
+                parsedData,
+                user,
+                type: 'leads',
+              });
+            } else {
+              throw new Error('Tipo de CSV não reconhecido. Verifique se o arquivo possui as colunas corretas.');
+            }
           } else {
             // Skip Excel for now - only CSV supported
-            throw new Error('Apenas arquivos CSV são suportados para dados de campanhas');
+            throw new Error('Apenas arquivos CSV são suportados');
           }
 
         } catch (error) {
@@ -310,72 +348,166 @@ export default function UserSettings() {
       console.log('✅ Todos os dados foram limpos');
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Process CSV campaign data
+      // Process each file based on type
+      let totalLeads = 0;
+      
       for (const { parsedData, type } of parsedFilesData) {
-        if (type !== 'csv') continue;
-        
-        console.log(`📊 Processando ${parsedData.length} campaign-profile combinations`);
+        if (type === 'campaign-input') {
+          // Process campaign input CSV
+          console.log(`📊 Processando ${parsedData.length} campaign-profile combinations`);
 
-        for (const data of parsedData) {
-          // Create profile
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles_data')
-            .upsert({
-              user_id: user.id,
-              profile_name: data.profileName,
-            }, {
-              onConflict: 'user_id,profile_name',
-              ignoreDuplicates: false,
-            })
-            .select()
-            .single();
+          for (const data of parsedData) {
+            // Create profile
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles_data')
+              .upsert({
+                user_id: user.id,
+                profile_name: data.profileName,
+              }, {
+                onConflict: 'user_id,profile_name',
+                ignoreDuplicates: false,
+              })
+              .select()
+              .single();
 
-          if (profileError) {
-            console.error('❌ Error creating profile:', profileError);
-            continue;
-          }
+            if (profileError) {
+              console.error('❌ Error creating profile:', profileError);
+              continue;
+            }
 
-          totalProfiles++;
-          console.log(`✅ Profile: ${data.profileName}`);
+            totalProfiles++;
+            console.log(`✅ Profile: ${data.profileName}`);
 
-          // Create campaign
-          const { data: campaign, error: campaignError } = await supabase
-            .from('campaigns')
-            .insert({
-              user_id: user.id,
-              profile_id: profile.id,
-              name: data.campaignName,
-              profile_name: data.profileName,
-            })
-            .select()
-            .single();
-
-          if (campaignError) {
-            console.error('❌ Error creating campaign:', campaignError);
-            continue;
-          }
-
-          totalCampaigns++;
-          console.log(`✅ Campaign: ${data.campaignName}`);
-
-          // Insert metrics
-          for (const metric of data.metrics) {
-            const { error: metricError } = await supabase
-              .from('campaign_metrics')
+            // Create campaign
+            const { data: campaign, error: campaignError } = await supabase
+              .from('campaigns')
               .insert({
                 user_id: user.id,
-                campaign_name: data.campaignName,
+                profile_id: profile.id,
+                name: data.campaignName,
                 profile_name: data.profileName,
-                event_type: metric.eventType,
-                total_count: metric.totalCount,
-                daily_data: metric.dailyData,
+              })
+              .select()
+              .single();
+
+            if (campaignError) {
+              console.error('❌ Error creating campaign:', campaignError);
+              continue;
+            }
+
+            totalCampaigns++;
+            console.log(`✅ Campaign: ${data.campaignName}`);
+
+            // Insert metrics
+            for (const metric of data.metrics) {
+              const { error: metricError } = await supabase
+                .from('campaign_metrics')
+                .insert({
+                  user_id: user.id,
+                  campaign_name: data.campaignName,
+                  profile_name: data.profileName,
+                  event_type: metric.eventType,
+                  total_count: metric.totalCount,
+                  daily_data: metric.dailyData,
+                });
+
+              if (metricError) {
+                console.error(`❌ Error inserting metric ${metric.eventType}:`, metricError);
+              } else {
+                totalMetrics++;
+                console.log(`✅ Metric: ${metric.eventType}`);
+              }
+            }
+          }
+        } else if (type === 'leads') {
+          // Process leads CSV
+          console.log(`👥 Processando leads: ${parsedData.positiveLeads.length} positivos, ${parsedData.negativeLeads.length} negativos`);
+          
+          // Insert positive leads
+          if (parsedData.positiveLeads.length > 0) {
+            const leadsToInsert = parsedData.positiveLeads.map(lead => ({
+              user_id: user.id,
+              campaign: lead.campaign,
+              linkedin: lead.linkedin,
+              name: lead.name,
+              position: lead.position,
+              company: lead.company,
+              status: lead.status,
+              source: lead.source,
+              connection_date: lead.connectionDate,
+              positive_response_date: lead.positiveResponseDate,
+              transfer_date: lead.transferDate,
+              status_details: lead.statusDetails,
+              comments: lead.comments,
+              follow_up_1_date: lead.followUp1Date,
+              follow_up_1_comments: lead.followUp1Comments,
+              follow_up_2_date: lead.followUp2Date,
+              follow_up_2_comments: lead.followUp2Comments,
+              follow_up_3_date: lead.followUp3Date,
+              follow_up_3_comments: lead.followUp3Comments,
+              follow_up_4_date: lead.followUp4Date,
+              follow_up_4_comments: lead.followUp4Comments,
+              observations: lead.observations,
+              meeting_schedule_date: lead.meetingScheduleDate,
+              meeting_date: lead.meetingDate,
+              proposal_date: lead.proposalDate,
+              proposal_value: lead.proposalValue,
+              sale_date: lead.saleDate,
+              sale_value: lead.saleValue,
+              profile: lead.profile,
+              classification: lead.classification,
+              attended_webinar: lead.attendedWebinar,
+              whatsapp: lead.whatsapp,
+              stand_day: lead.standDay,
+              pavilion: lead.pavilion,
+              stand: lead.stand,
+            }));
+
+            const { error: leadsError } = await supabase
+              .from('leads')
+              .upsert(leadsToInsert, {
+                onConflict: 'user_id,campaign,name',
+                ignoreDuplicates: false
               });
 
-            if (metricError) {
-              console.error(`❌ Error inserting metric ${metric.eventType}:`, metricError);
+            if (leadsError) {
+              console.error('❌ Error inserting positive leads:', leadsError);
             } else {
-              totalMetrics++;
-              console.log(`✅ Metric: ${metric.eventType}`);
+              totalLeads += leadsToInsert.length;
+              console.log(`✅ ${leadsToInsert.length} positive leads inserted`);
+            }
+          }
+          
+          // Insert negative leads
+          if (parsedData.negativeLeads.length > 0) {
+            const leadsToInsert = parsedData.negativeLeads.map(lead => ({
+              user_id: user.id,
+              campaign: lead.campaign,
+              linkedin: lead.linkedin,
+              name: lead.name,
+              position: lead.position,
+              company: lead.company,
+              status: lead.status,
+              source: lead.source,
+              connection_date: lead.connectionDate,
+              negative_response_date: lead.negativeResponseDate,
+              had_follow_up: lead.hadFollowUp,
+              follow_up_reason: lead.followUpReason,
+              observations: lead.observations,
+            }));
+
+            const { error: leadsError } = await supabase
+              .from('leads')
+              .upsert(leadsToInsert, {
+                onConflict: 'user_id,campaign,name',
+                ignoreDuplicates: false
+              });
+
+            if (leadsError) {
+              console.error('❌ Error inserting negative leads:', leadsError);
+            } else {
+              totalLeads += leadsToInsert.length;
+              console.log(`✅ ${leadsToInsert.length} negative leads inserted`);
             }
           }
         }
@@ -385,13 +517,19 @@ export default function UserSettings() {
       console.log('Total perfis:', totalProfiles);
       console.log('Total campanhas:', totalCampaigns);
       console.log('Total métricas:', totalMetrics);
+      console.log('Total leads:', totalLeads);
       
       await loadFromDatabase();
       setShowPreview(false);
       setParsedFilesData([]);
       setPreviewData([]);
       
-      toast.success(`Importação concluída! ${totalCampaigns} campanhas, ${totalMetrics} métricas`);
+      const successParts = [];
+      if (totalCampaigns > 0) successParts.push(`${totalCampaigns} campanhas`);
+      if (totalMetrics > 0) successParts.push(`${totalMetrics} métricas`);
+      if (totalLeads > 0) successParts.push(`${totalLeads} leads`);
+      
+      toast.success(`Importação concluída! ${successParts.join(', ')}`);
     } catch (error: any) {
       console.error('Erro na importação:', error);
       toast.error(error.message || 'Erro ao importar dados');
