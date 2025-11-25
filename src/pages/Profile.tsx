@@ -2,28 +2,46 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCampaignData } from '@/hooks/useCampaignData';
+import { useProfileFilter } from '@/contexts/ProfileFilterContext';
 import { Separator } from '@/components/ui/separator';
 
 export default function Profile() {
   const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
+  const { selectedProfile } = useProfileFilter();
   const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
 
   useEffect(() => {
     loadFromDatabase();
   }, [loadFromDatabase]);
 
-  // Extract unique campaigns from database
-  const uniqueCampaigns = Array.from(new Set(campaignMetrics.map(m => m.campaignName).filter(Boolean)));
+  // Extract unique campaigns from database - filter by selected profile
+  const uniqueCampaigns = Array.from(
+    new Set(
+      campaignMetrics
+        .filter(m => !selectedProfile || m.profileName === selectedProfile)
+        .map(m => m.campaignName)
+        .filter(Boolean)
+    )
+  );
 
-  // Filter metrics and leads based on selected campaign
-  const filteredMetrics = selectedCampaign === 'all' 
-    ? campaignMetrics 
-    : campaignMetrics.filter(m => m.campaignName === selectedCampaign);
+  // Filter metrics and leads based on selected campaign AND selected profile
+  const filteredMetrics = campaignMetrics.filter(m => {
+    const matchesProfile = !selectedProfile || m.profileName === selectedProfile;
+    const matchesCampaign = selectedCampaign === 'all' || m.campaignName === selectedCampaign;
+    return matchesProfile && matchesCampaign;
+  });
   
   const allLeads = getAllLeads();
   const filteredLeads = selectedCampaign === 'all'
     ? allLeads
     : allLeads.filter(l => l.campaign === selectedCampaign);
+
+  // Reset selected campaign when profile changes if it's not available
+  useEffect(() => {
+    if (selectedCampaign !== 'all' && !uniqueCampaigns.includes(selectedCampaign)) {
+      setSelectedCampaign('all');
+    }
+  }, [selectedProfile, uniqueCampaigns, selectedCampaign]);
 
   // Calculate consolidated metrics from filtered campaigns
   const calculateMetrics = () => {

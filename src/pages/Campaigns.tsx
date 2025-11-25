@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCampaignData } from '@/hooks/useCampaignData';
+import { useProfileFilter } from '@/contexts/ProfileFilterContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -53,6 +54,7 @@ interface WeeklyData {
 
 export default function Campaigns() {
   const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
+  const { selectedProfile } = useProfileFilter();
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [granularity, setGranularity] = useState<'daily' | 'weekly'>('weekly');
   const [currentPage, setCurrentPage] = useState(1);
@@ -123,14 +125,30 @@ export default function Campaigns() {
     }
   };
 
-  // Extract unique campaigns
-  const allCampaigns = Array.from(new Set(campaignMetrics.map(m => m.campaignName).filter(Boolean)));
+  // Extract unique campaigns - filter by selected profile
+  const allCampaigns = Array.from(
+    new Set(
+      campaignMetrics
+        .filter(m => !selectedProfile || m.profileName === selectedProfile)
+        .map(m => m.campaignName)
+        .filter(Boolean)
+    )
+  );
 
   useEffect(() => {
     if (allCampaigns.length > 0 && selectedCampaigns.length === 0) {
       setSelectedCampaigns([allCampaigns[0]]);
     }
-  }, [allCampaigns]);
+    // Reset selected campaigns if they're not in the filtered list
+    if (selectedCampaigns.length > 0) {
+      const validCampaigns = selectedCampaigns.filter(c => allCampaigns.includes(c));
+      if (validCampaigns.length === 0 && allCampaigns.length > 0) {
+        setSelectedCampaigns([allCampaigns[0]]);
+      } else if (validCampaigns.length !== selectedCampaigns.length) {
+        setSelectedCampaigns(validCampaigns);
+      }
+    }
+  }, [allCampaigns, selectedProfile]);
 
   const toggleCampaign = (campaign: string) => {
     setSelectedCampaigns(prev => 
