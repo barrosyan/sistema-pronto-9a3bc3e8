@@ -245,7 +245,7 @@ export default function UserSettings() {
               });
             } else if (detection.type === 'leads') {
               // Process leads CSV
-              const parsedData = parseLeadsCsv(text);
+              const parsedData = parseLeadsCsv(text, fileRecord.file_name);
               
               const campaignNames = Array.from(
                 new Set([

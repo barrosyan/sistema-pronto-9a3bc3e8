@@ -5,7 +5,7 @@ export interface ParsedLeadData {
   negativeLeads: any[];
 }
 
-export function parseLeadsCsv(csvContent: string): ParsedLeadData {
+export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLeadData {
   console.log('🔍 Starting leads CSV parsing...');
   
   const parseResult = Papa.parse(csvContent, {
@@ -25,33 +25,52 @@ export function parseLeadsCsv(csvContent: string): ParsedLeadData {
   const positiveLeads: any[] = [];
   const negativeLeads: any[] = [];
 
+  // Try to extract campaign name from filename if available
+  let campaignFromFile = '';
+  if (fileName) {
+    // Remove file extension and clean up
+    campaignFromFile = fileName.replace(/\.(csv|xlsx|xls)$/i, '').replace(/_/g, ' ');
+  }
+
   rows.forEach((row, index) => {
     // Detect if it's positive or negative lead based on columns
     const hasPositiveResponse = row['Data Resposta Positiva'] || row['Positive Response Date'] || row['Data resposta positiva'];
     const hasNegativeResponse = row['Data Resposta Negativa'] || row['Negative Response Date'] || row['Data resposta negativa'];
 
-    const campaign = row['Campanha'] || row['Campaign'] || '';
-    const linkedin = row['LinkedIn'] || row['linkedin'] || '';
-    const name = row['Nome'] || row['Name'] || '';
+    // Handle both old format (single Name field) and new format (First Name + Last Name)
+    const firstName = row['First Name'] || '';
+    const lastName = row['Last Name'] || '';
+    const fullName = firstName && lastName ? `${firstName} ${lastName}`.trim() : '';
+    
+    const campaign = row['Campanha'] || row['Campaign'] || campaignFromFile || '';
+    const linkedin = row['LinkedIn'] || row['linkedin'] || row['linkedin_url'] || '';
+    const name = row['Nome'] || row['Name'] || fullName || '';
     const position = row['Cargo'] || row['Position'] || '';
     const company = row['Empresa'] || row['Company'] || '';
 
-    if (!name || !campaign) {
-      console.warn(`⚠️ Row ${index + 1} missing required fields (name or campaign), skipping`);
+    if (!name) {
+      console.warn(`⚠️ Row ${index + 1} missing required field (name), skipping`);
       return;
     }
 
-    // Extract connection date from Messages field if present
-    let connectionDate = null;
-    const messagesField = row['Messages Sent: 1, Received: 4, Connected: Thu Apr 17 2025'] || 
-                         row['Messages'] || 
-                         row['messages'] || '';
-    if (messagesField && typeof messagesField === 'string') {
-      const connectedMatch = messagesField.match(/Connected:\s*(.+?)(?:\s|$)/i);
-      if (connectedMatch) {
-        connectionDate = connectedMatch[1].trim();
+    // Extract connection date from "Connected At" field or Messages field
+    let connectionDate = row['Connected At'] || row['connected_at'] || null;
+    
+    // Fallback: try to extract from Messages field if present
+    if (!connectionDate) {
+      const messagesField = row['Messages Sent: 1, Received: 4, Connected: Thu Apr 17 2025'] || 
+                           row['Messages'] || 
+                           row['messages'] || '';
+      if (messagesField && typeof messagesField === 'string') {
+        const connectedMatch = messagesField.match(/Connected:\s*(.+?)(?:\s|$)/i);
+        if (connectedMatch) {
+          connectionDate = connectedMatch[1].trim();
+        }
       }
     }
+
+    // Extract sequence generated date
+    const sequenceDate = row['Sequence Generated At'] || row['sequence_generated_at'] || null;
 
     const baseLead = {
       campaign,
@@ -61,13 +80,14 @@ export function parseLeadsCsv(csvContent: string): ParsedLeadData {
       company,
       source: 'Kontax',
       connectionDate,
+      sequenceDate,
     };
 
     if (hasPositiveResponse) {
       // Positive lead
       positiveLeads.push({
         ...baseLead,
-        status: 'pending',
+        status: 'Pendente',
         positiveResponseDate: row['Data Resposta Positiva'] || row['Positive Response Date'] || null,
         transferDate: row['Data Repasse'] || row['Transfer Date'] || null,
         statusDetails: row['Status'] || null,
@@ -104,6 +124,38 @@ export function parseLeadsCsv(csvContent: string): ParsedLeadData {
         hadFollowUp: row['Teve FU?'] === 'Sim' || row['Had Follow-Up'] === 'Yes',
         followUpReason: row['Porque?'] || row['Follow-Up Reason'] || null,
         observations: row['Observações'] || row['Observations'] || null,
+      });
+    } else {
+      // For new format CSVs without positive/negative response indicators, treat as pending leads
+      positiveLeads.push({
+        ...baseLead,
+        status: 'Pendente',
+        positiveResponseDate: null,
+        transferDate: null,
+        statusDetails: null,
+        comments: null,
+        followUp1Date: null,
+        followUp1Comments: null,
+        followUp2Date: null,
+        followUp2Comments: null,
+        followUp3Date: null,
+        followUp3Comments: null,
+        followUp4Date: null,
+        followUp4Comments: null,
+        observations: null,
+        meetingScheduleDate: null,
+        meetingDate: null,
+        proposalDate: null,
+        proposalValue: null,
+        saleDate: null,
+        saleValue: null,
+        profile: null,
+        classification: null,
+        attendedWebinar: false,
+        whatsapp: null,
+        standDay: null,
+        pavilion: null,
+        stand: null,
       });
     }
   });

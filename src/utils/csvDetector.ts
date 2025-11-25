@@ -24,10 +24,11 @@ export function detectCsvType(headers: string[]): CsvDetectionResult {
   // Leads CSV detection - check for common lead fields
   const leadsHeaders = [
     'campanha', 'campaign',
-    'linkedin',
-    'nome', 'name',
+    'linkedin', 'linkedin_url',
+    'nome', 'name', 'first name', 'last name',
     'cargo', 'position',
-    'empresa', 'company'
+    'empresa', 'company',
+    'connected at', 'sequence generated at'
   ];
   
   const leadHeaderMatches = leadsHeaders.filter(header =>
