@@ -15,7 +15,6 @@ import { CampaignDetailsDialog } from '@/components/CampaignDetailsDialog';
 import { CampaignDialog } from '@/components/CampaignDialog';
 import { CampaignFunnelChart } from '@/components/CampaignFunnelChart';
 import { CampaignFunnelComparison } from '@/components/CampaignFunnelComparison';
-import { CampaignTrendChart } from '@/components/CampaignTrendChart';
 import { WeeklyPerformanceChart } from '@/components/WeeklyPerformanceChart';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
@@ -768,14 +767,6 @@ export default function Campaigns() {
                 })}
               </div>
 
-              {selectedCampaigns.length === 1 && (
-                <div className="mt-6">
-                  <CampaignTrendChart
-                    campaignName={selectedCampaigns[0]}
-                    data={getDailyDataForCampaign(selectedCampaigns[0])}
-                  />
-                </div>
-              )}
             </div>
           )}
 
