@@ -146,7 +146,8 @@ export default function Campaigns() {
     
     campaignData.forEach(metric => {
       Object.keys(metric.dailyData || {}).forEach(date => {
-        if (date && date.trim() !== '') {
+        // Filtrar apenas datas válidas no formato YYYY-MM-DD
+        if (date && date.trim() !== '' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
           allDates.add(date);
         }
       });
@@ -184,23 +185,18 @@ export default function Campaigns() {
     const dailyData = getDailyDataForCampaign(campaignName);
     const weeklyMap = new Map<string, WeeklyData>();
 
-    // Get Active Days from database for this campaign
-    const activeDaysMetric = campaignMetrics.find(
-      m => m.campaignName === campaignName && m.eventType === 'Active Days'
-    );
-
     dailyData.forEach(day => {
       // Validar data antes de processar
       if (!day.date || isNaN(new Date(day.date).getTime())) return;
       
       const date = new Date(day.date);
-      const weekStart = startOfWeek(date, { locale: ptBR });
-      const weekEnd = endOfWeek(date, { locale: ptBR });
+      const weekStart = startOfWeek(date, { weekStartsOn: 1 }); // Começar semana na segunda-feira
+      const weekEnd = endOfWeek(date, { weekStartsOn: 1 });
       const weekKey = format(weekStart, 'yyyy-MM-dd');
 
       if (!weeklyMap.has(weekKey)) {
         weeklyMap.set(weekKey, {
-          week: `Semana ${format(weekStart, 'dd/MM')} - ${format(weekEnd, 'dd/MM')}`,
+          week: format(weekStart, 'dd/MM/yyyy'),
           startDate: format(weekStart, 'yyyy-MM-dd'),
           endDate: format(weekEnd, 'yyyy-MM-dd'),
           invitations: 0,
@@ -214,7 +210,7 @@ export default function Campaigns() {
           proposals: 0,
           sales: 0,
           activeDays: 0,
-          totalDays: 0
+          totalDays: 7 // Sempre 7 dias por semana
         });
       }
 
@@ -226,7 +222,6 @@ export default function Campaigns() {
       weekData.likes += day.likes;
       weekData.comments += day.comments;
       weekData.positiveResponses += day.positiveResponses;
-      weekData.totalDays += 1;
       
       // Count active days: a day is active if it has any activity
       if (day.isActive) {
@@ -484,6 +479,7 @@ export default function Campaigns() {
         return row;
       });
     } else {
+      // Weekly view
       const allWeeksSet = new Set<string>();
       const weekDataMap = new Map<string, { week: string; startDate: string }>();
       
@@ -503,7 +499,8 @@ export default function Campaigns() {
           const row: any = { week };
           selectedCampaigns.forEach(campaign => {
             const campaignData = getWeeklyDataForCampaign(campaign).find(w => w.week === week);
-            row[`${campaign}_status`] = campaignData ? `${campaignData.activeDays}/${campaignData.totalDays}` : '0/0';
+            // Mostrar apenas o número de dias ativos (0-7) como status
+            row[`${campaign}_status`] = campaignData ? campaignData.activeDays : 0;
             row[`${campaign}_invitations`] = campaignData?.invitations || 0;
             row[`${campaign}_connections`] = campaignData?.connections || 0;
             row[`${campaign}_messages`] = campaignData?.messages || 0;
@@ -1038,9 +1035,7 @@ export default function Campaigns() {
                       {selectedCampaigns.map(campaign => (
                         <React.Fragment key={campaign}>
                           <th className="text-center p-2 text-xs font-medium border-l border-border">
-                            {calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly' 
-                              ? 'Dias Ativos' 
-                              : 'Status'}
+                            {granularity === 'daily' ? 'Status' : 'Dias Ativos'}
                           </th>
                           <th className="text-center p-2 text-xs font-medium">Convites</th>
                           <th className="text-center p-2 text-xs font-medium">Conexões</th>
@@ -1061,24 +1056,19 @@ export default function Campaigns() {
                         </td>
                         {selectedCampaigns.map(campaign => {
                           const status = row[`${campaign}_status`];
-                          const activeDays = row[`${campaign}_activeDays`];
                           const isActive = granularity === 'daily' 
                             ? status === 'Ativo' 
-                            : status && status !== '0/0';
+                            : typeof status === 'number' && status > 0;
                           
                           return (
                             <React.Fragment key={campaign}>
                               <td className="p-2 text-center border-l border-border">
-                                {calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly' ? (
-                                  <span className="text-sm">{activeDays || 0}</span>
-                                ) : granularity === 'daily' ? (
+                                {granularity === 'daily' ? (
                                   <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
                                     {status}
                                   </Badge>
                                 ) : (
-                                  <Badge variant="outline" className="text-xs">
-                                    {status} dias
-                                  </Badge>
+                                  <span className="text-sm font-medium">{status}</span>
                                 )}
                               </td>
                               <td className="p-2 text-center text-sm">{row[`${campaign}_invitations`]}</td>
