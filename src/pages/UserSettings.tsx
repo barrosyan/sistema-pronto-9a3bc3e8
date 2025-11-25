@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { parseCampaignCsv } from '@/utils/campaignCsvParser';
 import { parseLeadsCsv } from '@/utils/leadsCsvParser';
 import { detectCsvType, parseCsvHeaders } from '@/utils/csvDetector';
+import { useProfileFilter } from '@/contexts/ProfileFilterContext';
 import DataImportPreview, { FilePreviewData } from '@/components/DataImportPreview';
 import { useCampaignData } from '@/hooks/useCampaignData';
 
@@ -23,6 +24,7 @@ type FileUpload = {
 
 export default function UserSettings() {
   const { loadFromDatabase } = useCampaignData();
+  const { loadProfiles } = useProfileFilter();
   const [files, setFiles] = useState<FileUpload[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -520,6 +522,7 @@ export default function UserSettings() {
       console.log('Total leads:', totalLeads);
       
       await loadFromDatabase();
+      await loadProfiles(); // Reload profiles after import
       setShowPreview(false);
       setParsedFilesData([]);
       setPreviewData([]);

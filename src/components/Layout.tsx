@@ -4,7 +4,9 @@ import { NavLink } from './NavLink';
 import { Merge, Users, Sparkles, LogOut, User, Settings, Target, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from './ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
+import { useProfileFilter } from '@/contexts/ProfileFilterContext';
 
 interface LayoutProps {
   children: ReactNode;
@@ -12,6 +14,7 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
+  const { selectedProfile, setSelectedProfile, availableProfiles } = useProfileFilter();
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -29,11 +32,34 @@ export const Layout = ({ children }: LayoutProps) => {
       <header className="border-b border-border bg-card">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Sistema Pronto</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Gestão Inteligente de Campanhas e Leads
-              </p>
+            <div className="flex items-center gap-4">
+              <div>
+                <h1 className="text-3xl font-bold text-foreground">Sistema Pronto</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Gestão Inteligente de Campanhas e Leads
+                </p>
+              </div>
+              
+              {availableProfiles.length > 0 && (
+                <div className="flex items-center gap-2 ml-6">
+                  <span className="text-sm text-muted-foreground">Perfil:</span>
+                  <Select 
+                    value={selectedProfile || undefined} 
+                    onValueChange={setSelectedProfile}
+                  >
+                    <SelectTrigger className="w-[200px] bg-background">
+                      <SelectValue placeholder="Selecione um perfil" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border-border shadow-lg z-[100]">
+                      {availableProfiles.map((profile) => (
+                        <SelectItem key={profile} value={profile} className="hover:bg-accent">
+                          {profile}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Button
