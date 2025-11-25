@@ -337,256 +337,195 @@ export default function UserSettings() {
       
       console.log('✅ Todos os dados foram limpos com sucesso');
 
+      // STEP 1: Consolidate ALL data from ALL files BEFORE inserting
+      console.log('=== CONSOLIDANDO DADOS DE TODOS OS ARQUIVOS ===');
+      
+      const allCampaignDetailsMap = new Map<string, any>();
+      const allMetricsMap = new Map<string, any>();
+      const allLeadsMap = new Map<string, any>();
+      
+      // Consolidate data from all files
       for (const { parsedData } of parsedFilesData) {
-        console.log('Processando arquivo com dados:', {
+        console.log('Consolidando arquivo com:', {
           campanhas: parsedData.allCampaignDetails?.length,
           metricas: parsedData.campaignMetrics.length,
           leadsPositivos: parsedData.positiveLeads.length,
           leadsNegativos: parsedData.negativeLeads.length
         });
+        
+        // Consolidate campaign details
         const campaignDetailsArray = parsedData.allCampaignDetails || 
           (parsedData.campaignDetails ? [parsedData.campaignDetails] : []);
-
-        // Extrair nomes únicos de campanhas das métricas e dos detalhes
-        const uniqueCampaignNames = new Set<string>();
         
-        // Adicionar campanhas das métricas
-        parsedData.campaignMetrics.forEach(metric => {
-          if (metric.campaignName) {
-            uniqueCampaignNames.add(metric.campaignName);
-          }
-        });
-
-        // Criar mapa de detalhes por nome de campanha e adicionar ao Set
-        const campaignDetailsMap = new Map<string, typeof campaignDetailsArray[0]>();
         campaignDetailsArray.forEach(detail => {
           if (detail.campaignName) {
-            campaignDetailsMap.set(detail.campaignName, detail);
-            uniqueCampaignNames.add(detail.campaignName); // Adicionar ao Set também
+            allCampaignDetailsMap.set(detail.campaignName, detail);
           }
         });
-
-        console.log('Processando campanhas:', uniqueCampaignNames.size, 'únicas encontradas');
-
-        // Salvar todas as campanhas únicas (com ou sem detalhes completos)
-        for (const campaignName of uniqueCampaignNames) {
-          console.log('Salvando campanha:', campaignName);
-          
-          const details = campaignDetailsMap.get(campaignName);
-
-          const { error: campaignError } = await supabase
-            .from('campaigns')
-            .upsert({
-              user_id: user.id,
-              name: campaignName,
-              company: details?.company || null,
-              profile_name: details?.profile || null,
-              objective: details?.objective || null,
-              cadence: details?.cadence || null,
-              job_titles: details?.jobTitles || null,
-            }, {
-              onConflict: 'user_id,name',
-              ignoreDuplicates: false
-            });
-          
-          if (campaignError) {
-            console.error('Erro ao upsert campanha:', campaignError);
-            throw campaignError;
+        
+        // Consolidate campaign names from metrics
+        parsedData.campaignMetrics.forEach(metric => {
+          if (metric.campaignName && !allCampaignDetailsMap.has(metric.campaignName)) {
+            allCampaignDetailsMap.set(metric.campaignName, { campaignName: metric.campaignName });
           }
-        }
-
-        if (parsedData.campaignMetrics.length > 0) {
-          console.log('Processando métricas:', parsedData.campaignMetrics.length);
+        });
+        
+        // Consolidate metrics
+        parsedData.campaignMetrics.forEach(metric => {
+          const key = `${metric.campaignName}|${metric.eventType}|${metric.profileName}`;
           
-          // Deduplicate and consolidate metrics with the same key
-          const metricsMap = new Map<string, typeof parsedData.campaignMetrics[0]>();
-          
-          parsedData.campaignMetrics.forEach(metric => {
-            const key = `${metric.campaignName}|${metric.eventType}|${metric.profileName}`;
+          if (allMetricsMap.has(key)) {
+            const existing = allMetricsMap.get(key)!;
+            const mergedDailyData = { ...existing.dailyData };
             
-            if (metricsMap.has(key)) {
-              // Consolidate: merge daily data
-              const existing = metricsMap.get(key)!;
-              const mergedDailyData = { ...existing.dailyData };
-              
-              Object.entries(metric.dailyData).forEach(([date, value]) => {
-                mergedDailyData[date] = (mergedDailyData[date] || 0) + (typeof value === 'number' ? value : 0);
-              });
-              
-              const mergedTotalCount = Object.values(mergedDailyData).reduce((sum: number, val) => {
-                const numVal = typeof val === 'number' ? val : 0;
-                return sum + numVal;
-              }, 0);
-              
-              metricsMap.set(key, {
-                ...existing,
-                dailyData: mergedDailyData,
-                totalCount: mergedTotalCount
-              });
-              
-              console.log(`Métricas consolidadas para: ${key}`);
-            } else {
-              metricsMap.set(key, metric);
-            }
-          });
-          
-          const uniqueMetrics = Array.from(metricsMap.values());
-          console.log(`Métricas após deduplicação: ${uniqueMetrics.length} (original: ${parsedData.campaignMetrics.length})`);
-          
-          const metricsToInsert = uniqueMetrics.map(metric => ({
-            user_id: user.id,
-            campaign_name: metric.campaignName,
-            event_type: metric.eventType,
-            profile_name: metric.profileName,
-            total_count: metric.totalCount,
-            daily_data: metric.dailyData,
-          }));
-
-          const { error: metricsError } = await supabase
-            .from('campaign_metrics')
-            .upsert(metricsToInsert, {
-              onConflict: 'user_id,campaign_name,event_type,profile_name',
-              ignoreDuplicates: false
+            Object.entries(metric.dailyData).forEach(([date, value]) => {
+              mergedDailyData[date] = (mergedDailyData[date] || 0) + (typeof value === 'number' ? value : 0);
             });
-
-          if (metricsError) {
-            console.error('Erro ao inserir métricas:', metricsError);
-            throw metricsError;
-          }
-          console.log('Métricas inseridas/atualizadas com sucesso');
-          totalMetrics += uniqueMetrics.length;
-        }
-
-
-        if (parsedData.positiveLeads.length > 0) {
-          console.log('Processando leads positivos:', parsedData.positiveLeads.length);
-          
-          // Deduplicate leads with the same key
-          const leadsMap = new Map<string, typeof parsedData.positiveLeads[0]>();
-          
-          parsedData.positiveLeads.forEach(lead => {
-            const key = `${lead.campaign}|${lead.name}`;
             
-            if (leadsMap.has(key)) {
-              console.log(`Lead duplicado encontrado: ${key}, mantendo o primeiro`);
-            } else {
-              leadsMap.set(key, lead);
-            }
-          });
-          
-          const uniqueLeads = Array.from(leadsMap.values());
-          console.log(`Leads após deduplicação: ${uniqueLeads.length} (original: ${parsedData.positiveLeads.length})`);
-          
-          const leadsToInsert = uniqueLeads.map(lead => ({
-            user_id: user.id,
-            campaign: lead.campaign,
-            linkedin: lead.linkedin,
-            name: lead.name,
-            position: lead.position,
-            company: lead.company,
-            status: lead.status,
-            positive_response_date: lead.positiveResponseDate,
-            transfer_date: lead.transferDate,
-            status_details: lead.statusDetails,
-            comments: lead.comments,
-            follow_up_1_date: lead.followUp1Date,
-            follow_up_1_comments: lead.followUp1Comments,
-            follow_up_2_date: lead.followUp2Date,
-            follow_up_2_comments: lead.followUp2Comments,
-            follow_up_3_date: lead.followUp3Date,
-            follow_up_3_comments: lead.followUp3Comments,
-            follow_up_4_date: lead.followUp4Date,
-            follow_up_4_comments: lead.followUp4Comments,
-            observations: lead.observations,
-            meeting_schedule_date: lead.meetingScheduleDate,
-            meeting_date: lead.meetingDate,
-            proposal_date: lead.proposalDate,
-            proposal_value: lead.proposalValue != null ? Number(lead.proposalValue) : null,
-            sale_date: lead.saleDate,
-            sale_value: lead.saleValue != null ? Number(lead.saleValue) : null,
-            profile: lead.profile,
-            classification: lead.classification,
-            attended_webinar: lead.attendedWebinar,
-            whatsapp: lead.whatsapp,
-            stand_day: lead.standDay,
-            pavilion: lead.pavilion,
-            stand: lead.stand,
-            source: lead.source,
-            connection_date: lead.connectionDate,
-          }));
-
-          const { error: leadsError } = await supabase
-            .from('leads')
-            .upsert(leadsToInsert, {
-              onConflict: 'user_id,campaign,name',
-              ignoreDuplicates: false
-            });
-
-          if (leadsError) {
-            console.error('Erro ao inserir leads positivos:', leadsError);
-            throw leadsError;
-          }
-          console.log('Leads positivos inseridos/atualizados com sucesso');
-          totalLeads += uniqueLeads.length;
-        }
-
-
-        if (parsedData.negativeLeads.length > 0) {
-          console.log('Processando leads negativos:', parsedData.negativeLeads.length);
-          
-          // Deduplicate leads with the same key
-          const negLeadsMap = new Map<string, typeof parsedData.negativeLeads[0]>();
-          
-          parsedData.negativeLeads.forEach(lead => {
-            const key = `${lead.campaign}|${lead.name}`;
+            const mergedTotalCount = Object.values(mergedDailyData).reduce((sum: number, val) => {
+              const numVal = typeof val === 'number' ? val : 0;
+              return sum + numVal;
+            }, 0);
             
-            if (negLeadsMap.has(key)) {
-              console.log(`Lead negativo duplicado encontrado: ${key}, mantendo o primeiro`);
-            } else {
-              negLeadsMap.set(key, lead);
-            }
-          });
-          
-          const uniqueNegLeads = Array.from(negLeadsMap.values());
-          console.log(`Leads negativos após deduplicação: ${uniqueNegLeads.length} (original: ${parsedData.negativeLeads.length})`);
-          
-          const leadsToInsert = uniqueNegLeads.map(lead => ({
-            user_id: user.id,
-            campaign: lead.campaign,
-            linkedin: lead.linkedin,
-            name: lead.name,
-            position: lead.position,
-            company: lead.company,
-            status: lead.status,
-            negative_response_date: lead.negativeResponseDate,
-            transfer_date: lead.transferDate,
-            status_details: lead.statusDetails,
-            observations: lead.observations,
-            had_follow_up: lead.hadFollowUp,
-            follow_up_reason: lead.followUpReason,
-            source: lead.source,
-            connection_date: lead.connectionDate,
-            attended_webinar: lead.attendedWebinar,
-            whatsapp: lead.whatsapp,
-            stand_day: lead.standDay,
-            pavilion: lead.pavilion,
-            stand: lead.stand,
-          }));
-
-          const { error: leadsError } = await supabase
-            .from('leads')
-            .upsert(leadsToInsert, {
-              onConflict: 'user_id,campaign,name',
-              ignoreDuplicates: false
+            allMetricsMap.set(key, {
+              ...existing,
+              dailyData: mergedDailyData,
+              totalCount: mergedTotalCount
             });
-
-          if (leadsError) {
-            console.error('Erro ao inserir leads negativos:', leadsError);
-            throw leadsError;
+          } else {
+            allMetricsMap.set(key, metric);
           }
-          console.log('Leads negativos inseridos/atualizados com sucesso');
-          totalLeads += uniqueNegLeads.length;
+        });
+        
+        // Consolidate positive leads
+        parsedData.positiveLeads.forEach(lead => {
+          const key = `${lead.campaign}|${lead.name}`;
+          if (!allLeadsMap.has(key)) {
+            allLeadsMap.set(key, lead);
+          }
+        });
+        
+        // Consolidate negative leads
+        parsedData.negativeLeads.forEach(lead => {
+          const key = `${lead.campaign}|${lead.name}`;
+          if (!allLeadsMap.has(key)) {
+            allLeadsMap.set(key, lead);
+          }
+        });
+      }
+      
+      console.log('✅ Consolidação completa:', {
+        campanhas: allCampaignDetailsMap.size,
+        metricas: allMetricsMap.size,
+        leads: allLeadsMap.size
+      });
+
+      // STEP 2: Insert campaigns
+      console.log('=== INSERINDO CAMPANHAS ===');
+      const campaignsToInsert = Array.from(allCampaignDetailsMap.values()).map(detail => ({
+        user_id: user.id,
+        name: detail.campaignName,
+        company: detail.company || null,
+        profile_name: detail.profile || null,
+        objective: detail.objective || null,
+        cadence: detail.cadence || null,
+        job_titles: detail.jobTitles || null,
+      }));
+      
+      const { error: campaignsError } = await supabase
+        .from('campaigns')
+        .upsert(campaignsToInsert, {
+          onConflict: 'user_id,name',
+          ignoreDuplicates: false
+        });
+      
+      if (campaignsError) {
+        console.error('Erro ao inserir campanhas:', campaignsError);
+        throw campaignsError;
+      }
+      console.log(`✅ ${campaignsToInsert.length} campanhas inseridas`);
+
+      // STEP 3: Insert metrics
+      if (allMetricsMap.size > 0) {
+        console.log('=== INSERINDO MÉTRICAS ===');
+        const metricsToInsert = Array.from(allMetricsMap.values()).map(metric => ({
+          user_id: user.id,
+          campaign_name: metric.campaignName,
+          event_type: metric.eventType,
+          profile_name: metric.profileName,
+          total_count: metric.totalCount,
+          daily_data: metric.dailyData,
+        }));
+
+        const { error: metricsError } = await supabase
+          .from('campaign_metrics')
+          .upsert(metricsToInsert, {
+            onConflict: 'user_id,campaign_name,event_type,profile_name',
+            ignoreDuplicates: false
+          });
+
+        if (metricsError) {
+          console.error('Erro ao inserir métricas:', metricsError);
+          throw metricsError;
         }
+        console.log(`✅ ${metricsToInsert.length} métricas inseridas`);
+        totalMetrics = metricsToInsert.length;
+      }
+
+      // STEP 4: Insert leads
+      if (allLeadsMap.size > 0) {
+        console.log('=== INSERINDO LEADS ===');
+        const leadsToInsert = Array.from(allLeadsMap.values()).map(lead => ({
+          user_id: user.id,
+          campaign: lead.campaign,
+          linkedin: lead.linkedin,
+          name: lead.name,
+          position: lead.position,
+          company: lead.company,
+          status: lead.status,
+          positive_response_date: lead.positiveResponseDate,
+          transfer_date: lead.transferDate,
+          status_details: lead.statusDetails,
+          comments: lead.comments,
+          follow_up_1_date: lead.followUp1Date,
+          follow_up_1_comments: lead.followUp1Comments,
+          follow_up_2_date: lead.followUp2Date,
+          follow_up_2_comments: lead.followUp2Comments,
+          follow_up_3_date: lead.followUp3Date,
+          follow_up_3_comments: lead.followUp3Comments,
+          follow_up_4_date: lead.followUp4Date,
+          follow_up_4_comments: lead.followUp4Comments,
+          observations: lead.observations,
+          meeting_schedule_date: lead.meetingScheduleDate,
+          meeting_date: lead.meetingDate,
+          proposal_date: lead.proposalDate,
+          proposal_value: lead.proposalValue != null ? Number(lead.proposalValue) : null,
+          sale_date: lead.saleDate,
+          sale_value: lead.saleValue != null ? Number(lead.saleValue) : null,
+          profile: lead.profile,
+          classification: lead.classification,
+          attended_webinar: lead.attendedWebinar,
+          whatsapp: lead.whatsapp,
+          stand_day: lead.standDay,
+          pavilion: lead.pavilion,
+          stand: lead.stand,
+          source: lead.source,
+          connection_date: lead.connectionDate,
+        }));
+
+        const { error: leadsError } = await supabase
+          .from('leads')
+          .upsert(leadsToInsert, {
+            onConflict: 'user_id,campaign,name',
+            ignoreDuplicates: false
+          });
+
+        if (leadsError) {
+          console.error('Erro ao inserir leads:', leadsError);
+          throw leadsError;
+        }
+        console.log(`✅ ${leadsToInsert.length} leads inseridos`);
+        totalLeads = leadsToInsert.length;
       }
 
       console.log('=== Importação concluída ===');
