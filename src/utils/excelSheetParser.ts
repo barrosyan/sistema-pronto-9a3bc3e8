@@ -270,56 +270,117 @@ function parseWeeklyMetricsFromCampaignSheet(
   
   campaignNameConsolidation.add(campaignName);
 
-  // Encontrar linha "Semana/Dia da Semana" ou similar que contém os dias ativos
-  let activeDaysRowIndex = -1;
+  console.log(`[parseWeeklyMetricsFromCampaignSheet] Processing campaign: ${campaignName}`);
+
+  // Encontrar linha "Semana/Dia da Semana" que contém os cabeçalhos dos dias da semana
+  let activeDaysHeaderIndex = -1;
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
     if (!row) continue;
     
-    const firstCol = String(row['__EMPTY'] || row['A'] || row[Object.keys(row)[0]] || '').toLowerCase();
+    const rowKeys = Object.keys(row);
+    const firstCol = String(row[rowKeys[0]] || '').toLowerCase();
+    
     if (firstCol.includes('semana/dia da semana') || firstCol.includes('dias da semana')) {
-      activeDaysRowIndex = i;
+      activeDaysHeaderIndex = i;
+      console.log(`[parseWeeklyMetricsFromCampaignSheet] Found "Semana/Dia da Semana" header at row ${i}`);
       break;
     }
   }
   
-  // Se encontramos a linha de dias ativos, processar
-  if (activeDaysRowIndex !== -1 && activeDaysRowIndex + 1 < data.length) {
-    const activeDaysRow = data[activeDaysRowIndex];
-    const headerKeys = Object.keys(activeDaysRow);
+  // Se encontramos o cabeçalho, processar as linhas seguintes para dias ativos por semana
+  if (activeDaysHeaderIndex !== -1) {
+    const headerRow = data[activeDaysHeaderIndex];
+    const headerKeys = Object.keys(headerRow);
     
-    // A última coluna deve ter "Dias Ativos"
-    const lastKey = headerKeys[headerKeys.length - 1];
-    const activeDaysValue = activeDaysRow[lastKey];
+    console.log(`[parseWeeklyMetricsFromCampaignSheet] Header row has ${headerKeys.length} columns`);
     
-    console.log(`[parseWeeklyMetricsFromCampaignSheet] Found active days row, value: ${activeDaysValue}`);
+    // Encontrar as colunas de dias da semana (Segunda-Feira até Domingo) e Dias Ativos
+    // A última coluna antes dos dados gerais deve ser "Dias Ativos"
+    let daysActivesColumnFound = false;
+    let daysActivesColumnIndex = -1;
     
-    if (activeDaysValue !== undefined && activeDaysValue !== null) {
-      const activeDaysCount = typeof activeDaysValue === 'number' ? activeDaysValue : parseInt(String(activeDaysValue)) || 0;
+    for (let i = headerKeys.length - 1; i >= 0; i--) {
+      const colValue = String(headerRow[headerKeys[i]] || '').toLowerCase();
+      if (colValue.includes('dias ativos')) {
+        daysActivesColumnFound = true;
+        daysActivesColumnIndex = i;
+        console.log(`[parseWeeklyMetricsFromCampaignSheet] Found "Dias Ativos" column at index ${i} (key: ${headerKeys[i]})`);
+        break;
+      }
+    }
+    
+    if (daysActivesColumnFound && daysActivesColumnIndex > 0) {
+      // As 7 colunas antes de "Dias Ativos" devem ser os dias da semana
+      const weekdayStartIndex = daysActivesColumnIndex - 7;
       
-      if (activeDaysCount > 0) {
-        let activeDaysMetric = metrics.find(m => 
-          m.campaignName === campaignName && 
-          m.eventType === 'Active Days' &&
-          m.profileName === profileName
-        );
+      if (weekdayStartIndex >= 0) {
+        console.log(`[parseWeeklyMetricsFromCampaignSheet] Weekday columns from index ${weekdayStartIndex} to ${daysActivesColumnIndex - 1}`);
         
-        if (!activeDaysMetric) {
-          activeDaysMetric = {
-            campaignName,
-            eventType: 'Active Days',
-            profileName,
-            totalCount: 0,
-            dailyData: {}
-          };
-          metrics.push(activeDaysMetric);
+        // Processar linhas abaixo do cabeçalho para extrair semanas
+        let weekNumber = 1;
+        for (let rowIdx = activeDaysHeaderIndex + 1; rowIdx < data.length; rowIdx++) {
+          const row = data[rowIdx];
+          if (!row) continue;
+          
+          const rowKeys = Object.keys(row);
+          const firstCol = String(row[rowKeys[0]] || '').toLowerCase().trim();
+          
+          // Parar se chegamos em seção de métricas ou outra seção
+          if (firstCol.includes('tipo do dado') || firstCol.includes('período') ||
+              firstCol.includes('convites') || firstCol.includes('conexões')) {
+            console.log(`[parseWeeklyMetricsFromCampaignSheet] Stopped processing active days at row ${rowIdx}: found "${firstCol}"`);
+            break;
+          }
+          
+          // Pular linhas vazias
+          if (!firstCol) continue;
+          
+          // Contar quantos dias estão ativos nesta semana
+          let activeDaysInWeek = 0;
+          for (let i = weekdayStartIndex; i < daysActivesColumnIndex; i++) {
+            const dayValue = String(row[headerKeys[i]] || '').toLowerCase().trim();
+            if (dayValue === 'ativo' || dayValue === 'active') {
+              activeDaysInWeek++;
+            }
+          }
+          
+          // Pegar o valor da coluna "Dias Ativos" se disponível
+          const daysActiveValue = row[headerKeys[daysActivesColumnIndex]];
+          if (daysActiveValue !== undefined && daysActiveValue !== null && daysActiveValue !== '') {
+            const parsed = typeof daysActiveValue === 'number' ? daysActiveValue : parseInt(String(daysActiveValue));
+            if (!isNaN(parsed)) {
+              activeDaysInWeek = parsed;
+            }
+          }
+          
+          if (activeDaysInWeek > 0) {
+            console.log(`[parseWeeklyMetricsFromCampaignSheet] Week ${weekNumber}: ${activeDaysInWeek} active days`);
+            
+            let activeDaysMetric = metrics.find(m => 
+              m.campaignName === campaignName && 
+              m.eventType === 'Active Days' &&
+              m.profileName === profileName
+            );
+            
+            if (!activeDaysMetric) {
+              activeDaysMetric = {
+                campaignName,
+                eventType: 'Active Days',
+                profileName,
+                totalCount: 0,
+                dailyData: {}
+              };
+              metrics.push(activeDaysMetric);
+            }
+            
+            const weekKey = `week-${weekNumber}`;
+            activeDaysMetric.dailyData[weekKey] = activeDaysInWeek;
+            activeDaysMetric.totalCount += activeDaysInWeek;
+          }
+          
+          weekNumber++;
         }
-        
-        // Adicionar aos dados semanais
-        activeDaysMetric.dailyData['week-1'] = activeDaysCount;
-        activeDaysMetric.totalCount += activeDaysCount;
-        
-        console.log(`[parseWeeklyMetricsFromCampaignSheet] Added ${activeDaysCount} active days`);
       }
     }
   }
