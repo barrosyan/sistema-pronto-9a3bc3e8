@@ -497,16 +497,21 @@ function parseDailyMetricsFromDiarioSheet(
     'comentários': 'Comments Done',
     'comentarios': 'Comments Done',
     'fu 1': 'Follow Up 1',
+    'fu 1:': 'Follow Up 1',
     'fu 2': 'Follow Up 2',
+    'fu 2:': 'Follow Up 2',
     'fu 3': 'Follow Up 3',
+    'fu 3:': 'Follow Up 3',
     'respostas gerais': 'General Responses',
     'respostas positivas': 'Positive Responses',
-    'reuniões marcadas': 'Meetings Scheduled',
-    'reunioes marcadas': 'Meetings Scheduled',
+    'respostas positivas:': 'Positive Responses',
+    'reuniões marcadas': 'Meetings',
+    'reunioes marcadas': 'Meetings',
     'leads processados': 'Processed Leads'
   };
   
   console.log(`[parseDailyMetricsFromDiarioSheet] Starting parse for ${campaignName}`);
+  console.log(`[parseDailyMetricsFromDiarioSheet] Total rows: ${data.length}`);
   
   let i = 0;
   while (i < data.length) {
@@ -516,142 +521,141 @@ function parseDailyMetricsFromDiarioSheet(
       continue;
     }
     
-    const firstCol = String(row['__EMPTY'] || row['A'] || row[Object.keys(row)[0]] || '').toLowerCase().trim();
+    // Pegar todas as chaves disponíveis
+    const allKeys = Object.keys(row);
+    const firstColKey = allKeys[0] || '';
+    const firstCol = String(row[firstColKey] || '').toLowerCase().trim();
+    
+    // Verificar se é uma linha "Semana X"
     const weekMatch = firstCol.match(/semana\s+(\d+)/i);
     
     if (weekMatch) {
       const weekNumber = parseInt(weekMatch[1]);
-      console.log(`[parseDailyMetricsFromDiarioSheet] Found week ${weekNumber} at row ${i}`);
+      console.log(`[parseDailyMetricsFromDiarioSheet] Found Semana ${weekNumber} at row ${i}`);
       
-      if (i + 1 >= data.length) break;
+      // Próxima linha deve ser "Dias da Semana" com as datas
+      if (i + 1 >= data.length) {
+        console.log(`[parseDailyMetricsFromDiarioSheet] No next row after Semana ${weekNumber}`);
+        break;
+      }
+      
       const daysRow = data[i + 1];
       if (!daysRow) {
+        console.log(`[parseDailyMetricsFromDiarioSheet] Days row is null`);
         i++;
         continue;
       }
       
-      const daysLabel = String(daysRow['__EMPTY'] || daysRow['A'] || daysRow[Object.keys(daysRow)[0]] || '').toLowerCase();
-      if (!daysLabel.includes('dias da semana') && !daysLabel.includes('semana/dia da semana')) {
-        console.log(`[parseDailyMetricsFromDiarioSheet] Expected 'dias da semana' row but got: ${daysLabel}`);
+      const daysRowKeys = Object.keys(daysRow);
+      const daysLabel = String(daysRow[daysRowKeys[0]] || '').toLowerCase();
+      
+      if (!daysLabel.includes('dias da semana')) {
+        console.log(`[parseDailyMetricsFromDiarioSheet] Expected 'Dias da Semana' but got: "${daysLabel}"`);
         i++;
         continue;
       }
       
-      // Pegar as chaves das colunas (7 dias da semana)
-      const allKeys = Object.keys(daysRow);
-      const daysKeys = allKeys.slice(1, 8); // Colunas 1-7 (ignorar primeira que é o label)
+      console.log(`[parseDailyMetricsFromDiarioSheet] Found Dias da Semana row at ${i + 1}`);
+      
+      // Extrair as 7 datas (colunas B até H, índices 1-7)
+      // Coluna I (índice 8) é o total da semana
+      const dateColumns = daysRowKeys.slice(1, 8); // Pega 7 colunas de datas
       const dates: string[] = [];
       
-      console.log(`[parseDailyMetricsFromDiarioSheet] Days row keys:`, daysKeys);
+      console.log(`[parseDailyMetricsFromDiarioSheet] Date column keys:`, dateColumns);
       
-      // Extrair datas dos cabeçalhos
-      daysKeys.forEach((key, idx) => {
+      dateColumns.forEach((key, idx) => {
         const dateValue = daysRow[key];
+        console.log(`[parseDailyMetricsFromDiarioSheet] Column ${key} (${idx}): raw value = "${dateValue}"`);
+        
         if (dateValue) {
-          // Converter data do Excel se necessário
           let dateStr = String(dateValue).trim();
           
-          // Se é número (formato Excel), converter
+          // Se é número (formato Excel serial date), converter
           if (/^\d+$/.test(dateStr)) {
             const excelDate = parseInt(dateStr);
             const jsDate = new Date((excelDate - 25569) * 86400 * 1000);
             dateStr = jsDate.toISOString().split('T')[0]; // YYYY-MM-DD
+            console.log(`[parseDailyMetricsFromDiarioSheet]   Excel date ${excelDate} -> ${dateStr}`);
           }
-          // Se já está em formato DD/MM/YYYY, converter para YYYY-MM-DD
+          // Se está em formato DD/MM/YYYY, converter para YYYY-MM-DD
           else if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
             const parts = dateStr.split('/');
             dateStr = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            console.log(`[parseDailyMetricsFromDiarioSheet]   DD/MM/YYYY format -> ${dateStr}`);
           }
           
           dates.push(dateStr);
-          console.log(`[parseDailyMetricsFromDiarioSheet] Day ${idx + 1}: ${dateValue} -> ${dateStr}`);
         } else {
-          dates.push(`week${weekNumber}-day${idx + 1}`);
-          console.log(`[parseDailyMetricsFromDiarioSheet] Day ${idx + 1}: no date, using fallback`);
+          const fallbackDate = `week${weekNumber}-day${idx + 1}`;
+          dates.push(fallbackDate);
+          console.log(`[parseDailyMetricsFromDiarioSheet]   No date, using fallback: ${fallbackDate}`);
         }
       });
       
-      // Verificar se tem linha de "Dias Ativos" após a linha dos dias
-      const activeDaysData: number[] = new Array(7).fill(0);
-      if (i + 2 < data.length) {
-        const nextRow = data[i + 2];
-        if (nextRow) {
-          const nextLabel = String(nextRow['__EMPTY'] || nextRow['A'] || nextRow[Object.keys(nextRow)[0]] || '').toLowerCase().trim();
-          
-          // Esta linha pode conter status (Ativo/Inativo) para cada dia
-          if (nextLabel === '' || nextLabel.includes('ativo') || nextLabel.includes('inativo')) {
-            daysKeys.forEach((key, dayIdx) => {
-              const statusValue = String(nextRow[key] || '').toLowerCase().trim();
-              if (statusValue.includes('ativo') && !statusValue.includes('inativo')) {
-                activeDaysData[dayIdx] = 1;
-              }
-            });
-          }
-        }
-      }
+      console.log(`[parseDailyMetricsFromDiarioSheet] Extracted ${dates.length} dates:`, dates);
       
-      // Salvar Active Days se algum dia está ativo
-      const totalActiveDays = activeDaysData.reduce((sum, val) => sum + val, 0);
-      if (totalActiveDays > 0) {
-        let activeDaysMetric = metrics.find(m => 
-          m.campaignName === campaignName && 
-          m.eventType === 'Active Days' &&
-          m.profileName === profileName
-        );
-        
-        if (!activeDaysMetric) {
-          activeDaysMetric = {
-            campaignName,
-            eventType: 'Active Days',
-            profileName,
-            totalCount: 0,
-            dailyData: {}
-          };
-          metrics.push(activeDaysMetric);
-        }
-        
-        daysKeys.forEach((key, dayIdx) => {
-          if (activeDaysData[dayIdx] > 0) {
-            const dateKey = dates[dayIdx];
-            activeDaysMetric!.dailyData[dateKey] = 1;
-            activeDaysMetric!.totalCount += 1;
-          }
-        });
-        
-        console.log(`[parseDailyMetricsFromDiarioSheet] Added ${totalActiveDays} active days`);
-      }
-      
-      // Processar métricas diárias
+      // Processar linhas de métricas (começando em i+2)
       let metricRowIdx = i + 2;
+      let processedMetrics = 0;
+      
       while (metricRowIdx < data.length) {
         const metricRow = data[metricRowIdx];
-        if (!metricRow) break;
+        if (!metricRow) {
+          metricRowIdx++;
+          continue;
+        }
         
-        const metricLabel = String(metricRow['__EMPTY'] || metricRow['A'] || metricRow[Object.keys(metricRow)[0]] || '').toLowerCase().trim();
+        const metricRowKeys = Object.keys(metricRow);
+        const metricLabel = String(metricRow[metricRowKeys[0]] || '').toLowerCase().trim();
         
-        // Verificar se chegamos à próxima semana
+        // Parar se encontrar próxima semana
         if (metricLabel.match(/semana\s+\d+/i)) {
+          console.log(`[parseDailyMetricsFromDiarioSheet] Found next week at row ${metricRowIdx}`);
           break;
         }
         
+        // Pular linhas vazias
         if (!metricLabel) {
           metricRowIdx++;
           continue;
         }
         
-        const eventType = metricMap[metricLabel.replace(':', '')];
+        // Remover dois pontos do final se houver
+        const cleanedLabel = metricLabel.replace(/:$/, '').trim();
+        const eventType = metricMap[cleanedLabel];
+        
         if (!eventType) {
+          console.log(`[parseDailyMetricsFromDiarioSheet] ⚠️ No mapping for metric: "${metricLabel}" (cleaned: "${cleanedLabel}")`);
           metricRowIdx++;
           continue;
         }
         
-        console.log(`[parseDailyMetricsFromDiarioSheet] Processing metric: ${metricLabel} -> ${eventType}`);
+        console.log(`[parseDailyMetricsFromDiarioSheet] Processing metric row ${metricRowIdx}: "${metricLabel}" -> ${eventType}`);
+        processedMetrics++;
         
-        // Processar todos os dias desta métrica
-        daysKeys.forEach((key, dayIdx) => {
+        // Extrair valores para cada dia (mesmas colunas das datas)
+        dateColumns.forEach((key, dayIdx) => {
           const value = metricRow[key];
-          const count = typeof value === 'number' ? value : (value ? parseInt(String(value)) || 0 : 0);
+          let count = 0;
           
+          if (value !== undefined && value !== null && value !== '') {
+            // Converter para número
+            if (typeof value === 'number') {
+              count = Math.round(value); // Arredondar para evitar decimais
+            } else {
+              const parsed = parseFloat(String(value));
+              if (!isNaN(parsed)) {
+                count = Math.round(parsed);
+              }
+            }
+          }
+          
+          if (count > 0) {
+            console.log(`[parseDailyMetricsFromDiarioSheet]   ${eventType} on ${dates[dayIdx]}: ${count}`);
+          }
+          
+          // Encontrar ou criar a métrica
           let metric = metrics.find(m => 
             m.campaignName === campaignName && 
             m.eventType === eventType &&
@@ -671,7 +675,8 @@ function parseDailyMetricsFromDiarioSheet(
           
           const dateKey = dates[dayIdx];
           
-          if (count >= 0) {
+          // Acumular valores (caso haja múltiplas semanas)
+          if (count > 0) {
             metric.dailyData[dateKey] = (metric.dailyData[dateKey] || 0) + count;
             metric.totalCount += count;
           }
@@ -680,16 +685,22 @@ function parseDailyMetricsFromDiarioSheet(
         metricRowIdx++;
       }
       
+      console.log(`[parseDailyMetricsFromDiarioSheet] Processed ${processedMetrics} metrics for week ${weekNumber}`);
+      
+      // Continuar do ponto onde paramos
       i = metricRowIdx;
     } else {
       i++;
     }
   }
   
-  console.log(`[parseDailyMetricsFromDiarioSheet] Extracted ${metrics.length} metric entries for ${campaignName}`);
+  console.log(`[parseDailyMetricsFromDiarioSheet] ✅ Extraction complete for ${campaignName}`);
+  console.log(`[parseDailyMetricsFromDiarioSheet] Total metrics created: ${metrics.length}`);
+  
   metrics.forEach(m => {
     const dateKeys = Object.keys(m.dailyData);
-    console.log(`  - ${m.eventType}: total=${m.totalCount}, dates=${dateKeys.length} (${dateKeys.slice(0, 3).join(', ')}...)`);
+    const sampleDates = dateKeys.slice(0, 3).join(', ');
+    console.log(`  - ${m.eventType}: total=${m.totalCount}, dates=${dateKeys.length} (${sampleDates}...)`);
   });
   
   return metrics;
