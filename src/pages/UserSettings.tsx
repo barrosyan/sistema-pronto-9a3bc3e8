@@ -32,6 +32,7 @@ export default function UserSettings() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewData, setPreviewData] = useState<FilePreviewData[]>([]);
   const [parsedFilesData, setParsedFilesData] = useState<any[]>([]);
+  const [profileSelections, setProfileSelections] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadFiles();
@@ -228,6 +229,34 @@ export default function UserSettings() {
               const profileNames = Array.from(new Set(parsedData.map(d => d.profileName)));
               const campaignNames = Array.from(new Set(parsedData.map(d => d.campaignName)));
               
+              // Build campaign-profile mappings
+              const campaignProfileMap = new Map<string, Set<string>>();
+              parsedData.forEach(d => {
+                if (!campaignProfileMap.has(d.campaignName)) {
+                  campaignProfileMap.set(d.campaignName, new Set());
+                }
+                campaignProfileMap.get(d.campaignName)!.add(d.profileName);
+              });
+              
+              const campaignProfileMappings = Array.from(campaignProfileMap.entries()).map(([campaignName, profiles]) => {
+                const profilesArray = Array.from(profiles);
+                return {
+                  campaignName,
+                  profiles: profilesArray,
+                  selectedProfile: profilesArray.length === 1 ? profilesArray[0] : undefined,
+                };
+              });
+              
+              // Auto-select single profile options
+              campaignProfileMappings.forEach(mapping => {
+                if (mapping.selectedProfile) {
+                  setProfileSelections(prev => ({
+                    ...prev,
+                    [mapping.campaignName]: mapping.selectedProfile!
+                  }));
+                }
+              });
+              
               previews.push({
                 fileName: fileRecord.file_name,
                 campaignsCount: campaignNames.length,
@@ -235,6 +264,7 @@ export default function UserSettings() {
                 positiveLeadsCount: 0,
                 negativeLeadsCount: 0,
                 campaignNames,
+                campaignProfileMappings,
               });
 
               parsedDataArray.push({
@@ -323,9 +353,27 @@ export default function UserSettings() {
     }
   };
 
+  const handleProfileSelect = (campaignName: string, profileName: string) => {
+    setProfileSelections(prev => ({
+      ...prev,
+      [campaignName]: profileName
+    }));
+    
+    // Update preview data with selection
+    setPreviewData(prev => prev.map(file => ({
+      ...file,
+      campaignProfileMappings: file.campaignProfileMappings?.map(mapping => 
+        mapping.campaignName === campaignName 
+          ? { ...mapping, selectedProfile: profileName }
+          : mapping
+      )
+    })));
+  };
+
   const confirmImport = async () => {
     console.log('=== Iniciando importação ===');
     console.log('Arquivos parseados:', parsedFilesData.length);
+    console.log('Seleções de perfil:', profileSelections);
     
     setProcessing(true);
     let totalMetrics = 0;
@@ -355,10 +403,15 @@ export default function UserSettings() {
       
       for (const { parsedData, type } of parsedFilesData) {
         if (type === 'campaign-input') {
-          // Process campaign input CSV
-          console.log(`📊 Processando ${parsedData.length} campaign-profile combinations`);
+          // Filter parsed data based on selected profiles
+          const filteredData = parsedData.filter((data: any) => {
+            const selectedProfile = profileSelections[data.campaignName];
+            return selectedProfile === data.profileName;
+          });
+          
+          console.log(`📊 Processando ${filteredData.length} campaign-profile combinations (filtrado de ${parsedData.length})`);
 
-          for (const data of parsedData) {
+          for (const data of filteredData) {
             // Create profile
             const { data: profile, error: profileError } = await supabase
               .from('profiles_data')
@@ -706,7 +759,9 @@ export default function UserSettings() {
           setShowPreview(false);
           setParsedFilesData([]);
           setPreviewData([]);
+          setProfileSelections({});
         }}
+        onProfileSelect={handleProfileSelect}
         loading={processing}
       />
     </div>
