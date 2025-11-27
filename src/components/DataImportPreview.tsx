@@ -11,6 +11,20 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FileSpreadsheet, Users, TrendingUp, CheckCircle2, XCircle } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
+export interface CampaignProfileMapping {
+  campaignName: string;
+  profiles: string[];
+  selectedProfile?: string;
+}
 
 export interface FilePreviewData {
   fileName: string;
@@ -19,6 +33,7 @@ export interface FilePreviewData {
   positiveLeadsCount: number;
   negativeLeadsCount: number;
   campaignNames: string[];
+  campaignProfileMappings?: CampaignProfileMapping[];
   error?: string;
 }
 
@@ -28,6 +43,7 @@ interface DataImportPreviewProps {
   previewData: FilePreviewData[];
   onConfirm: () => void;
   onCancel: () => void;
+  onProfileSelect: (campaignName: string, profileName: string) => void;
   loading?: boolean;
 }
 
@@ -37,6 +53,7 @@ export default function DataImportPreview({
   previewData,
   onConfirm,
   onCancel,
+  onProfileSelect,
   loading = false,
 }: DataImportPreviewProps) {
   const totalCampaigns = previewData.reduce((sum, f) => sum + f.campaignsCount, 0);
@@ -44,6 +61,11 @@ export default function DataImportPreview({
   const totalPositiveLeads = previewData.reduce((sum, f) => sum + f.positiveLeadsCount, 0);
   const totalNegativeLeads = previewData.reduce((sum, f) => sum + f.negativeLeadsCount, 0);
   const hasErrors = previewData.some(f => f.error);
+  
+  // Check if all campaigns with mappings have a profile selected
+  const allCampaignMappings = previewData.flatMap(f => f.campaignProfileMappings || []);
+  const allProfilesSelected = allCampaignMappings.length === 0 || 
+    allCampaignMappings.every(m => m.selectedProfile);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -145,17 +167,62 @@ export default function DataImportPreview({
                           </div>
                         </div>
                         
-                        {file.campaignNames.length > 0 && (
+                        {file.campaignProfileMappings && file.campaignProfileMappings.length > 0 ? (
                           <div className="pt-2 border-t">
-                            <p className="text-xs text-muted-foreground mb-2">Campanhas detectadas:</p>
-                            <div className="flex flex-wrap gap-1">
-                              {file.campaignNames.map((name, i) => (
-                                <Badge key={i} variant="secondary" className="text-xs">
-                                  {name}
-                                </Badge>
-                              ))}
+                            <p className="text-xs text-muted-foreground mb-2 font-semibold">
+                              Selecione o perfil para cada campanha:
+                            </p>
+                            <div className="space-y-2">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-[60%]">Campanha</TableHead>
+                                    <TableHead className="w-[40%]">Perfil</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {file.campaignProfileMappings.map((mapping, i) => (
+                                    <TableRow key={i}>
+                                      <TableCell className="font-medium text-sm">
+                                        {mapping.campaignName}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Select
+                                          value={mapping.selectedProfile || ''}
+                                          onValueChange={(value) => onProfileSelect(mapping.campaignName, value)}
+                                          disabled={mapping.profiles.length === 1}
+                                        >
+                                          <SelectTrigger className={`h-8 text-xs ${!mapping.selectedProfile ? 'border-destructive' : ''}`}>
+                                            <SelectValue placeholder="Selecione..." />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {mapping.profiles.map((profile) => (
+                                              <SelectItem key={profile} value={profile} className="text-xs">
+                                                {profile}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
                             </div>
                           </div>
+                        ) : (
+                          file.campaignNames.length > 0 && (
+                            <div className="pt-2 border-t">
+                              <p className="text-xs text-muted-foreground mb-2">Campanhas detectadas:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {file.campaignNames.map((name, i) => (
+                                  <Badge key={i} variant="secondary" className="text-xs">
+                                    {name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )
                         )}
                       </>
                     )}
@@ -166,13 +233,20 @@ export default function DataImportPreview({
           </div>
         </ScrollArea>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onCancel} disabled={loading}>
-            Cancelar
-          </Button>
-          <Button onClick={onConfirm} disabled={loading || hasErrors}>
-            {loading ? 'Processando...' : 'Confirmar Importação'}
-          </Button>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          {!allProfilesSelected && (
+            <p className="text-sm text-destructive text-left flex-1">
+              Selecione um perfil para todas as campanhas antes de continuar
+            </p>
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onCancel} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button onClick={onConfirm} disabled={loading || hasErrors || !allProfilesSelected}>
+              {loading ? 'Processando...' : 'Confirmar Importação'}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
