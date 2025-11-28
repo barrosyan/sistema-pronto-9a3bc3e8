@@ -158,7 +158,7 @@ export function calculateCampaignMetrics(data: ParsedCampaignData) {
   const messagesSent = followUps1 + followUps2 + followUps3;
 
   const totalActivities = profileVisits + invitationsSent + messagesSent + 
-                         likes + comments + followUps1 + followUps2 + followUps3;
+                         likes + comments;
 
   const acceptanceRate = invitationsSent > 0 
     ? (connectionsAccepted / invitationsSent) * 100 
