@@ -147,13 +147,15 @@ export function calculateCampaignMetrics(data: ParsedCampaignData) {
 
   const invitationsSent = getMetricTotal('Connection Requests Sent');
   const connectionsAccepted = getMetricTotal('Connection Requests Accepted');
-  const messagesSent = getMetricTotal('Messages Sent');
   const profileVisits = getMetricTotal('Profile Visits');
   const likes = getMetricTotal('Post Likes');
   const comments = getMetricTotal('Comments Done');
   const followUps1 = getMetricTotal('Follow-Ups 1');
   const followUps2 = getMetricTotal('Follow-Ups 2');
   const followUps3 = getMetricTotal('Follow-Ups 3');
+  
+  // Messages sent should count only follow-ups
+  const messagesSent = followUps1 + followUps2 + followUps3;
 
   const totalActivities = profileVisits + invitationsSent + messagesSent + 
                          likes + comments + followUps1 + followUps2 + followUps3;
