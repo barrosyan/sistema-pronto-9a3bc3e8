@@ -172,15 +172,33 @@ export default function Campaigns() {
       });
     });
 
+    // Helper to get daily value from multiple event types
+    const getDailyValue = (date: string, eventTypes: string[]) => {
+      for (const eventType of eventTypes) {
+        const value = campaignData.find(m => m.eventType === eventType)?.dailyData?.[date];
+        if (value) return value;
+      }
+      return 0;
+    };
+
+    // Calculate follow-ups sum for messages
+    const getFollowUpsSum = (date: string) => {
+      const fu1 = getDailyValue(date, ['Follow-Ups 1']);
+      const fu2 = getDailyValue(date, ['Follow-Ups 2']);
+      const fu3 = getDailyValue(date, ['Follow-Ups 3']);
+      return fu1 + fu2 + fu3;
+    };
+
     return Array.from(allDates).sort().map(date => {
-      const invitations = campaignData.find(m => m.eventType === 'Connection Requests Sent')?.dailyData?.[date] || 0;
-      const connections = campaignData.find(m => m.eventType === 'Connections Made')?.dailyData?.[date] || 0;
-      const messages = campaignData.find(m => m.eventType === 'Messages Sent')?.dailyData?.[date] || 0;
-      const visits = campaignData.find(m => m.eventType === 'Profile Visits')?.dailyData?.[date] || 0;
-      const likes = campaignData.find(m => m.eventType === 'Post Likes')?.dailyData?.[date] || 0;
-      const comments = campaignData.find(m => m.eventType === 'Comments Done')?.dailyData?.[date] || 0;
-      const positiveResponses = campaignData.find(m => m.eventType === 'Positive Responses')?.dailyData?.[date] || 0;
-      const meetings = campaignData.find(m => m.eventType === 'Meetings')?.dailyData?.[date] || 0;
+      const invitations = getDailyValue(date, ['Connection Requests Sent', 'Convites Enviados']);
+      const connections = getDailyValue(date, ['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made']);
+      const followUpsMessages = getFollowUpsSum(date);
+      const messages = followUpsMessages || getDailyValue(date, ['Messages Sent', 'Mensagens Enviadas']);
+      const visits = getDailyValue(date, ['Profile Visits', 'Visitas a Perfil']);
+      const likes = getDailyValue(date, ['Post Likes', 'Curtidas']);
+      const comments = getDailyValue(date, ['Comments Done', 'Comentários']);
+      const positiveResponses = getDailyValue(date, ['Positive Responses', 'Respostas Positivas']);
+      const meetings = getDailyValue(date, ['Meetings', 'Reuniões Marcadas']);
 
       const isActive = invitations > 0 || connections > 0 || messages > 0 || 
                        visits > 0 || likes > 0 || comments > 0;
@@ -321,63 +339,52 @@ export default function Campaigns() {
     }
   };
 
+  // Helper to get metric total with multiple event type options (PT/EN)
+  const getMetricValue = (campaignData: any[], eventTypes: string[], dateFilter?: DateRange) => {
+    let total = 0;
+    for (const eventType of eventTypes) {
+      const metric = campaignData.find(m => m.eventType === eventType);
+      if (metric) {
+        if (!dateFilter?.from) {
+          total += metric.totalCount || 0;
+        } else {
+          Object.entries(metric.dailyData || {}).forEach(([dateKey, value]) => {
+            try {
+              const metricDate = parseISO(dateKey);
+              const isInRange = dateFilter.to
+                ? isWithinInterval(metricDate, { start: dateFilter.from, end: dateFilter.to })
+                : metricDate >= dateFilter.from;
+              if (isInRange) {
+                total += Number(value);
+              }
+            } catch (e) {}
+          });
+        }
+      }
+    }
+    return total;
+  };
+
   const getCampaignSummary = (campaignName: string, dateFilter?: DateRange) => {
     const campaignData = campaignMetrics.filter(m => m.campaignName === campaignName);
     
-    // Filter metrics by date range if provided
-    const filterMetricsByDate = (metric: any) => {
-      if (!dateFilter?.from || !metric.dailyData) return metric.totalCount || 0;
-      
-      let filteredTotal = 0;
-      Object.entries(metric.dailyData).forEach(([dateKey, value]) => {
-        try {
-          const metricDate = parseISO(dateKey);
-          const isInRange = dateFilter.to
-            ? isWithinInterval(metricDate, { start: dateFilter.from, end: dateFilter.to })
-            : metricDate >= dateFilter.from;
-          
-          if (isInRange) {
-            filteredTotal += Number(value);
-          }
-        } catch (e) {
-          // Skip invalid dates
-        }
-      });
-      
-      return filteredTotal;
-    };
+    // Calculate messages from follow-ups
+    const followUps1 = getMetricValue(campaignData, ['Follow-Ups 1'], dateFilter);
+    const followUps2 = getMetricValue(campaignData, ['Follow-Ups 2'], dateFilter);
+    const followUps3 = getMetricValue(campaignData, ['Follow-Ups 3'], dateFilter);
+    const messagesFromFollowUps = followUps1 + followUps2 + followUps3;
     
     const totals = {
-      invitations: dateFilter 
-        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Connection Requests Sent'))
-        : campaignData.find(m => m.eventType === 'Connection Requests Sent')?.totalCount || 0,
-      connections: dateFilter
-        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Connections Made'))
-        : campaignData.find(m => m.eventType === 'Connections Made')?.totalCount || 0,
-      messages: dateFilter
-        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Messages Sent'))
-        : campaignData.find(m => m.eventType === 'Messages Sent')?.totalCount || 0,
-      visits: dateFilter
-        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Profile Visits'))
-        : campaignData.find(m => m.eventType === 'Profile Visits')?.totalCount || 0,
-      likes: dateFilter
-        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Post Likes'))
-        : campaignData.find(m => m.eventType === 'Post Likes')?.totalCount || 0,
-      comments: dateFilter
-        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Comments Done'))
-        : campaignData.find(m => m.eventType === 'Comments Done')?.totalCount || 0,
-      positiveResponses: dateFilter
-        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Positive Responses'))
-        : campaignData.find(m => m.eventType === 'Positive Responses')?.totalCount || 0,
-      meetings: dateFilter
-        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Meetings'))
-        : campaignData.find(m => m.eventType === 'Meetings')?.totalCount || 0,
-      proposals: dateFilter
-        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Proposals'))
-        : campaignData.find(m => m.eventType === 'Proposals')?.totalCount || 0,
-      sales: dateFilter
-        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Sales'))
-        : campaignData.find(m => m.eventType === 'Sales')?.totalCount || 0
+      invitations: getMetricValue(campaignData, ['Connection Requests Sent', 'Convites Enviados'], dateFilter),
+      connections: getMetricValue(campaignData, ['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made'], dateFilter),
+      messages: messagesFromFollowUps || getMetricValue(campaignData, ['Messages Sent', 'Mensagens Enviadas'], dateFilter),
+      visits: getMetricValue(campaignData, ['Profile Visits', 'Visitas a Perfil'], dateFilter),
+      likes: getMetricValue(campaignData, ['Post Likes', 'Curtidas'], dateFilter),
+      comments: getMetricValue(campaignData, ['Comments Done', 'Comentários'], dateFilter),
+      positiveResponses: getMetricValue(campaignData, ['Positive Responses', 'Respostas Positivas'], dateFilter),
+      meetings: getMetricValue(campaignData, ['Meetings', 'Reuniões Marcadas'], dateFilter),
+      proposals: getMetricValue(campaignData, ['Proposals', 'Propostas'], dateFilter),
+      sales: getMetricValue(campaignData, ['Sales', 'Vendas'], dateFilter)
     };
 
     const acceptanceRate = totals.invitations > 0 
