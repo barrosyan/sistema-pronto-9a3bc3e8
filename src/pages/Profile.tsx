@@ -51,26 +51,46 @@ export default function Profile() {
       mensagensEnviadas: 0,
       visitas: 0,
       likes: 0,
-      comentarios: 0
+      comentarios: 0,
+      followUps1: 0,
+      followUps2: 0,
+      followUps3: 0
+    };
+
+    // Event type mappings (PT and EN)
+    const eventMappings: Record<string, keyof typeof totals> = {
+      'Connection Requests Sent': 'convitesEnviados',
+      'Convites Enviados': 'convitesEnviados',
+      'Connection Requests Accepted': 'conexoesRealizadas',
+      'Conexões Realizadas': 'conexoesRealizadas',
+      'Connections Made': 'conexoesRealizadas',
+      'Messages Sent': 'mensagensEnviadas',
+      'Mensagens Enviadas': 'mensagensEnviadas',
+      'Profile Visits': 'visitas',
+      'Visitas a Perfil': 'visitas',
+      'Post Likes': 'likes',
+      'Curtidas': 'likes',
+      'Comments Done': 'comentarios',
+      'Comentários': 'comentarios',
+      'Follow-Ups 1': 'followUps1',
+      'Follow-Ups 2': 'followUps2',
+      'Follow-Ups 3': 'followUps3',
     };
 
     filteredMetrics.forEach(metric => {
-      Object.values(metric.dailyData || {}).forEach(value => {
-        if (metric.eventType === 'Connection Requests Sent') {
-          totals.convitesEnviados += value;
-        } else if (metric.eventType === 'Connection Requests Accepted') {
-          totals.conexoesRealizadas += value;
-        } else if (metric.eventType === 'Messages Sent') {
-          totals.mensagensEnviadas += value;
-        } else if (metric.eventType === 'Profile Visits') {
-          totals.visitas += value;
-        } else if (metric.eventType === 'Post Likes') {
-          totals.likes += value;
-        } else if (metric.eventType === 'Comments Done') {
-          totals.comentarios += value;
-        }
-      });
+      const targetKey = eventMappings[metric.eventType];
+      if (targetKey) {
+        Object.values(metric.dailyData || {}).forEach(value => {
+          totals[targetKey] += value;
+        });
+      }
     });
+
+    // Calculate messages from follow-ups (if follow-ups exist, use them; otherwise use mensagensEnviadas)
+    const followUpsTotal = totals.followUps1 + totals.followUps2 + totals.followUps3;
+    if (followUpsTotal > 0) {
+      totals.mensagensEnviadas = followUpsTotal;
+    }
 
     const positiveLeads = filteredLeads.filter(l => l.status === 'positive');
     const reunioes = positiveLeads.filter(l => l.meetingDate).length;
