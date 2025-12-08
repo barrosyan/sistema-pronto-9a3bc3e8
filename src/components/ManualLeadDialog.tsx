@@ -151,6 +151,11 @@ export function ManualLeadDialog({
                     <SelectItem value="pending">Pendente</SelectItem>
                     <SelectItem value="positive">Positivo</SelectItem>
                     <SelectItem value="negative">Negativo</SelectItem>
+                    <SelectItem value="follow-up">Follow-Up</SelectItem>
+                    <SelectItem value="retomar-contato">Retomar Contato</SelectItem>
+                    <SelectItem value="em-negociacao">Em Negociação</SelectItem>
+                    <SelectItem value="sem-interesse">Sem Interesse</SelectItem>
+                    <SelectItem value="sem-fit">Sem Fit</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -193,6 +198,7 @@ export function ManualLeadDialog({
                   <SelectContent>
                     <SelectItem value="Kontax">Kontax</SelectItem>
                     <SelectItem value="Evento Presencial">Evento Presencial</SelectItem>
+                    <SelectItem value="Indicação">Indicação</SelectItem>
                     <SelectItem value="Outros">Outros</SelectItem>
                   </SelectContent>
                 </Select>

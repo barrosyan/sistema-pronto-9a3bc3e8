@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { useProfileFilter } from '@/contexts/ProfileFilterContext';
 import { Separator } from '@/components/ui/separator';
+import { ExportOptions } from '@/components/ExportOptions';
 
 export default function Profile() {
   const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
@@ -318,6 +319,34 @@ export default function Profile() {
           </div>
         </CardContent>
       </Card>
+
+      <Separator />
+
+      {/* Export Options */}
+      <ExportOptions 
+        data={[{
+          Campanha: selectedCampaign === 'all' ? 'Todas' : selectedCampaign,
+          Perfil: selectedProfile || 'Todos',
+          'Convites Enviados': metrics.convitesEnviados,
+          'Conexões Realizadas': metrics.conexoesRealizadas,
+          'Mensagens Enviadas': metrics.mensagensEnviadas,
+          'Taxa de Aceite': `${metrics.taxaAceite}%`,
+          Visitas: metrics.visitas,
+          Likes: metrics.likes,
+          Comentários: metrics.comentarios,
+          'Total Atividades': metrics.totalAtividades,
+          'Respostas Positivas': metrics.respostasPositivas,
+          Reuniões: metrics.reunioes,
+          Propostas: metrics.propostas,
+          Vendas: metrics.vendas,
+          'Taxa Resp. Positivas/Convites': `${conversionRates.respostasPositivasConvitesEnviados}%`,
+          'Taxa Resp. Positivas/Conexões': `${conversionRates.respostasPositivasConexoesRealizadas}%`,
+          'Taxa Resp. Positivas/Mensagens': `${conversionRates.respostasPositivasMensagensEnviadas}%`,
+          'Taxa Reuniões/Resp. Positivas': `${conversionRates.numeroDeReunioesRespostasPositivas}%`,
+          'Taxa Reuniões/Convites': `${conversionRates.numeroDeReunioesConvitesEnviados}%`,
+        }]}
+        filename={`perfil-${selectedProfile || 'todos'}-${selectedCampaign === 'all' ? 'todas-campanhas' : selectedCampaign}-${new Date().toISOString().split('T')[0]}`}
+      />
     </div>
   );
 }

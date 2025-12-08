@@ -29,11 +29,12 @@ export interface Campaign {
 export interface Lead {
   id: string;
   campaign: string;
+  campaigns?: string[]; // Multiple campaign support
   linkedin: string;
   name: string;
   position: string;
   company: string;
-  status: 'positive' | 'negative' | 'pending';
+  status: 'positive' | 'negative' | 'pending' | 'follow-up' | 'retomar-contato' | 'em-negociacao' | 'sem-interesse' | 'sem-fit';
   source?: string;
   
   // Connection data

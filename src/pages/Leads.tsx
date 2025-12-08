@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, Search, Filter, Users, Edit, Plus, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Upload, Search, Filter, Users, Edit, Plus, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
@@ -26,6 +26,7 @@ import { useCampaignData } from '@/hooks/useCampaignData';
 import { parseExcelSheets } from '@/utils/excelSheetParser';
 import { LeadEditDialog } from '@/components/LeadEditDialog';
 import { ManualLeadDialog } from '@/components/ManualLeadDialog';
+import { ExportOptions } from '@/components/ExportOptions';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -73,6 +74,18 @@ const Leads = () => {
         return <Badge variant="destructive">Negativo</Badge>;
       case 'pending':
         return <Badge variant="outline">Pendente</Badge>;
+      case 'follow-up':
+        return <Badge className="bg-blue-500 text-white">Follow-Up</Badge>;
+      case 'retomar-contato':
+        return <Badge className="bg-orange-500 text-white">Retomar Contato</Badge>;
+      case 'em-negociacao':
+        return <Badge className="bg-purple-500 text-white">Em Negociação</Badge>;
+      case 'sem-interesse':
+        return <Badge className="bg-gray-500 text-white">Sem Interesse</Badge>;
+      case 'sem-fit':
+        return <Badge className="bg-gray-400 text-white">Sem Fit</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
@@ -402,6 +415,28 @@ const Leads = () => {
               </PaginationContent>
             </Pagination>
           )}
+
+          {/* Export Options */}
+          <ExportOptions 
+            data={filteredLeads.map(lead => ({
+              Nome: lead.name,
+              Cargo: lead.position || '',
+              Empresa: lead.company || '',
+              Campanha: lead.campaign,
+              Source: lead.source || '',
+              Status: lead.status,
+              'Data Conexão': lead.connectionDate || '',
+              LinkedIn: lead.linkedin || '',
+              WhatsApp: lead.whatsapp || '',
+              Observações: lead.observations || '',
+              'Data Reunião': lead.meetingDate || '',
+              'Data Proposta': lead.proposalDate || '',
+              'Valor Proposta': lead.proposalValue || 0,
+              'Data Venda': lead.saleDate || '',
+              'Valor Venda': lead.saleValue || 0,
+            }))}
+            filename={`leads-${new Date().toISOString().split('T')[0]}`}
+          />
         </>
       )}
 

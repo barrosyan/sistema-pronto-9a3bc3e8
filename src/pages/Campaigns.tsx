@@ -11,7 +11,7 @@ import { format, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Info, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, Plus, Download } from 'lucide-react';
 import { CampaignDetailsDialog } from '@/components/CampaignDetailsDialog';
 import { CampaignDetailsCard } from '@/components/CampaignDetailsCard';
 import { CampaignDialog } from '@/components/CampaignDialog';
@@ -21,6 +21,7 @@ import { WeeklyPerformanceChart } from '@/components/WeeklyPerformanceChart';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { supabase } from '@/integrations/supabase/client';
+import { ExportOptions } from '@/components/ExportOptions';
 
 interface DailyData {
   date: string;
@@ -1121,6 +1122,29 @@ export default function Campaigns() {
               )}
             </CardContent>
           </Card>
+
+          {/* Export Options */}
+          <ExportOptions 
+            data={pivotData.map(row => {
+              const exportRow: Record<string, any> = {
+                [granularity === 'daily' ? 'Data' : 'Semana']: calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly'
+                  ? row.weekLabel
+                  : granularity === 'daily' ? row.date : row.week
+              };
+              selectedCampaigns.forEach(campaign => {
+                exportRow[`${campaign} - Status`] = row[`${campaign}_status`];
+                exportRow[`${campaign} - Convites`] = row[`${campaign}_invitations`];
+                exportRow[`${campaign} - Conexões`] = row[`${campaign}_connections`];
+                exportRow[`${campaign} - Mensagens`] = row[`${campaign}_messages`];
+                exportRow[`${campaign} - Resp. Positivas`] = row[`${campaign}_positiveResponses`];
+                if (granularity === 'weekly') {
+                  exportRow[`${campaign} - Reuniões`] = row[`${campaign}_meetings`];
+                }
+              });
+              return exportRow;
+            })}
+            filename={`campanhas-${granularity}-${format(new Date(), 'yyyy-MM-dd')}`}
+          />
         </>
       )}
 

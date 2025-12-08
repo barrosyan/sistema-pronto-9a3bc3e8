@@ -102,7 +102,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         campaignMetrics: metrics,
         positiveLeads: leads.filter(l => l.status === 'positive'),
         negativeLeads: leads.filter(l => l.status === 'negative'),
-        pendingLeads: leads.filter(l => l.status === 'pending')
+        pendingLeads: leads.filter(l => !['positive', 'negative'].includes(l.status))
       });
     } catch (error) {
       console.error('Error loading data from database:', error);
@@ -456,7 +456,15 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
   },
   
   addPositiveLead: async (lead) => {
-    set((state) => ({ positiveLeads: [...state.positiveLeads, lead] }));
+    // Add to correct list based on status
+    const status = lead.status || 'pending';
+    if (status === 'positive') {
+      set((state) => ({ positiveLeads: [...state.positiveLeads, lead] }));
+    } else if (status === 'negative') {
+      set((state) => ({ negativeLeads: [...state.negativeLeads, lead] }));
+    } else {
+      set((state) => ({ pendingLeads: [...state.pendingLeads, lead] }));
+    }
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -468,7 +476,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         name: lead.name,
         position: lead.position,
         company: lead.company,
-        status: 'positive',
+        status: status,
         source: lead.source,
         user_id: user.id,
         connection_date: lead.connectionDate,
@@ -504,8 +512,8 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
       });
       if (error) throw error;
     } catch (error) {
-      console.error('Error adding positive lead:', error);
-      toast.error('Erro ao adicionar lead positivo');
+      console.error('Error adding lead:', error);
+      toast.error('Erro ao adicionar lead');
     }
   },
   
@@ -570,13 +578,37 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
       ),
       negativeLeads: state.negativeLeads.map(lead => 
         lead.id === id ? { ...lead, ...updates } : lead
+      ),
+      pendingLeads: state.pendingLeads.map(lead => 
+        lead.id === id ? { ...lead, ...updates } : lead
       )
     }));
     
     try {
+      // Convert camelCase to snake_case for database
+      const dbUpdates: Record<string, any> = {};
+      if (updates.status !== undefined) dbUpdates.status = updates.status;
+      if (updates.campaign !== undefined) dbUpdates.campaign = updates.campaign;
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.position !== undefined) dbUpdates.position = updates.position;
+      if (updates.company !== undefined) dbUpdates.company = updates.company;
+      if (updates.linkedin !== undefined) dbUpdates.linkedin = updates.linkedin;
+      if (updates.source !== undefined) dbUpdates.source = updates.source;
+      if (updates.connectionDate !== undefined) dbUpdates.connection_date = updates.connectionDate;
+      if (updates.observations !== undefined) dbUpdates.observations = updates.observations;
+      if (updates.meetingDate !== undefined) dbUpdates.meeting_date = updates.meetingDate;
+      if (updates.proposalDate !== undefined) dbUpdates.proposal_date = updates.proposalDate;
+      if (updates.proposalValue !== undefined) dbUpdates.proposal_value = updates.proposalValue;
+      if (updates.saleDate !== undefined) dbUpdates.sale_date = updates.saleDate;
+      if (updates.saleValue !== undefined) dbUpdates.sale_value = updates.saleValue;
+      if (updates.whatsapp !== undefined) dbUpdates.whatsapp = updates.whatsapp;
+      if (updates.comments !== undefined) dbUpdates.comments = updates.comments;
+      if (updates.positiveResponseDate !== undefined) dbUpdates.positive_response_date = updates.positiveResponseDate;
+      if (updates.negativeResponseDate !== undefined) dbUpdates.negative_response_date = updates.negativeResponseDate;
+
       const { error } = await supabase
         .from('leads')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id);
       
       if (error) throw error;
@@ -588,7 +620,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
   
   getAllLeads: () => {
     const state = get();
-    return [...state.positiveLeads, ...state.negativeLeads];
+    return [...state.positiveLeads, ...state.negativeLeads, ...state.pendingLeads];
   },
   
   reset: async () => {

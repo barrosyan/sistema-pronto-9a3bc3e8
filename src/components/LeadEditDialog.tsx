@@ -88,18 +88,43 @@ export const LeadEditDialog = ({ lead, open, onOpenChange, onSave }: LeadEditDia
                   <SelectItem value="positive">Positivo</SelectItem>
                   <SelectItem value="negative">Negativo</SelectItem>
                   <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="follow-up">Follow-Up</SelectItem>
+                  <SelectItem value="retomar-contato">Retomar Contato</SelectItem>
+                  <SelectItem value="em-negociacao">Em Negociação</SelectItem>
+                  <SelectItem value="sem-interesse">Sem Interesse</SelectItem>
+                  <SelectItem value="sem-fit">Sem Fit</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="linkedin">LinkedIn</Label>
-            <Input
-              id="linkedin"
-              value={editedLead.linkedin || ''}
-              onChange={(e) => setEditedLead({ ...editedLead, linkedin: e.target.value })}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="linkedin">LinkedIn</Label>
+              <Input
+                id="linkedin"
+                value={editedLead.linkedin || ''}
+                onChange={(e) => setEditedLead({ ...editedLead, linkedin: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="source">Source</Label>
+              <Select 
+                value={editedLead.source || 'Kontax'} 
+                onValueChange={(value) => setEditedLead({ ...editedLead, source: value })}
+              >
+                <SelectTrigger id="source">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Kontax">Kontax</SelectItem>
+                  <SelectItem value="Evento Presencial">Evento Presencial</SelectItem>
+                  <SelectItem value="Indicação">Indicação</SelectItem>
+                  <SelectItem value="Outros">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="space-y-2">
