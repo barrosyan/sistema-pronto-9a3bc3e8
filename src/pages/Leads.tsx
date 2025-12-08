@@ -26,6 +26,7 @@ import { useCampaignData } from '@/hooks/useCampaignData';
 import { parseExcelSheets } from '@/utils/excelSheetParser';
 import { LeadEditDialog } from '@/components/LeadEditDialog';
 import { ManualLeadDialog } from '@/components/ManualLeadDialog';
+import { LeadDetailDialog } from '@/components/LeadDetailDialog';
 import { ExportOptions } from '@/components/ExportOptions';
 
 const ITEMS_PER_PAGE = 20;
