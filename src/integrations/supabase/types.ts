@@ -55,6 +55,7 @@ export type Database = {
           cadence: string | null
           company: string | null
           created_at: string | null
+          end_date: string | null
           event_id: string | null
           id: string
           job_titles: string | null
@@ -62,6 +63,7 @@ export type Database = {
           objective: string | null
           profile_id: string | null
           profile_name: string | null
+          start_date: string | null
           updated_at: string | null
           user_id: string
         }
@@ -69,6 +71,7 @@ export type Database = {
           cadence?: string | null
           company?: string | null
           created_at?: string | null
+          end_date?: string | null
           event_id?: string | null
           id?: string
           job_titles?: string | null
@@ -76,6 +79,7 @@ export type Database = {
           objective?: string | null
           profile_id?: string | null
           profile_name?: string | null
+          start_date?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -83,6 +87,7 @@ export type Database = {
           cadence?: string | null
           company?: string | null
           created_at?: string | null
+          end_date?: string | null
           event_id?: string | null
           id?: string
           job_titles?: string | null
@@ -90,6 +95,7 @@ export type Database = {
           objective?: string | null
           profile_id?: string | null
           profile_name?: string | null
+          start_date?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -106,6 +112,44 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_metrics: {
+        Row: {
+          campaign_metric_id: string
+          created_at: string
+          date: string
+          id: string
+          updated_at: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          campaign_metric_id: string
+          created_at?: string
+          date: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          value?: number
+        }
+        Update: {
+          campaign_metric_id?: string
+          created_at?: string
+          date?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_metrics_campaign_metric_id_fkey"
+            columns: ["campaign_metric_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_metrics"
             referencedColumns: ["id"]
           },
         ]

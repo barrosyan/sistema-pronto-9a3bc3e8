@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Save } from 'lucide-react';
+import { Save, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -16,6 +16,8 @@ interface CampaignDetailsCardProps {
     objective?: string;
     cadence?: string;
     jobTitles?: string;
+    startDate?: string;
+    endDate?: string;
   };
   onUpdate?: () => void;
 }
@@ -28,6 +30,8 @@ export function CampaignDetailsCard({ campaign, details, onUpdate }: CampaignDet
     objective: details?.objective || '',
     cadence: details?.cadence || '',
     jobTitles: details?.jobTitles || '',
+    startDate: details?.startDate || '',
+    endDate: details?.endDate || '',
   });
 
   const hasChanges = 
@@ -35,7 +39,9 @@ export function CampaignDetailsCard({ campaign, details, onUpdate }: CampaignDet
     formData.profile !== (details?.profile || '') ||
     formData.objective !== (details?.objective || '') ||
     formData.cadence !== (details?.cadence || '') ||
-    formData.jobTitles !== (details?.jobTitles || '');
+    formData.jobTitles !== (details?.jobTitles || '') ||
+    formData.startDate !== (details?.startDate || '') ||
+    formData.endDate !== (details?.endDate || '');
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -68,6 +74,8 @@ export function CampaignDetailsCard({ campaign, details, onUpdate }: CampaignDet
             objective: formData.objective || null,
             cadence: formData.cadence || null,
             job_titles: formData.jobTitles || null,
+            start_date: formData.startDate || null,
+            end_date: formData.endDate || null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', existingCampaign.id);
@@ -85,6 +93,8 @@ export function CampaignDetailsCard({ campaign, details, onUpdate }: CampaignDet
             objective: formData.objective || null,
             cadence: formData.cadence || null,
             job_titles: formData.jobTitles || null,
+            start_date: formData.startDate || null,
+            end_date: formData.endDate || null,
           });
 
         if (insertError) throw insertError;
@@ -107,6 +117,35 @@ export function CampaignDetailsCard({ campaign, details, onUpdate }: CampaignDet
         <CardDescription>Detalhes da Campanha</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label htmlFor={`startDate-${campaign}`} className="text-xs text-muted-foreground flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              Data Início
+            </Label>
+            <Input
+              id={`startDate-${campaign}`}
+              type="date"
+              value={formData.startDate}
+              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+              className="h-9"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`endDate-${campaign}`} className="text-xs text-muted-foreground flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              Data Fim
+            </Label>
+            <Input
+              id={`endDate-${campaign}`}
+              type="date"
+              value={formData.endDate}
+              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+              className="h-9"
+            />
+          </div>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor={`company-${campaign}`} className="text-xs text-muted-foreground">
             Empresa
