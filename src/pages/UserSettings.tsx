@@ -12,6 +12,8 @@ import { detectCsvType, parseCsvHeaders } from '@/utils/csvDetector';
 import { useProfileFilter } from '@/contexts/ProfileFilterContext';
 import DataImportPreview, { FilePreviewData } from '@/components/DataImportPreview';
 import { useCampaignData } from '@/hooks/useCampaignData';
+import { DeleteDataSection } from '@/components/DeleteDataSection';
+import { ProfileCrud } from '@/components/ProfileCrud';
 
 type FileUpload = {
   id: string;
@@ -333,24 +335,9 @@ export default function UserSettings() {
     }
   };
 
-  const clearAllData = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error('Usuário não autenticado');
-        return;
-      }
-
-      // Delete all user data
-      await supabase.from('campaign_metrics').delete().eq('user_id', user.id);
-      await supabase.from('leads').delete().eq('user_id', user.id);
-      await supabase.from('campaigns').delete().eq('user_id', user.id);
-
-      toast.success('Todos os dados foram limpos com sucesso');
-    } catch (error) {
-      console.error('Erro ao limpar dados:', error);
-      toast.error('Erro ao limpar dados do banco');
-    }
+  const handleDataCleared = async () => {
+    await loadFromDatabase();
+    await loadProfiles();
   };
 
   const handleProfileSelect = (campaignName: string, profileName: string) => {
@@ -455,7 +442,8 @@ export default function UserSettings() {
 
             // Insert metrics
             for (const metric of data.metrics) {
-              const { error: metricError } = await supabase
+              // Insert campaign_metric without daily_data (will be stored in daily_metrics table)
+              const { data: insertedMetric, error: metricError } = await supabase
                 .from('campaign_metrics')
                 .insert({
                   user_id: user.id,
@@ -463,14 +451,40 @@ export default function UserSettings() {
                   profile_name: data.profileName,
                   event_type: metric.eventType,
                   total_count: metric.totalCount,
-                  daily_data: metric.dailyData,
-                });
+                  daily_data: {}, // Empty - daily data goes to daily_metrics table
+                })
+                .select()
+                .single();
 
               if (metricError) {
                 console.error(`❌ Error inserting metric ${metric.eventType}:`, metricError);
               } else {
                 totalMetrics++;
                 console.log(`✅ Metric: ${metric.eventType}`);
+
+                // Insert daily data into daily_metrics table
+                if (insertedMetric && metric.dailyData) {
+                  const dailyEntries = Object.entries(metric.dailyData)
+                    .filter(([date]) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+                    .map(([date, value]) => ({
+                      campaign_metric_id: insertedMetric.id,
+                      user_id: user.id,
+                      date,
+                      value: Number(value) || 0,
+                    }));
+
+                  if (dailyEntries.length > 0) {
+                    const { error: dailyError } = await supabase
+                      .from('daily_metrics' as any)
+                      .insert(dailyEntries);
+
+                    if (dailyError) {
+                      console.error(`❌ Error inserting daily metrics:`, dailyError);
+                    } else {
+                      console.log(`✅ Inserted ${dailyEntries.length} daily entries for ${metric.eventType}`);
+                    }
+                  }
+                }
               }
             }
           }
@@ -662,26 +676,15 @@ export default function UserSettings() {
                 {uploading ? 'Enviando...' : 'Fazer Upload'}
               </Button>
               {files.length > 0 && (
-                <>
-                  <Button
-                    onClick={processAllFiles}
-                    disabled={uploading || processing}
-                    variant="default"
-                    className="w-full sm:w-auto"
-                  >
-                    <Play className="mr-2 h-4 w-4" />
-                    {processing ? 'Processando...' : 'Processar Todos os Arquivos'}
-                  </Button>
-                  <Button
-                    onClick={clearAllData}
-                    disabled={uploading || processing}
-                    variant="destructive"
-                    className="w-full sm:w-auto"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Limpar Banco de Dados
-                  </Button>
-                </>
+                <Button
+                  onClick={processAllFiles}
+                  disabled={uploading || processing}
+                  variant="default"
+                  className="w-full sm:w-auto"
+                >
+                  <Play className="mr-2 h-4 w-4" />
+                  {processing ? 'Processando...' : 'Processar Todos os Arquivos'}
+                </Button>
               )}
             </div>
 
@@ -749,6 +752,12 @@ export default function UserSettings() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Profile Management */}
+      <ProfileCrud onProfilesChange={loadProfiles} />
+
+      {/* Delete Data Section */}
+      <DeleteDataSection onDataCleared={handleDataCleared} />
 
       <DataImportPreview
         open={showPreview}

@@ -210,7 +210,7 @@ export function LeadDetailDialog({
               <CardTitle className="text-base">Campanhas Associadas</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 mb-4">
                 {selectedCampaigns.map((campaign, idx) => (
                   <Badge 
                     key={campaign} 
@@ -219,35 +219,39 @@ export function LeadDetailDialog({
                   >
                     {campaign}
                     {idx === 0 && <span className="text-xs ml-1">(principal)</span>}
-                    <button
-                      onClick={() => handleRemoveCampaign(campaign)}
-                      className="ml-1 hover:bg-white/20 rounded-full p-0.5"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
                   </Badge>
                 ))}
               </div>
               
-              <div className="flex gap-2">
-                <Select value={newCampaign} onValueChange={setNewCampaign}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Adicionar campanha..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allCampaigns
-                      .filter(c => !selectedCampaigns.includes(c))
-                      .map(campaign => (
-                        <SelectItem key={campaign} value={campaign}>
-                          {campaign}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleAddCampaign} size="icon" variant="outline">
-                  <Plus className="h-4 w-4" />
-                </Button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {allCampaigns.map(campaign => (
+                  <div key={campaign} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`lead-campaign-${campaign}`}
+                      checked={selectedCampaigns.includes(campaign)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedCampaigns([...selectedCampaigns, campaign]);
+                        } else {
+                          handleRemoveCampaign(campaign);
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor={`lead-campaign-${campaign}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {campaign}
+                    </label>
+                  </div>
+                ))}
               </div>
+              
+              {allCampaigns.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma campanha disponível. Importe dados primeiro.
+                </p>
+              )}
             </CardContent>
           </Card>
 

@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { ExportOptions } from '@/components/ExportOptions';
 import { ProfileComparison } from '@/components/ProfileComparison';
 import { WeeklyProfileView } from '@/components/WeeklyProfileView';
+import { WeeklyComparisonTable } from '@/components/WeeklyComparisonTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';

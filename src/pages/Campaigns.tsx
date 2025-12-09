@@ -92,6 +92,8 @@ export default function Campaigns() {
           objective: campaign.objective,
           cadence: campaign.cadence,
           jobTitles: campaign.job_titles,
+          startDate: campaign.start_date,
+          endDate: campaign.end_date,
         };
         return acc;
       }, {} as Record<string, any>);
