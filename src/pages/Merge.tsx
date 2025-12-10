@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { ParsedFile, MergeType, performLeftJoin } from '@/utils/dataProcessing';
+import { ParsedFile, MergeType, performLeftJoin, concatenateFiles, convertToKontaxInputFormat, convertToKontaxLeadsFormat } from '@/utils/dataProcessing';
 import { FileUpload } from '@/components/FileUpload';
 import { DataPreview } from '@/components/DataPreview';
 import { MergeConfiguration } from '@/components/MergeConfiguration';
 import { MergePreview } from '@/components/MergePreview';
 import { ExportOptions } from '@/components/ExportOptions';
 import { Button } from '@/components/ui/button';
-import { Merge as MergeIcon, ArrowLeft } from 'lucide-react';
+import { Merge as MergeIcon, ArrowLeft, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Step = 'upload' | 'configure' | 'preview' | 'export';
@@ -16,6 +16,7 @@ const MergePage = () => {
   const [files, setFiles] = useState<ParsedFile[]>([]);
   const [mainFileIndex, setMainFileIndex] = useState(0);
   const [mergeType, setMergeType] = useState<MergeType>('lead-name');
+  const [concatenateMode, setConcatenateMode] = useState(false);
   const [mergedData, setMergedData] = useState<Record<string, any>[]>([]);
 
   const handleFilesProcessed = (processedFiles: ParsedFile[]) => {
@@ -25,17 +26,52 @@ const MergePage = () => {
     }
   };
 
+  const handleRemoveFile = (index: number) => {
+    const newFiles = files.filter((_, i) => i !== index);
+    setFiles(newFiles);
+    if (mainFileIndex >= newFiles.length) {
+      setMainFileIndex(Math.max(0, newFiles.length - 1));
+    }
+  };
+
+  const handleClearFiles = () => {
+    setFiles([]);
+    setMergedData([]);
+    setStep('upload');
+    setMainFileIndex(0);
+  };
+
   const handlePreviewMerge = () => {
-    if (files.length < 2) {
+    if (files.length < 2 && !concatenateMode) {
       toast.error('É necessário pelo menos 2 arquivos para realizar o merge');
       return;
     }
 
-    const mainFile = files[mainFileIndex];
-    const secondaryFiles = files.filter((_, index) => index !== mainFileIndex);
-    
+    if (files.length < 1) {
+      toast.error('É necessário pelo menos 1 arquivo');
+      return;
+    }
+
     try {
-      const result = performLeftJoin(mainFile, secondaryFiles, mergeType);
+      let result: Record<string, any>[];
+
+      if (concatenateMode) {
+        // Concatenate all files
+        result = concatenateFiles(files);
+      } else {
+        // Perform LEFT JOIN
+        const mainFile = files[mainFileIndex];
+        const secondaryFiles = files.filter((_, index) => index !== mainFileIndex);
+        result = performLeftJoin(mainFile, secondaryFiles, mergeType);
+      }
+
+      // Apply format conversion if selected
+      if (mergeType === 'kontax-input') {
+        result = convertToKontaxInputFormat(result, files);
+      } else if (mergeType === 'kontax-leads') {
+        result = convertToKontaxLeadsFormat(result, files);
+      }
+
       setMergedData(result);
       setStep('preview');
       toast.success('Preview do merge gerado com sucesso!');
@@ -56,6 +92,11 @@ const MergePage = () => {
     setMergedData([]);
     setMainFileIndex(0);
     setMergeType('lead-name');
+    setConcatenateMode(false);
+  };
+
+  const getTotalRows = () => {
+    return files.reduce((sum, f) => sum + f.rowCount, 0);
   };
 
   return (
@@ -109,7 +150,29 @@ const MergePage = () => {
       {/* Content */}
       <div className="space-y-6">
           {step === 'upload' && (
-            <FileUpload onFilesProcessed={handleFilesProcessed} />
+            <div className="space-y-4">
+              <FileUpload onFilesProcessed={handleFilesProcessed} />
+              
+              {files.length > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">
+                    {files.length} arquivo(s) carregado(s) • Total: {getTotalRows()} linhas
+                  </span>
+                  <Button variant="outline" size="sm" onClick={handleClearFiles}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Limpar Todos
+                  </Button>
+                </div>
+              )}
+
+              {files.length >= 2 && (
+                <div className="flex justify-end">
+                  <Button onClick={() => setStep('configure')} size="lg">
+                    Próximo: Configurar
+                  </Button>
+                </div>
+              )}
+            </div>
           )}
 
           {step === 'configure' && (
@@ -119,17 +182,34 @@ const MergePage = () => {
                   files={files}
                   mainFileIndex={mainFileIndex}
                   mergeType={mergeType}
+                  concatenateMode={concatenateMode}
                   onMainFileChange={setMainFileIndex}
                   onMergeTypeChange={setMergeType}
+                  onConcatenateModeChange={setConcatenateMode}
                 />
               </div>
 
               <div className="space-y-4">
-                <h2 className="text-2xl font-semibold text-foreground">
-                  Preview dos Arquivos
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-semibold text-foreground">
+                    Preview dos Arquivos
+                  </h2>
+                  <span className="text-sm text-muted-foreground">
+                    {files.length} arquivo(s)
+                  </span>
+                </div>
                 {files.map((file, index) => (
-                  <DataPreview key={index} file={file} />
+                  <div key={index} className="relative">
+                    <DataPreview file={file} />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-4 right-4"
+                      onClick={() => handleRemoveFile(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 ))}
               </div>
 
@@ -150,7 +230,7 @@ const MergePage = () => {
             <>
               <MergePreview
                 mergedData={mergedData}
-                originalRowCount={files[mainFileIndex]?.rowCount || 0}
+                originalRowCount={concatenateMode ? getTotalRows() : files[mainFileIndex]?.rowCount || 0}
               />
 
               <div className="flex gap-4 justify-end">
@@ -169,7 +249,7 @@ const MergePage = () => {
             <>
               <MergePreview
                 mergedData={mergedData}
-                originalRowCount={files[mainFileIndex]?.rowCount || 0}
+                originalRowCount={concatenateMode ? getTotalRows() : files[mainFileIndex]?.rowCount || 0}
               />
 
               <ExportOptions data={mergedData} filename="merged-data" />

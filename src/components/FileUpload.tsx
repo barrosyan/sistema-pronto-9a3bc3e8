@@ -29,13 +29,24 @@ export function FileUpload({ onFilesProcessed }: FileUploadProps) {
       // Read CSV as text for campaign CSV processing
       const text = await file.text();
       const lines = text.split('\n').filter(line => line.trim());
-      const headers = lines.length > 0 ? lines[0].split(',').map(h => h.trim()) : [];
+      const headers = lines.length > 0 ? lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '')) : [];
+      
+      // Parse CSV data into rows
+      const dataRows: Record<string, any>[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const row: Record<string, any> = {};
+        headers.forEach((header, idx) => {
+          row[header] = values[idx] || '';
+        });
+        dataRows.push(row);
+      }
       
       return {
         name: file.name,
         headers,
-        data: text,
-        rowCount: lines.length - 1, // Exclude header
+        data: dataRows,
+        rowCount: dataRows.length,
         type: 'csv',
         rawContent: text,
       };
@@ -48,7 +59,7 @@ export function FileUpload({ onFilesProcessed }: FileUploadProps) {
             const workbook = XLSX.read(data, { type: 'binary' });
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-            const headers = jsonData.length > 0 ? Object.keys(jsonData[0]) : [];
+            const headers = jsonData.length > 0 ? Object.keys(jsonData[0] as object) : [];
 
             resolve({
               name: file.name,
@@ -74,8 +85,10 @@ export function FileUpload({ onFilesProcessed }: FileUploadProps) {
     try {
       const fileArray = Array.from(files);
       const processed = await Promise.all(fileArray.map(processFile));
-      setUploadedFiles(processed);
-      onFilesProcessed(processed);
+      // Append to existing files instead of replacing
+      const newFiles = [...uploadedFiles, ...processed];
+      setUploadedFiles(newFiles);
+      onFilesProcessed(newFiles);
     } catch (error) {
       console.error('Erro ao processar arquivos:', error);
     } finally {

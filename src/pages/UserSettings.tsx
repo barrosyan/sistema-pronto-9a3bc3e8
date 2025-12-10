@@ -357,10 +357,11 @@ export default function UserSettings() {
     })));
   };
 
-  const confirmImport = async () => {
+  const confirmImport = async (incrementalMode: boolean = true) => {
     console.log('=== Iniciando importação ===');
     console.log('Arquivos parseados:', parsedFilesData.length);
     console.log('Seleções de perfil:', profileSelections);
+    console.log('Modo incremental:', incrementalMode);
     
     setProcessing(true);
     let totalMetrics = 0;
@@ -374,16 +375,22 @@ export default function UserSettings() {
         return;
       }
 
-      console.log('🗑️ Limpando dados existentes do usuário:', user.id);
-      
-      // Delete in correct order
-      await supabase.from('campaign_metrics').delete().eq('user_id', user.id);
-      await supabase.from('leads').delete().eq('user_id', user.id);
-      await supabase.from('campaigns').delete().eq('user_id', user.id);
-      await supabase.from('profiles_data').delete().eq('user_id', user.id);
-      
-      console.log('✅ Todos os dados foram limpos');
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Only clear data if NOT in incremental mode
+      if (!incrementalMode) {
+        console.log('🗑️ Limpando dados existentes do usuário:', user.id);
+        
+        // Delete daily_metrics first (foreign key dependency)
+        await supabase.from('daily_metrics').delete().eq('user_id', user.id);
+        await supabase.from('campaign_metrics').delete().eq('user_id', user.id);
+        await supabase.from('leads').delete().eq('user_id', user.id);
+        await supabase.from('campaigns').delete().eq('user_id', user.id);
+        await supabase.from('profiles_data').delete().eq('user_id', user.id);
+        
+        console.log('✅ Todos os dados foram limpos');
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } else {
+        console.log('➕ Modo incremental - adicionando aos dados existentes');
+      }
 
       // Process each file based on type
       let totalLeads = 0;

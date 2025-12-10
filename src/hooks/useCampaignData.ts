@@ -9,8 +9,12 @@ interface CampaignDataStore {
   negativeLeads: Lead[];
   pendingLeads: Lead[];
   isLoading: boolean;
+  selectedUserIds: string[];
+  isAdmin: boolean;
   
-  loadFromDatabase: () => Promise<void>;
+  loadFromDatabase: (userIds?: string[]) => Promise<void>;
+  setSelectedUserIds: (userIds: string[]) => void;
+  checkAdminStatus: () => Promise<boolean>;
   setCampaignMetrics: (metrics: CampaignMetrics[]) => Promise<void>;
   setPositiveLeads: (leads: Lead[]) => Promise<void>;
   setNegativeLeads: (leads: Lead[]) => Promise<void>;
@@ -30,32 +34,106 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
   negativeLeads: [],
   pendingLeads: [],
   isLoading: false,
+  selectedUserIds: [],
+  isAdmin: false,
+
+  checkAdminStatus: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      const isAdmin = !!roleData;
+      set({ isAdmin, selectedUserIds: isAdmin ? [] : [user.id] });
+      return isAdmin;
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      return false;
+    }
+  },
+
+  setSelectedUserIds: (userIds: string[]) => {
+    set({ selectedUserIds: userIds });
+  },
   
-  loadFromDatabase: async () => {
+  loadFromDatabase: async (userIds?: string[]) => {
     set({ isLoading: true });
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Use provided userIds, or selectedUserIds from state, or current user
+      const targetUserIds = userIds || get().selectedUserIds;
+      const effectiveUserIds = targetUserIds.length > 0 ? targetUserIds : [user.id];
+
       // Load campaign metrics
-      const { data: metricsData, error: metricsError } = await supabase
+      let metricsQuery = supabase
         .from('campaign_metrics')
         .select('*');
       
+      if (effectiveUserIds.length === 1) {
+        metricsQuery = metricsQuery.eq('user_id', effectiveUserIds[0]);
+      } else {
+        metricsQuery = metricsQuery.in('user_id', effectiveUserIds);
+      }
+      
+      const { data: metricsData, error: metricsError } = await metricsQuery;
       if (metricsError) throw metricsError;
+
+      // Load daily metrics from daily_metrics table
+      const metricIds = metricsData?.map(m => m.id) || [];
+      let dailyMetricsMap: Record<string, Record<string, number>> = {};
+
+      if (metricIds.length > 0) {
+        const { data: dailyData, error: dailyError } = await supabase
+          .from('daily_metrics')
+          .select('*')
+          .in('campaign_metric_id', metricIds);
+
+        if (!dailyError && dailyData) {
+          // Group daily metrics by campaign_metric_id
+          dailyData.forEach((dm: any) => {
+            if (!dailyMetricsMap[dm.campaign_metric_id]) {
+              dailyMetricsMap[dm.campaign_metric_id] = {};
+            }
+            dailyMetricsMap[dm.campaign_metric_id][dm.date] = Number(dm.value);
+          });
+        }
+      }
       
       // Load leads
-      const { data: leadsData, error: leadsError } = await supabase
+      let leadsQuery = supabase
         .from('leads')
         .select('*');
       
+      if (effectiveUserIds.length === 1) {
+        leadsQuery = leadsQuery.eq('user_id', effectiveUserIds[0]);
+      } else {
+        leadsQuery = leadsQuery.in('user_id', effectiveUserIds);
+      }
+      
+      const { data: leadsData, error: leadsError } = await leadsQuery;
       if (leadsError) throw leadsError;
       
       // Transform database data to app format
-      const metrics: CampaignMetrics[] = metricsData?.map(m => ({
-        campaignName: m.campaign_name,
-        eventType: m.event_type,
-        profileName: m.profile_name,
-        totalCount: m.total_count,
-        dailyData: m.daily_data as Record<string, number>
-      })) || [];
+      const metrics: CampaignMetrics[] = metricsData?.map(m => {
+        // Use daily_metrics table data if available, fallback to daily_data column
+        const dailyData = dailyMetricsMap[m.id] || (m.daily_data as Record<string, number>) || {};
+        
+        return {
+          campaignName: m.campaign_name,
+          eventType: m.event_type,
+          profileName: m.profile_name,
+          totalCount: m.total_count,
+          dailyData
+        };
+      }) || [];
       
       const leads: Lead[] = leadsData?.map(l => ({
         id: l.id,
