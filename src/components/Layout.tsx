@@ -7,6 +7,8 @@ import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
 import { useProfileFilter } from '@/contexts/ProfileFilterContext';
+import { AdminUserSelector } from './AdminUserSelector';
+import { useAdminUser } from '@/contexts/AdminUserContext';
 
 interface LayoutProps {
   children: ReactNode;
@@ -15,6 +17,7 @@ interface LayoutProps {
 export const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const { selectedProfile, setSelectedProfile, availableProfiles } = useProfileFilter();
+  const { isAdmin, selectedUserIds, setSelectedUserIds } = useAdminUser();
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -84,6 +87,16 @@ export const Layout = ({ children }: LayoutProps) => {
           </div>
         </div>
       </header>
+
+      {/* Admin User Selector */}
+      {isAdmin && (
+        <div className="container mx-auto px-4 py-4 border-b border-border bg-card/50">
+          <AdminUserSelector 
+            selectedUserIds={selectedUserIds} 
+            onSelectionChange={setSelectedUserIds} 
+          />
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="border-b border-border bg-card/50">

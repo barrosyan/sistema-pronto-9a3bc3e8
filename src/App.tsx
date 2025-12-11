@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProfileFilterProvider } from "./contexts/ProfileFilterContext";
+import { AdminUserProvider } from "./contexts/AdminUserContext";
 import Leads from "./pages/Leads";
 import Merge from "./pages/Merge";
 import ContentGeneration from "./pages/ContentGeneration";
@@ -25,19 +26,21 @@ function App() {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <ProfileFilterProvider>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={<ProtectedRoute><Layout><Leads /></Layout></ProtectedRoute>} />
-              <Route path="/campaigns" element={<ProtectedRoute><Layout><Campaigns /></Layout></ProtectedRoute>} />
-              <Route path="/events" element={<ProtectedRoute><Layout><EventsManagement /></Layout></ProtectedRoute>} />
-              <Route path="/merge" element={<ProtectedRoute><Layout><Merge /></Layout></ProtectedRoute>} />
-              <Route path="/content-generation" element={<ProtectedRoute><Layout><ContentGeneration /></Layout></ProtectedRoute>} />
-              <Route path="/profile" element={<ProtectedRoute><Layout><Profile /></Layout></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute><Layout><UserSettings /></Layout></ProtectedRoute>} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </ProfileFilterProvider>
+          <AdminUserProvider>
+            <ProfileFilterProvider>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/" element={<ProtectedRoute><Layout><Leads /></Layout></ProtectedRoute>} />
+                <Route path="/campaigns" element={<ProtectedRoute><Layout><Campaigns /></Layout></ProtectedRoute>} />
+                <Route path="/events" element={<ProtectedRoute><Layout><EventsManagement /></Layout></ProtectedRoute>} />
+                <Route path="/merge" element={<ProtectedRoute><Layout><Merge /></Layout></ProtectedRoute>} />
+                <Route path="/content-generation" element={<ProtectedRoute><Layout><ContentGeneration /></Layout></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><Layout><Profile /></Layout></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><Layout><UserSettings /></Layout></ProtectedRoute>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </ProfileFilterProvider>
+          </AdminUserProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

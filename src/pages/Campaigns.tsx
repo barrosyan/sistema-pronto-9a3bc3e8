@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { useProfileFilter } from '@/contexts/ProfileFilterContext';
+import { useAdminUser } from '@/contexts/AdminUserContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,6 +23,7 @@ import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { supabase } from '@/integrations/supabase/client';
 import { ExportOptions } from '@/components/ExportOptions';
+import { CampaignPivotTable } from '@/components/CampaignPivotTable';
 
 interface DailyData {
   date: string;
@@ -56,6 +58,7 @@ interface WeeklyData {
 export default function Campaigns() {
   const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
   const { selectedProfile } = useProfileFilter();
+  const { selectedUserIds } = useAdminUser();
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [granularity, setGranularity] = useState<'daily' | 'weekly'>('weekly');
   const [currentPage, setCurrentPage] = useState(1);
@@ -71,9 +74,9 @@ export default function Campaigns() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   useEffect(() => {
-    loadFromDatabase();
+    loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
     loadCampaignDetails();
-  }, [loadFromDatabase]);
+  }, [loadFromDatabase, selectedUserIds]);
 
   const loadCampaignDetails = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -540,6 +543,71 @@ export default function Campaigns() {
         });
     }
   };
+
+  // Prepare data for CampaignPivotTable
+  const getCampaignPivotTableData = () => {
+    return allCampaigns.map(campaignName => {
+      const campaignData = campaignMetrics.filter(m => m.campaignName === campaignName);
+      const campaignLeads = getAllLeads().filter(l => l.campaign === campaignName);
+      const positiveLeads = campaignLeads.filter(l => l.status === 'positive');
+
+      let convites = 0, conexoes = 0, mensagens = 0, visitas = 0, likes = 0, comentarios = 0;
+      let followUps1 = 0, followUps2 = 0, followUps3 = 0;
+      let allDates: string[] = [];
+
+      campaignData.forEach(metric => {
+        Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
+          if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            allDates.push(date);
+          }
+          
+          if (['Connection Requests Sent', 'Convites Enviados'].includes(metric.eventType)) {
+            convites += value;
+          } else if (['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made'].includes(metric.eventType)) {
+            conexoes += value;
+          } else if (['Profile Visits', 'Visitas a Perfil'].includes(metric.eventType)) {
+            visitas += value;
+          } else if (['Post Likes', 'Curtidas'].includes(metric.eventType)) {
+            likes += value;
+          } else if (['Comments Done', 'Comentários'].includes(metric.eventType)) {
+            comentarios += value;
+          } else if (metric.eventType === 'Follow-Ups 1') {
+            followUps1 += value;
+          } else if (metric.eventType === 'Follow-Ups 2') {
+            followUps2 += value;
+          } else if (metric.eventType === 'Follow-Ups 3') {
+            followUps3 += value;
+          }
+        });
+      });
+
+      mensagens = followUps1 + followUps2 + followUps3;
+      const sortedDates = [...new Set(allDates)].sort();
+      const activeDays = sortedDates.length;
+
+      return {
+        campaignName,
+        startDate: sortedDates[0] || null,
+        endDate: sortedDates[sortedDates.length - 1] || null,
+        activeDays,
+        convitesEnviados: convites,
+        conexoesRealizadas: conexoes,
+        taxaAceite: convites > 0 ? ((conexoes / convites) * 100).toFixed(1) : '0.0',
+        mensagensEnviadas: mensagens,
+        visitas,
+        likes,
+        comentarios,
+        totalAtividades: convites + conexoes + mensagens + visitas + likes + comentarios,
+        respostasPositivas: positiveLeads.length,
+        leadsProcessados: campaignLeads.length,
+        reunioes: positiveLeads.filter(l => l.meetingDate).length,
+        propostas: positiveLeads.filter(l => l.proposalDate).length,
+        vendas: positiveLeads.filter(l => l.saleDate).length,
+      };
+    });
+  };
+
+  const campaignPivotTableData = getCampaignPivotTableData();
   
   // Determine which data to show based on calendar view
   const pivotData = calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly'
@@ -616,6 +684,9 @@ export default function Campaigns() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Campaign Pivot Table - All campaigns comparison */}
+      <CampaignPivotTable campaigns={campaignPivotTableData} />
 
       {/* Campaign Details */}
       {selectedCampaigns.length > 0 && (

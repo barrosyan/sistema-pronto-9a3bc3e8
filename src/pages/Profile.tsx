@@ -3,25 +3,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { useProfileFilter } from '@/contexts/ProfileFilterContext';
+import { useAdminUser } from '@/contexts/AdminUserContext';
 import { Separator } from '@/components/ui/separator';
 import { ExportOptions } from '@/components/ExportOptions';
 import { ProfileComparison } from '@/components/ProfileComparison';
 import { WeeklyProfileView } from '@/components/WeeklyProfileView';
 import { WeeklyComparisonTable } from '@/components/WeeklyComparisonTable';
+import { CampaignPivotTable } from '@/components/CampaignPivotTable';
+import { WeeklyPivotTable } from '@/components/WeeklyPivotTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarDays } from 'lucide-react';
 
 export default function Profile() {
   const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
   const { selectedProfile, availableProfiles } = useProfileFilter();
+  const { selectedUserIds } = useAdminUser();
   const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
 
   useEffect(() => {
-    loadFromDatabase();
-  }, [loadFromDatabase]);
+    loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
+  }, [loadFromDatabase, selectedUserIds]);
 
   // Extract unique campaigns from database - filter by selected profile
   const uniqueCampaigns = Array.from(
@@ -237,6 +241,167 @@ export default function Profile() {
 
   const campaignsSideBySide = getCampaignsSideBySide();
 
+  // Prepare data for CampaignPivotTable
+  const getCampaignPivotData = () => {
+    return uniqueCampaigns.map(campaignName => {
+      const campaignMetricsData = campaignMetrics.filter(m => 
+        m.campaignName === campaignName && 
+        (!selectedProfile || m.profileName === selectedProfile)
+      );
+      
+      const campaignLeads = allLeads.filter(l => l.campaign === campaignName);
+      const positiveLeads = campaignLeads.filter(l => l.status === 'positive');
+
+      let convites = 0, conexoes = 0, mensagens = 0, visitas = 0, likes = 0, comentarios = 0;
+      let followUps1 = 0, followUps2 = 0, followUps3 = 0;
+      let allDates: string[] = [];
+
+      campaignMetricsData.forEach(metric => {
+        Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
+          if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            allDates.push(date);
+          }
+          
+          if (['Connection Requests Sent', 'Convites Enviados'].includes(metric.eventType)) {
+            convites += value;
+          } else if (['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made'].includes(metric.eventType)) {
+            conexoes += value;
+          } else if (['Profile Visits', 'Visitas a Perfil'].includes(metric.eventType)) {
+            visitas += value;
+          } else if (['Post Likes', 'Curtidas'].includes(metric.eventType)) {
+            likes += value;
+          } else if (['Comments Done', 'Comentários'].includes(metric.eventType)) {
+            comentarios += value;
+          } else if (metric.eventType === 'Follow-Ups 1') {
+            followUps1 += value;
+          } else if (metric.eventType === 'Follow-Ups 2') {
+            followUps2 += value;
+          } else if (metric.eventType === 'Follow-Ups 3') {
+            followUps3 += value;
+          }
+        });
+      });
+
+      mensagens = followUps1 + followUps2 + followUps3;
+      const sortedDates = [...new Set(allDates)].sort();
+      const activeDays = sortedDates.length;
+
+      return {
+        campaignName,
+        startDate: sortedDates[0] || null,
+        endDate: sortedDates[sortedDates.length - 1] || null,
+        activeDays,
+        convitesEnviados: convites,
+        conexoesRealizadas: conexoes,
+        taxaAceite: convites > 0 ? ((conexoes / convites) * 100).toFixed(1) : '0.0',
+        mensagensEnviadas: mensagens,
+        visitas,
+        likes,
+        comentarios,
+        totalAtividades: convites + conexoes + mensagens + visitas + likes + comentarios,
+        respostasPositivas: positiveLeads.length,
+        leadsProcessados: campaignLeads.length,
+        reunioes: positiveLeads.filter(l => l.meetingDate).length,
+        propostas: positiveLeads.filter(l => l.proposalDate).length,
+        vendas: positiveLeads.filter(l => l.saleDate).length,
+      };
+    });
+  };
+
+  // Prepare data for WeeklyPivotTable
+  const getWeeklyPivotData = () => {
+    const weeklyMap = new Map<string, any>();
+
+    filteredMetrics.forEach(metric => {
+      Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
+        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+        
+        const dateObj = parseISO(date);
+        const weekStart = startOfWeek(dateObj, { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(dateObj, { weekStartsOn: 1 });
+        const weekKey = format(weekStart, 'yyyy-MM-dd');
+
+        if (!weeklyMap.has(weekKey)) {
+          weeklyMap.set(weekKey, {
+            weekNumber: 0,
+            startDate: format(weekStart, 'yyyy-MM-dd'),
+            endDate: format(weekEnd, 'yyyy-MM-dd'),
+            activeCampaigns: new Set<string>(),
+            activeDays: new Set<string>(),
+            convitesEnviados: 0,
+            conexoesRealizadas: 0,
+            mensagensEnviadas: 0,
+            visitas: 0,
+            likes: 0,
+            comentarios: 0,
+            followUps1: 0,
+            followUps2: 0,
+            followUps3: 0,
+            respostasPositivas: 0,
+            leadsProcessados: 0,
+            reunioes: 0,
+            propostas: 0,
+            vendas: 0,
+          });
+        }
+
+        const weekData = weeklyMap.get(weekKey);
+        weekData.activeCampaigns.add(metric.campaignName);
+        weekData.activeDays.add(date);
+
+        if (['Connection Requests Sent', 'Convites Enviados'].includes(metric.eventType)) {
+          weekData.convitesEnviados += value;
+        } else if (['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made'].includes(metric.eventType)) {
+          weekData.conexoesRealizadas += value;
+        } else if (['Profile Visits', 'Visitas a Perfil'].includes(metric.eventType)) {
+          weekData.visitas += value;
+        } else if (['Post Likes', 'Curtidas'].includes(metric.eventType)) {
+          weekData.likes += value;
+        } else if (['Comments Done', 'Comentários'].includes(metric.eventType)) {
+          weekData.comentarios += value;
+        } else if (metric.eventType === 'Follow-Ups 1') {
+          weekData.followUps1 += value;
+        } else if (metric.eventType === 'Follow-Ups 2') {
+          weekData.followUps2 += value;
+        } else if (metric.eventType === 'Follow-Ups 3') {
+          weekData.followUps3 += value;
+        }
+      });
+    });
+
+    // Convert map to array and assign week numbers
+    const sortedWeeks = Array.from(weeklyMap.values())
+      .sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+    return sortedWeeks.map((week, index) => ({
+      weekNumber: index + 1,
+      startDate: week.startDate,
+      endDate: week.endDate,
+      activeCampaigns: Array.from(week.activeCampaigns) as string[],
+      activeDays: week.activeDays.size,
+      convitesEnviados: week.convitesEnviados,
+      conexoesRealizadas: week.conexoesRealizadas,
+      taxaAceite: week.convitesEnviados > 0 
+        ? ((week.conexoesRealizadas / week.convitesEnviados) * 100).toFixed(1)
+        : '0.0',
+      mensagensEnviadas: week.followUps1 + week.followUps2 + week.followUps3,
+      visitas: week.visitas,
+      likes: week.likes,
+      comentarios: week.comentarios,
+      totalAtividades: week.convitesEnviados + week.conexoesRealizadas + 
+        (week.followUps1 + week.followUps2 + week.followUps3) + 
+        week.visitas + week.likes + week.comentarios,
+      respostasPositivas: 0, // Would need leads filtering by date
+      leadsProcessados: 0,
+      reunioes: 0,
+      propostas: 0,
+      vendas: 0,
+    }));
+  };
+
+  const campaignPivotData = getCampaignPivotData();
+  const weeklyPivotData = getWeeklyPivotData();
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -312,13 +477,23 @@ export default function Profile() {
         </Card>
       )}
 
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs defaultValue="pivot-campaign" className="w-full">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="pivot-campaign">Pivot Campanhas</TabsTrigger>
+          <TabsTrigger value="pivot-weekly">Pivot Semanal</TabsTrigger>
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="sidebyside">Lado a Lado</TabsTrigger>
-          <TabsTrigger value="comparison">Comparação de Perfis</TabsTrigger>
-          <TabsTrigger value="weekly">Agrupamento Semanal</TabsTrigger>
+          <TabsTrigger value="comparison">Comparação</TabsTrigger>
+          <TabsTrigger value="weekly">Semanal</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="pivot-campaign" className="space-y-6">
+          <CampaignPivotTable campaigns={campaignPivotData} />
+        </TabsContent>
+
+        <TabsContent value="pivot-weekly" className="space-y-6">
+          <WeeklyPivotTable weeks={weeklyPivotData} />
+        </TabsContent>
 
         <TabsContent value="overview" className="space-y-6">
           {/* Campanhas Ativas */}
