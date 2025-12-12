@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Upload, Search, Filter, Users, Edit, Plus, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import {
   Table,
@@ -45,6 +47,28 @@ const Leads = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
+  const [showCampaignFilter, setShowCampaignFilter] = useState(false);
+
+  // Get unique campaign names from leads
+  const availableCampaigns = Array.from(new Set(allLeads.map(lead => lead.campaign).filter(Boolean)));
+
+  const handleCampaignToggle = (campaign: string, checked: boolean) => {
+    if (checked) {
+      setSelectedCampaigns([...selectedCampaigns, campaign]);
+    } else {
+      setSelectedCampaigns(selectedCampaigns.filter(c => c !== campaign));
+    }
+    setCurrentPage(1);
+  };
+
+  const selectAllCampaigns = () => {
+    setSelectedCampaigns(availableCampaigns);
+  };
+
+  const clearCampaignSelection = () => {
+    setSelectedCampaigns([]);
+  };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -135,11 +159,15 @@ const Leads = () => {
   };
 
   const filteredLeads = allLeads
-    .filter(lead => 
-      lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.campaign.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    .filter(lead => {
+      const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        lead.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        lead.campaign.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesCampaign = selectedCampaigns.length === 0 || selectedCampaigns.includes(lead.campaign);
+      
+      return matchesSearch && matchesCampaign;
+    })
     .sort((a, b) => {
       let aValue = a[sortField] || '';
       let bValue = b[sortField] || '';
@@ -262,11 +290,68 @@ const Leads = () => {
                 className="pl-10"
               />
             </div>
-            <Button variant="outline">
+            <Button 
+              variant={showCampaignFilter ? "default" : "outline"}
+              onClick={() => setShowCampaignFilter(!showCampaignFilter)}
+            >
               <Filter className="mr-2 h-4 w-4" />
-              Filtros
+              Filtrar Campanhas
+              {selectedCampaigns.length > 0 && (
+                <Badge variant="secondary" className="ml-2">{selectedCampaigns.length}</Badge>
+              )}
             </Button>
           </div>
+
+          {/* Campaign Filter with Checkboxes */}
+          {showCampaignFilter && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">Filtrar por Campanha</CardTitle>
+                    <CardDescription>Selecione as campanhas que deseja visualizar</CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={selectAllCampaigns}>
+                      Selecionar Todas
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={clearCampaignSelection}>
+                      Limpar
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {availableCampaigns.map((campaign, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`flex items-center space-x-2 p-2 rounded-md border transition-colors ${
+                        selectedCampaigns.includes(campaign) ? 'border-primary/50 bg-primary/5' : 'border-border'
+                      }`}
+                    >
+                      <Checkbox
+                        id={`campaign-filter-${idx}`}
+                        checked={selectedCampaigns.includes(campaign)}
+                        onCheckedChange={(checked) => handleCampaignToggle(campaign, checked as boolean)}
+                      />
+                      <Label
+                        htmlFor={`campaign-filter-${idx}`}
+                        className="text-sm cursor-pointer flex-1 truncate"
+                      >
+                        {campaign}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                {availableCampaigns.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Nenhuma campanha encontrada
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

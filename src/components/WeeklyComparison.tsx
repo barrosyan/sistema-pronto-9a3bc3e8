@@ -276,52 +276,79 @@ export const WeeklyComparison = ({ weeklyData, availableCampaigns }: WeeklyCompa
             </Card>
           )}
 
-          {/* Comparação Semanal Lado a Lado */}
+          {/* Comparação Semanal - Semanas como Colunas */}
           <Card>
             <CardHeader>
               <CardTitle>Desempenho Semanal por Campanha</CardTitle>
-              <CardDescription>Métricas principais de cada semana por campanha</CardDescription>
+              <CardDescription>Semanas como colunas, métricas por campanha nas linhas</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {dataPerCampaign.map((data, campaignIdx) => (
-                  <div key={campaignIdx} className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold text-lg">{data.campaign}</h4>
-                      <Badge variant="secondary">{data.weeks.length} semanas</Badge>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left p-2">Período</th>
-                            <th className="text-center p-2">Convites</th>
-                            <th className="text-center p-2">Conexões</th>
-                            <th className="text-center p-2">Mensagens</th>
-                            <th className="text-center p-2">Respostas</th>
-                            <th className="text-center p-2">Taxa Aceite</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.weeks.map((week, weekIdx) => (
-                            <tr key={weekIdx} className="border-b hover:bg-muted/30">
-                              <td className="p-2 font-medium text-xs">
-                                {week.semana || `Semana ${weekIdx + 1}`}
-                                <br />
-                                <span className="text-muted-foreground">{week.inicioDoPeriodo} - {week.fimDoPeriodo}</span>
-                              </td>
-                              <td className="text-center p-2">{week.convitesEnviados}</td>
-                              <td className="text-center p-2">{week.conexoesRealizadas}</td>
-                              <td className="text-center p-2">{week.mensagensEnviadas}</td>
-                              <td className="text-center p-2 font-semibold text-primary">{week.respostasPositivas}</td>
-                              <td className="text-center p-2">{week.taxaDeAceiteDeConexao}%</td>
+                {dataPerCampaign.map((data, campaignIdx) => {
+                  const metrics = [
+                    { key: 'convitesEnviados', label: 'Convites Enviados' },
+                    { key: 'conexoesRealizadas', label: 'Conexões Realizadas' },
+                    { key: 'mensagensEnviadas', label: 'Mensagens Enviadas' },
+                    { key: 'respostasPositivas', label: 'Respostas Positivas' },
+                    { key: 'reunioes', label: 'Reuniões' },
+                    { key: 'taxaDeAceiteDeConexao', label: 'Taxa de Aceite (%)' },
+                  ];
+
+                  return (
+                    <div key={campaignIdx} className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold text-lg">{data.campaign}</h4>
+                        <Badge variant="secondary">{data.weeks.length} semanas</Badge>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left p-2 sticky left-0 bg-background min-w-[150px]">Métrica</th>
+                              {data.weeks.map((week, weekIdx) => (
+                                <th key={weekIdx} className="text-center p-2 min-w-[100px]">
+                                  <div className="font-medium">{week.semana || `Semana ${weekIdx + 1}`}</div>
+                                  <div className="text-xs text-muted-foreground font-normal">
+                                    {week.inicioDoPeriodo}
+                                  </div>
+                                </th>
+                              ))}
+                              <th className="text-center p-2 min-w-[80px] font-bold bg-muted/30">Total</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {metrics.map((metric, metricIdx) => {
+                              const values = data.weeks.map(w => (w as any)[metric.key] || 0);
+                              const total = metric.key === 'taxaDeAceiteDeConexao'
+                                ? values.length > 0 
+                                  ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1)
+                                  : '0.0'
+                                : values.reduce((a, b) => a + b, 0);
+                              
+                              return (
+                                <tr key={metricIdx} className="border-b hover:bg-muted/30">
+                                  <td className="p-2 font-medium sticky left-0 bg-background">
+                                    {metric.label}
+                                  </td>
+                                  {data.weeks.map((week, weekIdx) => (
+                                    <td key={weekIdx} className="text-center p-2">
+                                      {metric.key === 'taxaDeAceiteDeConexao' 
+                                        ? `${(week as any)[metric.key]}%` 
+                                        : (week as any)[metric.key]}
+                                    </td>
+                                  ))}
+                                  <td className="text-center p-2 font-bold bg-muted/30">
+                                    {metric.key === 'taxaDeAceiteDeConexao' ? `${total}%` : total}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
