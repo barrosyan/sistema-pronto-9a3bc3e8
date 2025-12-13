@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, Trash2, Download, FileSpreadsheet, FileText, Play } from 'lucide-react';
+import { Upload, Trash2, Download, FileText, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { useCampaignData } from '@/hooks/useCampaignData';
 import { DeleteDataSection } from '@/components/DeleteDataSection';
 import { ProfileCrud } from '@/components/ProfileCrud';
 import { PMConfiguration } from '@/components/PMConfiguration';
+import { CsvFormatPreview } from '@/components/CsvFormatPreview';
 
 type FileUpload = {
   id: string;
@@ -89,15 +90,10 @@ export default function UserSettings() {
       }
 
       for (const file of Array.from(selectedFiles)) {
-        const validTypes = [
-          'text/csv',
-          'application/vnd.ms-excel',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'application/vnd.oasis.opendocument.spreadsheet'
-        ];
+        const validTypes = ['text/csv'];
         
-        if (!validTypes.includes(file.type) && !file.name.match(/\.(csv|xlsx|xls|ods)$/i)) {
-          toast.error(`Arquivo ${file.name} não é um CSV ou Excel válido`);
+        if (!validTypes.includes(file.type) && !file.name.match(/\.csv$/i)) {
+          toast.error(`Arquivo ${file.name} não é um CSV válido`);
           continue;
         }
 
@@ -640,11 +636,8 @@ export default function UserSettings() {
     }
   };
 
-  const getFileIcon = (fileName: string) => {
-    if (fileName.match(/\.csv$/i)) {
-      return <FileText className="h-5 w-5 text-primary" />;
-    }
-    return <FileSpreadsheet className="h-5 w-5 text-primary" />;
+  const getFileIcon = () => {
+    return <FileText className="h-5 w-5 text-primary" />;
   };
 
   return (
@@ -656,11 +649,13 @@ export default function UserSettings() {
         </div>
       </div>
 
+      <CsvFormatPreview />
+
       <Card>
         <CardHeader>
           <CardTitle>Meus Arquivos</CardTitle>
           <CardDescription>
-            Faça upload de arquivos CSV e Excel e processe-os para popular o banco de dados
+            Faça upload de arquivos CSV e processe-os para popular o banco de dados
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -669,7 +664,7 @@ export default function UserSettings() {
               <Input
                 id="file-upload"
                 type="file"
-                accept=".csv,.xlsx,.xls,.ods"
+                accept=".csv"
                 multiple
                 onChange={handleFileUpload}
                 disabled={uploading || processing}
@@ -702,9 +697,9 @@ export default function UserSettings() {
               </div>
             ) : files.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <FileSpreadsheet className="mx-auto h-12 w-12 mb-3 opacity-50" />
+                <FileText className="mx-auto h-12 w-12 mb-3 opacity-50" />
                 <p>Nenhum arquivo enviado ainda</p>
-                <p className="text-sm mt-1">Faça upload de seus arquivos CSV ou Excel</p>
+                <p className="text-sm mt-1">Faça upload de seus arquivos CSV</p>
               </div>
             ) : (
               <div className="border rounded-lg">
@@ -721,7 +716,7 @@ export default function UserSettings() {
                   <TableBody>
                     {files.map((file) => (
                       <TableRow key={file.id}>
-                        <TableCell>{getFileIcon(file.file_name)}</TableCell>
+                        <TableCell>{getFileIcon()}</TableCell>
                         <TableCell className="font-medium">{file.file_name}</TableCell>
                         <TableCell>{formatFileSize(file.file_size)}</TableCell>
                         <TableCell>
