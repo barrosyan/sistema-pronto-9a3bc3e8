@@ -553,41 +553,55 @@ export default function Campaigns() {
 
       let convites = 0, conexoes = 0, mensagens = 0, visitas = 0, likes = 0, comentarios = 0;
       let followUps1 = 0, followUps2 = 0, followUps3 = 0;
-      const datesWithActivity: string[] = [];
+      
+      // Use Set to track unique dates with activity (any metric > 0)
+      const datesWithActivity = new Set<string>();
+      // Track all dates to calculate period range properly
+      const allDatesMap = new Map<string, number>(); // date -> total activity
 
       campaignData.forEach(metric => {
         Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
-          // Track dates with activity (value > 0)
-          if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && value > 0) {
-            datesWithActivity.push(date);
+          // Validate date format
+          if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+          
+          const numValue = Number(value) || 0;
+          
+          // Track total activity per date
+          allDatesMap.set(date, (allDatesMap.get(date) || 0) + numValue);
+          
+          // Track dates with activity (value > 0) for active days count
+          if (numValue > 0) {
+            datesWithActivity.add(date);
           }
           
           if (['Connection Requests Sent', 'Convites Enviados'].includes(metric.eventType)) {
-            convites += value;
+            convites += numValue;
           } else if (['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made'].includes(metric.eventType)) {
-            conexoes += value;
+            conexoes += numValue;
           } else if (['Profile Visits', 'Visitas a Perfil'].includes(metric.eventType)) {
-            visitas += value;
+            visitas += numValue;
           } else if (['Post Likes', 'Curtidas'].includes(metric.eventType)) {
-            likes += value;
+            likes += numValue;
           } else if (['Comments Done', 'Comentários'].includes(metric.eventType)) {
-            comentarios += value;
+            comentarios += numValue;
           } else if (metric.eventType === 'Follow-Ups 1') {
-            followUps1 += value;
+            followUps1 += numValue;
           } else if (metric.eventType === 'Follow-Ups 2') {
-            followUps2 += value;
+            followUps2 += numValue;
           } else if (metric.eventType === 'Follow-Ups 3') {
-            followUps3 += value;
+            followUps3 += numValue;
           }
         });
       });
 
       mensagens = followUps1 + followUps2 + followUps3;
       
-      // Start/End = first/last date with any activity > 0
-      const sortedActiveDates = [...new Set(datesWithActivity)].sort();
+      // Start/End = first/last date where ANY metric value > 0
+      const sortedActiveDates = Array.from(datesWithActivity).sort();
       const startDate = sortedActiveDates.length > 0 ? sortedActiveDates[0] : null;
       const endDate = sortedActiveDates.length > 0 ? sortedActiveDates[sortedActiveDates.length - 1] : null;
+      
+      // Active days = count of unique dates where any metric > 0
       const activeDays = sortedActiveDates.length;
 
       return {
