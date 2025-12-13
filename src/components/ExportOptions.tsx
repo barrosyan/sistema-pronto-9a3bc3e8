@@ -1,4 +1,3 @@
-import PptxGenJS from 'pptxgenjs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Presentation } from 'lucide-react';
@@ -28,381 +27,328 @@ interface CampaignSummary {
 }
 
 export function ExportOptions({ data, filename = 'campanhas', campaignSummaries = [] }: ExportOptionsProps) {
+  
+  const generatePowerPointHTML = () => {
+    const primaryColor = '#3B82F6';
+    const successColor = '#22C55E';
+    const mutedColor = '#6B7280';
+
+    // Calculate totals
+    const totals = campaignSummaries.reduce(
+      (acc, c) => ({
+        invitations: acc.invitations + c.invitations,
+        connections: acc.connections + c.connections,
+        messages: acc.messages + c.messages,
+        positiveResponses: acc.positiveResponses + c.positiveResponses,
+        meetings: acc.meetings + c.meetings,
+        proposals: acc.proposals + (c.proposals || 0),
+        sales: acc.sales + (c.sales || 0),
+      }),
+      { invitations: 0, connections: 0, messages: 0, positiveResponses: 0, meetings: 0, proposals: 0, sales: 0 }
+    );
+
+    const avgAcceptanceRate = totals.invitations > 0 
+      ? ((totals.connections / totals.invitations) * 100).toFixed(1) 
+      : '0';
+
+    let html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @page { size: landscape; margin: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
+    .slide { 
+      width: 100%; 
+      min-height: 100vh; 
+      padding: 40px 60px; 
+      box-sizing: border-box; 
+      page-break-after: always;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    }
+    .slide:last-child { page-break-after: avoid; }
+    .title-slide { 
+      display: flex; 
+      flex-direction: column; 
+      justify-content: center; 
+      align-items: center; 
+      text-align: center;
+    }
+    .title-slide h1 { 
+      font-size: 48px; 
+      color: ${primaryColor}; 
+      margin-bottom: 20px;
+      font-weight: 700;
+    }
+    .title-slide p { 
+      font-size: 20px; 
+      color: ${mutedColor}; 
+    }
+    h2 { 
+      font-size: 32px; 
+      color: ${primaryColor}; 
+      margin-bottom: 30px;
+      border-bottom: 3px solid ${primaryColor};
+      padding-bottom: 10px;
+    }
+    .kpi-grid { 
+      display: grid; 
+      grid-template-columns: repeat(3, 1fr); 
+      gap: 20px; 
+      margin-bottom: 30px;
+    }
+    .kpi-card { 
+      background: white; 
+      padding: 25px; 
+      border-radius: 12px; 
+      text-align: center;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .kpi-value { 
+      font-size: 36px; 
+      font-weight: bold; 
+      color: ${primaryColor}; 
+    }
+    .kpi-value.success { color: ${successColor}; }
+    .kpi-label { 
+      font-size: 14px; 
+      color: ${mutedColor}; 
+      margin-top: 8px;
+    }
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-top: 20px;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th { 
+      background: ${primaryColor}; 
+      color: white; 
+      padding: 12px 16px; 
+      text-align: left;
+      font-size: 14px;
+    }
+    td { 
+      padding: 12px 16px; 
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 14px;
+    }
+    tr:nth-child(even) { background: #f8fafc; }
+    .funnel-container { 
+      display: flex; 
+      gap: 30px; 
+      margin-top: 20px;
+    }
+    .funnel-left { flex: 1; }
+    .funnel-right { flex: 1; }
+    .funnel-bar { 
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+    }
+    .funnel-label { 
+      width: 120px; 
+      font-size: 13px;
+      color: ${mutedColor};
+    }
+    .funnel-bar-container { 
+      flex: 1; 
+      height: 28px; 
+      background: #e2e8f0; 
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .funnel-bar-fill { 
+      height: 100%; 
+      background: ${primaryColor};
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 8px;
+      color: white;
+      font-weight: bold;
+      font-size: 12px;
+    }
+    .rate-cards { 
+      display: flex; 
+      gap: 20px; 
+      margin-top: 30px;
+    }
+    .rate-card { 
+      background: white; 
+      padding: 20px; 
+      border-radius: 8px;
+      text-align: center;
+      flex: 1;
+    }
+    .rate-value { 
+      font-size: 28px; 
+      font-weight: bold; 
+      color: ${successColor};
+    }
+    .rate-label { 
+      font-size: 12px; 
+      color: ${mutedColor};
+      margin-top: 5px;
+    }
+    .period-info {
+      font-size: 14px;
+      color: ${mutedColor};
+      margin-bottom: 20px;
+    }
+    .thank-you { 
+      display: flex; 
+      flex-direction: column; 
+      justify-content: center; 
+      align-items: center; 
+      text-align: center;
+    }
+    .thank-you h1 { 
+      font-size: 52px; 
+      color: ${primaryColor}; 
+    }
+  </style>
+</head>
+<body>
+  <!-- Title Slide -->
+  <div class="slide title-slide">
+    <h1>Relatório de Campanhas</h1>
+    <p>Gerado em ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
+    <p style="margin-top: 10px;">Sistema Pronto - Análise de Performance</p>
+  </div>
+`;
+
+    // Overview slide
+    if (campaignSummaries.length > 0) {
+      html += `
+  <!-- Overview Slide -->
+  <div class="slide">
+    <h2>Visão Geral</h2>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-value">${totals.invitations.toLocaleString('pt-BR')}</div>
+        <div class="kpi-label">Total Convites</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value">${totals.connections.toLocaleString('pt-BR')}</div>
+        <div class="kpi-label">Total Conexões</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value success">${avgAcceptanceRate}%</div>
+        <div class="kpi-label">Taxa Aceite Média</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value success">${totals.positiveResponses.toLocaleString('pt-BR')}</div>
+        <div class="kpi-label">Respostas Positivas</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value">${totals.meetings.toLocaleString('pt-BR')}</div>
+        <div class="kpi-label">Reuniões</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" style="color: ${mutedColor}">${campaignSummaries.length}</div>
+        <div class="kpi-label">Campanhas Ativas</div>
+      </div>
+    </div>
+  </div>
+`;
+
+      // Individual campaign slides
+      campaignSummaries.forEach((campaign) => {
+        const funnelData = [
+          { label: 'Convites', value: campaign.invitations, max: campaign.invitations },
+          { label: 'Conexões', value: campaign.connections, max: campaign.invitations },
+          { label: 'Mensagens', value: campaign.messages, max: campaign.invitations },
+          { label: 'Resp. +', value: campaign.positiveResponses, max: campaign.invitations },
+          { label: 'Reuniões', value: campaign.meetings, max: campaign.invitations },
+        ];
+
+        const convRateConn = campaign.invitations > 0 ? ((campaign.connections / campaign.invitations) * 100).toFixed(1) : '0';
+        const convRateResp = campaign.connections > 0 ? ((campaign.positiveResponses / campaign.connections) * 100).toFixed(1) : '0';
+        const convRateMeet = campaign.positiveResponses > 0 ? ((campaign.meetings / campaign.positiveResponses) * 100).toFixed(1) : '0';
+
+        html += `
+  <!-- Campaign: ${campaign.name} -->
+  <div class="slide">
+    <h2>${campaign.name}</h2>
+    ${campaign.startDate || campaign.endDate ? `<p class="period-info">Período: ${campaign.startDate || 'N/A'} - ${campaign.endDate || 'N/A'} | ${campaign.activeDays || 0} dias ativos</p>` : ''}
+    <div class="funnel-container">
+      <div class="funnel-left">
+        <table>
+          <tr><th>Métrica</th><th>Valor</th></tr>
+          <tr><td>Convites Enviados</td><td><strong>${campaign.invitations.toLocaleString('pt-BR')}</strong></td></tr>
+          <tr><td>Conexões Realizadas</td><td><strong>${campaign.connections.toLocaleString('pt-BR')}</strong></td></tr>
+          <tr><td>Taxa de Aceite</td><td><strong>${campaign.acceptanceRate}%</strong></td></tr>
+          <tr><td>Mensagens Enviadas</td><td><strong>${campaign.messages.toLocaleString('pt-BR')}</strong></td></tr>
+          <tr><td>Respostas Positivas</td><td><strong style="color:${successColor}">${campaign.positiveResponses.toLocaleString('pt-BR')}</strong></td></tr>
+          <tr><td>Reuniões Marcadas</td><td><strong>${campaign.meetings.toLocaleString('pt-BR')}</strong></td></tr>
+          ${campaign.proposals !== undefined ? `<tr><td>Propostas</td><td><strong>${campaign.proposals.toLocaleString('pt-BR')}</strong></td></tr>` : ''}
+          ${campaign.sales !== undefined ? `<tr><td>Vendas</td><td><strong style="color:${successColor}">${campaign.sales.toLocaleString('pt-BR')}</strong></td></tr>` : ''}
+        </table>
+      </div>
+      <div class="funnel-right">
+        <h3 style="margin-bottom:15px;color:${primaryColor}">Funil de Conversão</h3>
+        ${funnelData.map(item => {
+          const pct = item.max > 0 ? Math.round((item.value / item.max) * 100) : 0;
+          return `
+        <div class="funnel-bar">
+          <span class="funnel-label">${item.label}</span>
+          <div class="funnel-bar-container">
+            <div class="funnel-bar-fill" style="width:${Math.max(pct, 5)}%;${pct < 50 ? `background:${successColor}` : ''}">${item.value.toLocaleString('pt-BR')}</div>
+          </div>
+        </div>`;
+        }).join('')}
+        <div class="rate-cards">
+          <div class="rate-card">
+            <div class="rate-value">${convRateConn}%</div>
+            <div class="rate-label">Conexão/Convite</div>
+          </div>
+          <div class="rate-card">
+            <div class="rate-value">${convRateResp}%</div>
+            <div class="rate-label">Resp+/Conexão</div>
+          </div>
+          <div class="rate-card">
+            <div class="rate-value">${convRateMeet}%</div>
+            <div class="rate-label">Reunião/Resp+</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+`;
+      });
+    }
+
+    // Thank you slide
+    html += `
+  <!-- Thank You Slide -->
+  <div class="slide thank-you">
+    <h1>Obrigado!</h1>
+    <p style="font-size:18px;color:${mutedColor}">Relatório gerado pelo Sistema Pronto</p>
+  </div>
+</body>
+</html>`;
+
+    return html;
+  };
+
   const exportToPowerPoint = async () => {
     try {
-      const pptx = new PptxGenJS();
-      pptx.layout = 'LAYOUT_16x9';
-      pptx.author = 'Sistema Pronto';
-      pptx.title = 'Relatório de Campanhas';
-      pptx.subject = 'Análise de Performance de Campanhas';
-
-      // Define colors
-      const primaryColor = '3B82F6';
-      const successColor = '22C55E';
-      const mutedColor = '6B7280';
-      const bgColor = 'F8FAFC';
-
-      // Title Slide
-      const titleSlide = pptx.addSlide();
-      titleSlide.addText('Relatório de Campanhas', {
-        x: 0.5,
-        y: 2,
-        w: '90%',
-        h: 1.5,
-        fontSize: 44,
-        bold: true,
-        color: primaryColor,
-        align: 'center',
-      });
-      titleSlide.addText(`Gerado em ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}`, {
-        x: 0.5,
-        y: 3.5,
-        w: '90%',
-        h: 0.5,
-        fontSize: 18,
-        color: mutedColor,
-        align: 'center',
-      });
-      titleSlide.addText('Sistema Pronto - Análise de Performance', {
-        x: 0.5,
-        y: 4.2,
-        w: '90%',
-        h: 0.5,
-        fontSize: 14,
-        color: mutedColor,
-        align: 'center',
-      });
-
-      // Summary Slide - Overview
-      if (campaignSummaries.length > 0) {
-        const overviewSlide = pptx.addSlide();
-        overviewSlide.addText('Visão Geral', {
-          x: 0.5,
-          y: 0.3,
-          w: '90%',
-          h: 0.8,
-          fontSize: 32,
-          bold: true,
-          color: primaryColor,
-        });
-
-        // Calculate totals
-        const totals = campaignSummaries.reduce(
-          (acc, c) => ({
-            invitations: acc.invitations + c.invitations,
-            connections: acc.connections + c.connections,
-            messages: acc.messages + c.messages,
-            positiveResponses: acc.positiveResponses + c.positiveResponses,
-            meetings: acc.meetings + c.meetings,
-            proposals: acc.proposals + (c.proposals || 0),
-            sales: acc.sales + (c.sales || 0),
-          }),
-          { invitations: 0, connections: 0, messages: 0, positiveResponses: 0, meetings: 0, proposals: 0, sales: 0 }
-        );
-
-        const avgAcceptanceRate = totals.invitations > 0 
-          ? ((totals.connections / totals.invitations) * 100).toFixed(1) 
-          : '0';
-
-        // KPI Cards
-        const kpis = [
-          { label: 'Total Convites', value: totals.invitations.toLocaleString('pt-BR'), color: primaryColor },
-          { label: 'Total Conexões', value: totals.connections.toLocaleString('pt-BR'), color: primaryColor },
-          { label: 'Taxa Aceite Média', value: `${avgAcceptanceRate}%`, color: successColor },
-          { label: 'Respostas Positivas', value: totals.positiveResponses.toLocaleString('pt-BR'), color: successColor },
-          { label: 'Reuniões', value: totals.meetings.toLocaleString('pt-BR'), color: primaryColor },
-          { label: 'Campanhas Ativas', value: campaignSummaries.length.toString(), color: mutedColor },
-        ];
-
-        kpis.forEach((kpi, idx) => {
-          const col = idx % 3;
-          const row = Math.floor(idx / 3);
-          const x = 0.5 + col * 3.2;
-          const y = 1.3 + row * 1.8;
-
-          overviewSlide.addShape('rect' as any, {
-            x,
-            y,
-            w: 3,
-            h: 1.5,
-            fill: { color: bgColor },
-            line: { color: 'E2E8F0', pt: 1 },
-          });
-          overviewSlide.addText(kpi.value, {
-            x,
-            y: y + 0.2,
-            w: 3,
-            h: 0.8,
-            fontSize: 28,
-            bold: true,
-            color: kpi.color,
-            align: 'center',
-          });
-          overviewSlide.addText(kpi.label, {
-            x,
-            y: y + 0.9,
-            w: 3,
-            h: 0.4,
-            fontSize: 12,
-            color: mutedColor,
-            align: 'center',
-          });
-        });
-
-        // Individual Campaign Slides
-        campaignSummaries.forEach((campaign) => {
-          const slide = pptx.addSlide();
-          
-          // Campaign Title
-          slide.addText(campaign.name, {
-            x: 0.5,
-            y: 0.3,
-            w: '90%',
-            h: 0.8,
-            fontSize: 28,
-            bold: true,
-            color: primaryColor,
-          });
-
-          // Period info
-          if (campaign.startDate || campaign.endDate) {
-            const periodText = `Período: ${campaign.startDate || 'N/A'} - ${campaign.endDate || 'N/A'}`;
-            slide.addText(periodText, {
-              x: 0.5,
-              y: 1,
-              w: '90%',
-              h: 0.4,
-              fontSize: 12,
-              color: mutedColor,
-            });
-          }
-
-          // Metrics Table
-          const tableData: any[][] = [
-            [
-              { text: 'Métrica', options: { bold: true, fill: { color: primaryColor }, color: 'FFFFFF' } },
-              { text: 'Valor', options: { bold: true, fill: { color: primaryColor }, color: 'FFFFFF' } },
-            ],
-            ['Convites Enviados', campaign.invitations.toLocaleString('pt-BR')],
-            ['Conexões Realizadas', campaign.connections.toLocaleString('pt-BR')],
-            ['Taxa de Aceite', `${campaign.acceptanceRate}%`],
-            ['Mensagens Enviadas', campaign.messages.toLocaleString('pt-BR')],
-            ['Respostas Positivas', campaign.positiveResponses.toLocaleString('pt-BR')],
-            ['Reuniões Marcadas', campaign.meetings.toLocaleString('pt-BR')],
-          ];
-
-          if (campaign.proposals !== undefined) {
-            tableData.push(['Propostas', campaign.proposals.toLocaleString('pt-BR')]);
-          }
-          if (campaign.sales !== undefined) {
-            tableData.push(['Vendas', campaign.sales.toLocaleString('pt-BR')]);
-          }
-          if (campaign.activeDays !== undefined) {
-            tableData.push(['Dias Ativos', campaign.activeDays.toString()]);
-          }
-
-          slide.addTable(tableData, {
-            x: 0.5,
-            y: 1.5,
-            w: 5,
-            colW: [3, 2],
-            fontSize: 12,
-            border: { pt: 0.5, color: 'E2E8F0' },
-            align: 'left',
-            valign: 'middle',
-          });
-
-          // Funnel visualization (simplified bar chart representation)
-          const funnelData = [
-            { label: 'Convites', value: campaign.invitations, max: campaign.invitations },
-            { label: 'Conexões', value: campaign.connections, max: campaign.invitations },
-            { label: 'Mensagens', value: campaign.messages, max: campaign.invitations },
-            { label: 'Resp. +', value: campaign.positiveResponses, max: campaign.invitations },
-            { label: 'Reuniões', value: campaign.meetings, max: campaign.invitations },
-          ];
-
-          slide.addText('Funil de Conversão', {
-            x: 6,
-            y: 1.5,
-            w: 3.5,
-            h: 0.5,
-            fontSize: 14,
-            bold: true,
-            color: primaryColor,
-          });
-
-          funnelData.forEach((item, idx) => {
-            const maxWidth = 3.2;
-            const barWidth = item.max > 0 ? (item.value / item.max) * maxWidth : 0;
-            const y = 2.1 + idx * 0.7;
-
-            slide.addText(item.label, {
-              x: 6,
-              y,
-              w: 1.2,
-              h: 0.5,
-              fontSize: 10,
-              color: mutedColor,
-              align: 'right',
-            });
-
-            if (barWidth > 0) {
-              slide.addShape('rect' as any, {
-                x: 7.3,
-                y: y + 0.1,
-                w: barWidth,
-                h: 0.35,
-                fill: { color: idx < 2 ? primaryColor : successColor },
-              });
-            }
-
-            slide.addText(item.value.toLocaleString('pt-BR'), {
-              x: 7.3 + barWidth + 0.1,
-              y,
-              w: 1,
-              h: 0.5,
-              fontSize: 10,
-              bold: true,
-              color: '1F2937',
-            });
-          });
-
-          // Conversion rates
-          const conversionRates = [
-            { 
-              label: 'Conexão/Convite', 
-              value: campaign.invitations > 0 
-                ? ((campaign.connections / campaign.invitations) * 100).toFixed(1) 
-                : '0' 
-            },
-            { 
-              label: 'Resp+/Conexão', 
-              value: campaign.connections > 0 
-                ? ((campaign.positiveResponses / campaign.connections) * 100).toFixed(1) 
-                : '0' 
-            },
-            { 
-              label: 'Reunião/Resp+', 
-              value: campaign.positiveResponses > 0 
-                ? ((campaign.meetings / campaign.positiveResponses) * 100).toFixed(1) 
-                : '0' 
-            },
-          ];
-
-          slide.addText('Taxas de Conversão', {
-            x: 6,
-            y: 4.2,
-            w: 3.5,
-            h: 0.5,
-            fontSize: 14,
-            bold: true,
-            color: primaryColor,
-          });
-
-          conversionRates.forEach((rate, idx) => {
-            const x = 6 + idx * 1.2;
-            slide.addText(`${rate.value}%`, {
-              x,
-              y: 4.7,
-              w: 1.1,
-              h: 0.5,
-              fontSize: 18,
-              bold: true,
-              color: successColor,
-              align: 'center',
-            });
-            slide.addText(rate.label, {
-              x,
-              y: 5.1,
-              w: 1.1,
-              h: 0.4,
-              fontSize: 8,
-              color: mutedColor,
-              align: 'center',
-            });
-          });
-        });
-      }
-
-      // Data Table Slide (if detailed data provided)
-      if (data.length > 0) {
-        const dataSlide = pptx.addSlide();
-        dataSlide.addText('Dados Detalhados', {
-          x: 0.5,
-          y: 0.3,
-          w: '90%',
-          h: 0.8,
-          fontSize: 28,
-          bold: true,
-          color: primaryColor,
-        });
-
-        // Get columns from first row
-        const columns = Object.keys(data[0]).slice(0, 6); // Limit to 6 columns for readability
-        const rows = data.slice(0, 10); // Limit to 10 rows
-
-        const tableRows: any[][] = [
-          columns.map(col => ({ 
-            text: col.length > 15 ? col.substring(0, 15) + '...' : col, 
-            options: { bold: true, fill: { color: primaryColor }, color: 'FFFFFF', fontSize: 9 } 
-          })),
-          ...rows.map(row => 
-            columns.map(col => {
-              const val = String(row[col] || '-');
-              return { text: val.length > 12 ? val.substring(0, 12) + '...' : val, options: { fontSize: 8 } };
-            })
-          ),
-        ];
-
-        dataSlide.addTable(tableRows, {
-          x: 0.3,
-          y: 1.2,
-          w: 9.4,
-          fontSize: 8,
-          border: { pt: 0.5, color: 'E2E8F0' },
-          align: 'center',
-          valign: 'middle',
-        });
-
-        if (data.length > 10) {
-          dataSlide.addText(`Mostrando 10 de ${data.length} registros`, {
-            x: 0.5,
-            y: 4.8,
-            w: '90%',
-            h: 0.4,
-            fontSize: 10,
-            color: mutedColor,
-            align: 'center',
-          });
-        }
-      }
-
-      // Final Slide
-      const finalSlide = pptx.addSlide();
-      finalSlide.addText('Obrigado!', {
-        x: 0.5,
-        y: 2,
-        w: '90%',
-        h: 1,
-        fontSize: 44,
-        bold: true,
-        color: primaryColor,
-        align: 'center',
-      });
-      finalSlide.addText('Relatório gerado pelo Sistema Pronto', {
-        x: 0.5,
-        y: 3.2,
-        w: '90%',
-        h: 0.5,
-        fontSize: 16,
-        color: mutedColor,
-        align: 'center',
-      });
-
-      await pptx.writeFile({ fileName: `${filename}.pptx` });
-      toast.success('PowerPoint exportado com sucesso!');
+      const htmlContent = generatePowerPointHTML();
+      
+      // Create a Blob with the HTML content
+      const blob = new Blob([htmlContent], { type: 'application/vnd.ms-powerpoint' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${filename}-${format(new Date(), 'yyyy-MM-dd')}.ppt`;
+      link.click();
+      
+      toast.success('Apresentação exportada com sucesso! Abra o arquivo no PowerPoint para visualizar.');
     } catch (error) {
-      toast.error('Erro ao exportar PowerPoint');
+      toast.error('Erro ao exportar apresentação');
       console.error(error);
     }
   };
