@@ -264,42 +264,50 @@ export default function Profile() {
 
       let convites = 0, conexoes = 0, mensagens = 0, visitas = 0, likes = 0, comentarios = 0;
       let followUps1 = 0, followUps2 = 0, followUps3 = 0;
-      let allDates: string[] = [];
+      
+      // Use Set to track unique dates with activity (any metric > 0)
+      const datesWithActivity = new Set<string>();
 
       campaignMetricsData.forEach(metric => {
         Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
-          if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            allDates.push(date);
+          if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+          
+          const numValue = Number(value) || 0;
+          
+          // Track dates with activity (value > 0)
+          if (numValue > 0) {
+            datesWithActivity.add(date);
           }
           
           if (['Connection Requests Sent', 'Convites Enviados'].includes(metric.eventType)) {
-            convites += value;
+            convites += numValue;
           } else if (['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made'].includes(metric.eventType)) {
-            conexoes += value;
+            conexoes += numValue;
           } else if (['Profile Visits', 'Visitas a Perfil'].includes(metric.eventType)) {
-            visitas += value;
+            visitas += numValue;
           } else if (['Post Likes', 'Curtidas'].includes(metric.eventType)) {
-            likes += value;
+            likes += numValue;
           } else if (['Comments Done', 'Comentários'].includes(metric.eventType)) {
-            comentarios += value;
+            comentarios += numValue;
           } else if (metric.eventType === 'Follow-Ups 1') {
-            followUps1 += value;
+            followUps1 += numValue;
           } else if (metric.eventType === 'Follow-Ups 2') {
-            followUps2 += value;
+            followUps2 += numValue;
           } else if (metric.eventType === 'Follow-Ups 3') {
-            followUps3 += value;
+            followUps3 += numValue;
           }
         });
       });
 
       mensagens = followUps1 + followUps2 + followUps3;
-      const sortedDates = [...new Set(allDates)].sort();
-      const activeDays = sortedDates.length;
+      // Start/End = first/last date where ANY metric value > 0
+      const sortedActiveDates = Array.from(datesWithActivity).sort();
+      const activeDays = sortedActiveDates.length;
 
       return {
         campaignName,
-        startDate: sortedDates[0] || null,
-        endDate: sortedDates[sortedDates.length - 1] || null,
+        startDate: sortedActiveDates[0] || null,
+        endDate: sortedActiveDates[sortedActiveDates.length - 1] || null,
         activeDays,
         convitesEnviados: convites,
         conexoesRealizadas: conexoes,
