@@ -1290,6 +1290,38 @@ export default function Campaigns() {
               return exportRow;
             })}
             filename={`campanhas-${granularity}-${format(new Date(), 'yyyy-MM-dd')}`}
+            campaignSummaries={selectedCampaigns.map(campaign => {
+              const summary = getCampaignSummary(campaign);
+              const leads = getAllLeads().filter(l => l.campaign === campaign);
+              const proposalsCount = leads.filter(l => l.proposalDate).length;
+              const salesCount = leads.filter(l => l.saleDate).length;
+              const dailyData = getDailyDataForCampaign(campaign);
+              
+              // Calculate dates and active days from daily data
+              const activeDates = dailyData
+                .filter(d => d.invitations > 0 || d.connections > 0 || d.messages > 0 || d.visits > 0 || d.likes > 0 || d.comments > 0)
+                .map(d => d.date)
+                .sort();
+              
+              const startDate = activeDates.length > 0 ? activeDates[0] : undefined;
+              const endDate = activeDates.length > 0 ? activeDates[activeDates.length - 1] : undefined;
+              const activeDays = activeDates.length;
+              
+              return {
+                name: campaign,
+                invitations: summary.invitations,
+                connections: summary.connections,
+                messages: summary.messages,
+                acceptanceRate: summary.acceptanceRate,
+                positiveResponses: summary.positiveResponses,
+                meetings: summary.meetings,
+                proposals: proposalsCount,
+                sales: salesCount,
+                startDate,
+                endDate,
+                activeDays,
+              };
+            })}
           />
         </>
       )}
