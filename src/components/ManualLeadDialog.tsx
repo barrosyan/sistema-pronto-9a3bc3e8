@@ -168,22 +168,29 @@ export function ManualLeadDialog({
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="campaign">Campanha *</Label>
-                <Select
-                  value={formData.campaign || ''}
-                  onValueChange={(value) => handleInputChange('campaign', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma campanha" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {campaigns.map(campaign => (
-                      <SelectItem key={campaign} value={campaign}>
-                        {campaign}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Campanha *</Label>
+                <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+                  {campaigns.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhuma campanha disponível</p>
+                  ) : (
+                    campaigns.map((campaign) => (
+                      <div key={campaign} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`manual-campaign-${campaign}`}
+                          checked={formData.campaign === campaign}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              handleInputChange('campaign', campaign);
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`manual-campaign-${campaign}`} className="text-sm cursor-pointer">
+                          {campaign}
+                        </Label>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">

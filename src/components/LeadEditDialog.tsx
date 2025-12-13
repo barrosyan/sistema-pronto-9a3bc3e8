@@ -5,8 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Lead } from '@/types/campaign';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface LeadEditDialogProps {
   lead: Lead | null;
@@ -17,6 +19,25 @@ interface LeadEditDialogProps {
 
 export const LeadEditDialog = ({ lead, open, onOpenChange, onSave }: LeadEditDialogProps) => {
   const [editedLead, setEditedLead] = useState<Lead | null>(lead);
+  const [availableCampaigns, setAvailableCampaigns] = useState<string[]>([]);
+
+  // Load campaigns when dialog opens
+  useEffect(() => {
+    if (open) {
+      loadCampaigns();
+    }
+  }, [open]);
+
+  const loadCampaigns = async () => {
+    const { data, error } = await supabase
+      .from('campaigns')
+      .select('name')
+      .order('name');
+    
+    if (data && !error) {
+      setAvailableCampaigns(data.map(c => c.name));
+    }
+  };
 
   // Update editedLead when lead prop changes
   useEffect(() => {
@@ -128,12 +149,29 @@ export const LeadEditDialog = ({ lead, open, onOpenChange, onSave }: LeadEditDia
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="campaign">Campanha</Label>
-            <Input
-              id="campaign"
-              value={editedLead.campaign}
-              onChange={(e) => setEditedLead({ ...editedLead, campaign: e.target.value })}
-            />
+            <Label>Campanha *</Label>
+            <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+              {availableCampaigns.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma campanha disponível</p>
+              ) : (
+                availableCampaigns.map((campaign) => (
+                  <div key={campaign} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`campaign-${campaign}`}
+                      checked={editedLead.campaign === campaign}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setEditedLead({ ...editedLead, campaign });
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`campaign-${campaign}`} className="text-sm cursor-pointer">
+                      {campaign}
+                    </Label>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
