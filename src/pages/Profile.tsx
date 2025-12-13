@@ -56,23 +56,33 @@ export default function Profile() {
     }
   }, [selectedProfile, uniqueCampaigns, selectedCampaign]);
 
-  // Calculate date range from metrics - only dates with value > 0
+  // Calculate date range from metrics
+  // Start = first date with any value > 0
+  // End = last date with any value > 0
+  // Active days = dates between start-end with any value > 0
   const getDateRange = () => {
-    const allDates: string[] = [];
+    const datesWithActivity: string[] = [];
+    const allDatesInData: Set<string> = new Set();
+    
     filteredMetrics.forEach(metric => {
       Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
-        if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && value > 0) {
-          allDates.push(date);
+        if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          allDatesInData.add(date);
+          if (value > 0) {
+            datesWithActivity.push(date);
+          }
         }
       });
     });
     
-    const sortedDates = [...new Set(allDates)].sort();
-    return {
-      startDate: sortedDates.length > 0 ? sortedDates[0] : null,
-      endDate: sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : null,
-      activeDays: sortedDates.length
-    };
+    const sortedActiveDates = [...new Set(datesWithActivity)].sort();
+    const startDate = sortedActiveDates.length > 0 ? sortedActiveDates[0] : null;
+    const endDate = sortedActiveDates.length > 0 ? sortedActiveDates[sortedActiveDates.length - 1] : null;
+    
+    // Count active days between start and end
+    const activeDays = sortedActiveDates.length;
+    
+    return { startDate, endDate, activeDays };
   };
 
   const dateRange = getDateRange();

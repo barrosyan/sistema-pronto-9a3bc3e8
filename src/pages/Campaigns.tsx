@@ -553,13 +553,13 @@ export default function Campaigns() {
 
       let convites = 0, conexoes = 0, mensagens = 0, visitas = 0, likes = 0, comentarios = 0;
       let followUps1 = 0, followUps2 = 0, followUps3 = 0;
-      let allDates: string[] = [];
+      const datesWithActivity: string[] = [];
 
       campaignData.forEach(metric => {
         Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
-          // Only count dates where there's actual activity (value > 0)
+          // Track dates with activity (value > 0)
           if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && value > 0) {
-            allDates.push(date);
+            datesWithActivity.push(date);
           }
           
           if (['Connection Requests Sent', 'Convites Enviados'].includes(metric.eventType)) {
@@ -583,13 +583,17 @@ export default function Campaigns() {
       });
 
       mensagens = followUps1 + followUps2 + followUps3;
-      const sortedDates = [...new Set(allDates)].sort();
-      const activeDays = sortedDates.length;
+      
+      // Start/End = first/last date with any activity > 0
+      const sortedActiveDates = [...new Set(datesWithActivity)].sort();
+      const startDate = sortedActiveDates.length > 0 ? sortedActiveDates[0] : null;
+      const endDate = sortedActiveDates.length > 0 ? sortedActiveDates[sortedActiveDates.length - 1] : null;
+      const activeDays = sortedActiveDates.length;
 
       return {
         campaignName,
-        startDate: sortedDates[0] || null,
-        endDate: sortedDates[sortedDates.length - 1] || null,
+        startDate,
+        endDate,
         activeDays,
         convitesEnviados: convites,
         conexoesRealizadas: conexoes,

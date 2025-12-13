@@ -74,16 +74,16 @@ export function ProfileComparison({ campaignMetrics, leads, profiles, campaigns 
       followUps3: 0,
     };
 
-    let allDates: string[] = [];
+    const datesWithActivity: string[] = [];
 
     filteredMetrics.forEach(metric => {
       const targetKey = eventMappings[metric.eventType];
       if (targetKey) {
         Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
           totals[targetKey] += value;
-          // Only count dates where there's actual activity (value > 0)
+          // Only track dates with actual activity (value > 0)
           if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && value > 0) {
-            allDates.push(date);
+            datesWithActivity.push(date);
           }
         });
       }
@@ -95,9 +95,10 @@ export function ProfileComparison({ campaignMetrics, leads, profiles, campaigns 
       totals.mensagensEnviadas = followUpsTotal;
     }
 
-    const sortedDates = [...new Set(allDates)].sort();
-    const startDate = sortedDates.length > 0 ? sortedDates[0] : null;
-    const endDate = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : null;
+    // Start/End = first/last date with any activity > 0
+    const sortedActiveDates = [...new Set(datesWithActivity)].sort();
+    const startDate = sortedActiveDates.length > 0 ? sortedActiveDates[0] : null;
+    const endDate = sortedActiveDates.length > 0 ? sortedActiveDates[sortedActiveDates.length - 1] : null;
 
     const positiveLeads = filteredLeads.filter(l => l.status === 'positive');
     const taxaAceite = totals.convitesEnviados > 0 
