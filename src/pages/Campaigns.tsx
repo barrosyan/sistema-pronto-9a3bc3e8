@@ -557,7 +557,8 @@ export default function Campaigns() {
 
       campaignData.forEach(metric => {
         Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
-          if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          // Only count dates where there's actual activity (value > 0)
+          if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && value > 0) {
             allDates.push(date);
           }
           

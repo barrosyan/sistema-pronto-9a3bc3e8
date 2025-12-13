@@ -81,7 +81,8 @@ export function ProfileComparison({ campaignMetrics, leads, profiles, campaigns 
       if (targetKey) {
         Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
           totals[targetKey] += value;
-          if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          // Only count dates where there's actual activity (value > 0)
+          if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && value > 0) {
             allDates.push(date);
           }
         });

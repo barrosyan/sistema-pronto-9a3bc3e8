@@ -56,12 +56,12 @@ export default function Profile() {
     }
   }, [selectedProfile, uniqueCampaigns, selectedCampaign]);
 
-  // Calculate date range from metrics
+  // Calculate date range from metrics - only dates with value > 0
   const getDateRange = () => {
     const allDates: string[] = [];
     filteredMetrics.forEach(metric => {
-      Object.keys(metric.dailyData || {}).forEach(date => {
-        if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
+        if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && value > 0) {
           allDates.push(date);
         }
       });
