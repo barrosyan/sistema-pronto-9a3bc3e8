@@ -1098,6 +1098,17 @@ export default function Campaigns() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Legend */}
+              <div className="flex items-center gap-4 mb-4 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-success" />
+                  <span className="text-muted-foreground">Ativo (alguma métrica {'>'} 0)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-muted-foreground/30" />
+                  <span className="text-muted-foreground">Inativo (todas métricas = 0)</span>
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
@@ -1139,27 +1150,49 @@ export default function Campaigns() {
                         </td>
                         {selectedCampaigns.map(campaign => {
                           const status = row[`${campaign}_status`];
+                          const invitations = row[`${campaign}_invitations`] || 0;
+                          const connections = row[`${campaign}_connections`] || 0;
+                          const messages = row[`${campaign}_messages`] || 0;
+                          
+                          // For daily: check if any metric > 0
+                          // For weekly: check active days count
                           const isActive = granularity === 'daily' 
-                            ? status === 'Ativo' 
+                            ? (invitations > 0 || connections > 0 || messages > 0)
                             : typeof status === 'number' && status > 0;
                           
                           return (
                             <React.Fragment key={campaign}>
                               <td className="p-2 text-center border-l border-border">
                                 {granularity === 'daily' ? (
-                                  <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
-                                    {status}
+                                  <Badge 
+                                    variant={isActive ? "default" : "secondary"} 
+                                    className={`text-xs ${isActive ? 'bg-success text-success-foreground' : 'bg-muted text-muted-foreground'}`}
+                                  >
+                                    {isActive ? '● Ativo' : '○ Inativo'}
                                   </Badge>
                                 ) : (
-                                  <span className="text-sm font-medium">{status}</span>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <span className={`inline-block w-2 h-2 rounded-full ${status > 0 ? 'bg-success' : 'bg-muted-foreground/30'}`} />
+                                    <span className="text-sm font-medium">{status}/7</span>
+                                  </div>
                                 )}
                               </td>
-                              <td className="p-2 text-center text-sm">{row[`${campaign}_invitations`]}</td>
-                              <td className="p-2 text-center text-sm">{row[`${campaign}_connections`]}</td>
-                              <td className="p-2 text-center text-sm">{row[`${campaign}_messages`]}</td>
-                              <td className="p-2 text-center text-sm">{row[`${campaign}_positiveResponses`]}</td>
+                              <td className={`p-2 text-center text-sm ${invitations > 0 ? '' : 'text-muted-foreground'}`}>
+                                {invitations}
+                              </td>
+                              <td className={`p-2 text-center text-sm ${connections > 0 ? '' : 'text-muted-foreground'}`}>
+                                {connections}
+                              </td>
+                              <td className={`p-2 text-center text-sm ${messages > 0 ? '' : 'text-muted-foreground'}`}>
+                                {messages}
+                              </td>
+                              <td className={`p-2 text-center text-sm ${row[`${campaign}_positiveResponses`] > 0 ? 'text-success font-medium' : 'text-muted-foreground'}`}>
+                                {row[`${campaign}_positiveResponses`]}
+                              </td>
                               {granularity === 'weekly' && (
-                                <td className="p-2 text-center text-sm">{row[`${campaign}_meetings`]}</td>
+                                <td className={`p-2 text-center text-sm ${row[`${campaign}_meetings`] > 0 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                                  {row[`${campaign}_meetings`]}
+                                </td>
                               )}
                             </React.Fragment>
                           );
