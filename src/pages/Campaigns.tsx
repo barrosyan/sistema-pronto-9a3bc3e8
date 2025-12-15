@@ -326,6 +326,11 @@ export default function Campaigns() {
         return dataPoint;
       });
     } else {
+      // For week-numbers view, use week number comparison data
+      if (calendarView === 'week-numbers' && selectedCampaigns.length > 1) {
+        return getWeekNumberComparisonData();
+      }
+      
       const allWeeksSet = new Set<string>();
       selectedCampaigns.forEach(campaign => {
         getWeeklyDataForCampaign(campaign).forEach(w => allWeeksSet.add(w.week));
@@ -439,7 +444,8 @@ export default function Campaigns() {
     for (let weekNum = 1; weekNum <= maxWeeks; weekNum++) {
       const row: any = { 
         weekNumber: weekNum,
-        weekLabel: `${weekNum}ª Semana`
+        weekLabel: `${weekNum}ª Semana`,
+        week: `${weekNum}ª Semana` // Also add 'week' key for chart compatibility
       };
       
       selectedCampaigns.forEach(campaign => {
@@ -453,7 +459,7 @@ export default function Campaigns() {
           row[`${campaign}_visits`] = weekData.visits;
           row[`${campaign}_positiveResponses`] = weekData.positiveResponses;
           row[`${campaign}_meetings`] = weekData.meetings;
-          row[`${campaign}_activeDays`] = weekData.activeDays;
+          row[`${campaign}_status`] = weekData.activeDays; // Use _status for pivot table consistency
         } else {
           row[`${campaign}_invitations`] = 0;
           row[`${campaign}_connections`] = 0;
@@ -461,7 +467,7 @@ export default function Campaigns() {
           row[`${campaign}_visits`] = 0;
           row[`${campaign}_positiveResponses`] = 0;
           row[`${campaign}_meetings`] = 0;
-          row[`${campaign}_activeDays`] = 0;
+          row[`${campaign}_status`] = 0;
         }
       });
       
