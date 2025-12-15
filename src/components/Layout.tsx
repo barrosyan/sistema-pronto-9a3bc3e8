@@ -69,7 +69,7 @@ export const Layout = ({ children }: LayoutProps) => {
                 className="flex items-center gap-2"
               >
                 <Settings className="h-4 w-4" />
-                Importar Dados
+                Configurações
               </Button>
               <Button
                 variant="ghost"
