@@ -1,4 +1,4 @@
-export type CsvType = 'campaign-input' | 'leads' | 'unknown';
+export type CsvType = 'campaign-input' | 'leads' | 'hybrid' | 'unknown';
 
 interface CsvDetectionResult {
   type: CsvType;
@@ -19,6 +19,19 @@ export function detectCsvType(headers: string[]): CsvDetectionResult {
   
   if (hasCampaignHeaders || (normalizedHeaders.includes('campaign name') && hasDateColumns)) {
     return { type: 'campaign-input', confidence: 1.0 };
+  }
+
+  // Hybrid format detection (Nome, Linkedin, Invite, Aceito, FU1, FU2, etc.)
+  const hybridHeaders = ['invite', 'aceito', 'fu1', 'fu2', 'resposta'];
+  const hasName = normalizedHeaders.some(h => h === 'nome' || h === 'name');
+  const hasLinkedin = normalizedHeaders.some(h => h.includes('linkedin'));
+  const hybridMatches = hybridHeaders.filter(header =>
+    normalizedHeaders.some(h => h.includes(header))
+  ).length;
+  
+  // If it has name, linkedin and at least 2 hybrid headers (invite/aceito/fu)
+  if (hasName && hasLinkedin && hybridMatches >= 2) {
+    return { type: 'hybrid', confidence: 0.95 };
   }
   
   // Leads CSV detection - check for common lead fields

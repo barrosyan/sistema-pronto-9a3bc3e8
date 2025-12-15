@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { parseCampaignCsv } from '@/utils/campaignCsvParser';
 import { parseLeadsCsv } from '@/utils/leadsCsvParser';
+import { parseHybridCsv } from '@/utils/hybridCsvParser';
 import { detectCsvType, parseCsvHeaders } from '@/utils/csvDetector';
 import { useProfileFilter } from '@/contexts/ProfileFilterContext';
 import DataImportPreview, { FilePreviewData } from '@/components/DataImportPreview';
@@ -271,6 +272,29 @@ export default function UserSettings() {
                 parsedData,
                 user,
                 type: 'campaign-input',
+              });
+            } else if (detection.type === 'hybrid') {
+              // Process hybrid CSV (leads + campaign metrics combined)
+              const campaignName = fileRecord.file_name.replace(/\.(csv|xlsx|xls)$/i, '').replace(/_/g, ' ');
+              const parsedData = parseHybridCsv(text, campaignName);
+              
+              previews.push({
+                fileName: fileRecord.file_name,
+                campaignsCount: 1,
+                metricsCount: parsedData.campaignMetrics.filter(m => 
+                  Object.keys(m.dailyData).length > 0
+                ).length,
+                positiveLeadsCount: parsedData.summary.positiveResponses,
+                negativeLeadsCount: parsedData.summary.negativeResponses,
+                campaignNames: [campaignName],
+              });
+
+              parsedDataArray.push({
+                fileRecord,
+                parsedData,
+                user,
+                type: 'hybrid',
+                campaignName,
               });
             } else if (detection.type === 'leads') {
               // Process leads CSV
@@ -605,6 +629,154 @@ export default function UserSettings() {
             } else {
               totalLeads += leadsToInsert.length;
               console.log(`✅ ${leadsToInsert.length} negative leads inserted`);
+            }
+          }
+        } else if (type === 'hybrid') {
+          // Process hybrid CSV (leads + campaign metrics combined)
+          const { leads, campaignMetrics, summary } = parsedData;
+          const campaignName = (parsedFilesData.find((p: any) => p.type === 'hybrid') as any)?.campaignName || 'Campanha Importada';
+          
+          console.log(`🔀 Processando formato híbrido: ${leads.length} leads, ${campaignMetrics.length} tipos de métricas`);
+          console.log('📊 Resumo:', summary);
+
+          // Create a default profile name based on campaign
+          const profileName = `Perfil ${campaignName}`;
+
+          // Create profile
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles_data')
+            .upsert({
+              user_id: user.id,
+              profile_name: profileName,
+            }, {
+              onConflict: 'user_id,profile_name',
+              ignoreDuplicates: false,
+            })
+            .select()
+            .single();
+
+          if (profileError) {
+            console.error('❌ Error creating profile for hybrid:', profileError);
+          } else {
+            totalProfiles++;
+            console.log(`✅ Profile (hybrid): ${profileName}`);
+          }
+
+          // Create campaign
+          const { data: campaign, error: campaignError } = await supabase
+            .from('campaigns')
+            .insert({
+              user_id: user.id,
+              profile_id: profile?.id,
+              name: campaignName,
+              profile_name: profileName,
+            })
+            .select()
+            .single();
+
+          if (campaignError) {
+            console.error('❌ Error creating campaign for hybrid:', campaignError);
+          } else {
+            totalCampaigns++;
+            console.log(`✅ Campaign (hybrid): ${campaignName}`);
+          }
+
+          // Insert campaign metrics
+          for (const metric of campaignMetrics) {
+            if (Object.keys(metric.dailyData).length === 0) continue;
+
+            const dailyValues = Object.values(metric.dailyData) as number[];
+            const totalCount = dailyValues.reduce((a, b) => a + b, 0);
+
+            const { data: insertedMetric, error: metricError } = await supabase
+              .from('campaign_metrics')
+              .insert([{
+                user_id: user.id,
+                campaign_name: campaignName,
+                profile_name: profileName,
+                event_type: metric.eventType,
+                total_count: totalCount,
+                daily_data: {},
+              }])
+              .select()
+              .single();
+
+            if (metricError) {
+              console.error(`❌ Error inserting hybrid metric ${metric.eventType}:`, metricError);
+            } else {
+              totalMetrics++;
+              console.log(`✅ Metric (hybrid): ${metric.eventType} = ${totalCount}`);
+
+              // Insert daily data
+              if (insertedMetric) {
+                const dailyEntries = Object.entries(metric.dailyData)
+                  .filter(([date]) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+                  .map(([date, value]) => ({
+                    campaign_metric_id: insertedMetric.id,
+                    user_id: user.id,
+                    date,
+                    value: Number(value) || 0,
+                  }));
+
+                if (dailyEntries.length > 0) {
+                  const { error: dailyError } = await supabase
+                    .from('daily_metrics' as any)
+                    .insert(dailyEntries);
+
+                  if (dailyError) {
+                    console.error(`❌ Error inserting hybrid daily metrics:`, dailyError);
+                  } else {
+                    console.log(`✅ Inserted ${dailyEntries.length} daily entries for ${metric.eventType}`);
+                  }
+                }
+              }
+            }
+          }
+
+          // Insert leads from hybrid format
+          if (leads.length > 0) {
+            const leadsToInsert = leads.map((lead: any) => ({
+              user_id: user.id,
+              campaign: campaignName,
+              linkedin: lead.linkedin,
+              name: lead.name,
+              position: lead.position,
+              company: lead.company,
+              status: lead.status,
+              source: lead.source,
+              connection_date: lead.connectionDate,
+              positive_response_date: lead.positiveResponseDate,
+              negative_response_date: lead.negativeResponseDate,
+              follow_up_1_date: lead.followUp1Date,
+              follow_up_1_comments: lead.followUp1Comments,
+              follow_up_2_date: lead.followUp2Date,
+              follow_up_2_comments: lead.followUp2Comments,
+            }));
+
+            // Deduplicate leads
+            const uniqueLeads = leadsToInsert.reduce((acc: Map<string, any>, lead: any) => {
+              const key = `${lead.user_id}-${lead.campaign}-${lead.name}`;
+              if (!acc.has(key)) {
+                acc.set(key, lead);
+              }
+              return acc;
+            }, new Map<string, any>());
+
+            const deduplicatedLeads = Array.from(uniqueLeads.values());
+            console.log(`📊 Deduplicated ${leadsToInsert.length} hybrid leads to ${deduplicatedLeads.length} unique leads`);
+
+            const { error: leadsError } = await supabase
+              .from('leads')
+              .upsert(deduplicatedLeads as any[], {
+                onConflict: 'user_id,campaign,name',
+                ignoreDuplicates: false
+              });
+
+            if (leadsError) {
+              console.error('❌ Error inserting hybrid leads:', leadsError);
+            } else {
+              totalLeads += deduplicatedLeads.length;
+              console.log(`✅ ${deduplicatedLeads.length} hybrid leads inserted`);
             }
           }
         }
