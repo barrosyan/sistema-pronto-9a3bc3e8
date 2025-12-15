@@ -42,10 +42,8 @@ export function AdminUserProvider({ children }: { children: React.ReactNode }) {
       const adminStatus = !!roleData;
       setIsAdmin(adminStatus);
       
-      // Initialize with current user's ID
-      if (!adminStatus) {
-        setSelectedUserIds([user.id]);
-      }
+      // Always initialize with current user's ID (even for admin)
+      setSelectedUserIds([user.id]);
     } catch (error) {
       console.error('Error checking admin status:', error);
     } finally {

@@ -201,41 +201,47 @@ export default function Profile() {
       // Get profile for this campaign
       const profile = campaignMetricsData[0]?.profileName || '-';
 
-      // Calculate totals
+      // Calculate totals - use Set to track dates with activity (value > 0)
       let convites = 0, conexoes = 0, mensagens = 0, visitas = 0;
       let followUps1 = 0, followUps2 = 0, followUps3 = 0;
-      let allDates: string[] = [];
+      const datesWithActivity = new Set<string>();
 
       campaignMetricsData.forEach(metric => {
         Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
-          if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            allDates.push(date);
+          if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+          
+          const numValue = Number(value) || 0;
+          
+          // Track dates with activity (value > 0)
+          if (numValue > 0) {
+            datesWithActivity.add(date);
           }
           
           if (['Connection Requests Sent', 'Convites Enviados'].includes(metric.eventType)) {
-            convites += value;
+            convites += numValue;
           } else if (['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made'].includes(metric.eventType)) {
-            conexoes += value;
+            conexoes += numValue;
           } else if (['Profile Visits', 'Visitas a Perfil'].includes(metric.eventType)) {
-            visitas += value;
+            visitas += numValue;
           } else if (metric.eventType === 'Follow-Ups 1') {
-            followUps1 += value;
+            followUps1 += numValue;
           } else if (metric.eventType === 'Follow-Ups 2') {
-            followUps2 += value;
+            followUps2 += numValue;
           } else if (metric.eventType === 'Follow-Ups 3') {
-            followUps3 += value;
+            followUps3 += numValue;
           }
         });
       });
 
       mensagens = followUps1 + followUps2 + followUps3;
-      const sortedDates = [...new Set(allDates)].sort();
+      // Start/End = first/last date where ANY metric value > 0
+      const sortedActiveDates = Array.from(datesWithActivity).sort();
 
       return {
         name: campaignName,
         profile,
-        startDate: sortedDates[0] || null,
-        endDate: sortedDates[sortedDates.length - 1] || null,
+        startDate: sortedActiveDates[0] || null,
+        endDate: sortedActiveDates[sortedActiveDates.length - 1] || null,
         convites,
         conexoes,
         mensagens,
@@ -334,6 +340,7 @@ export default function Profile() {
       Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
         if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
         
+        const numValue = Number(value) || 0;
         const dateObj = parseISO(date);
         const weekStart = startOfWeek(dateObj, { weekStartsOn: 1 });
         const weekEnd = endOfWeek(dateObj, { weekStartsOn: 1 });
@@ -364,25 +371,29 @@ export default function Profile() {
         }
 
         const weekData = weeklyMap.get(weekKey);
-        weekData.activeCampaigns.add(metric.campaignName);
-        weekData.activeDays.add(date);
+        
+        // Only count as active if value > 0
+        if (numValue > 0) {
+          weekData.activeCampaigns.add(metric.campaignName);
+          weekData.activeDays.add(date);
+        }
 
         if (['Connection Requests Sent', 'Convites Enviados'].includes(metric.eventType)) {
-          weekData.convitesEnviados += value;
+          weekData.convitesEnviados += numValue;
         } else if (['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made'].includes(metric.eventType)) {
-          weekData.conexoesRealizadas += value;
+          weekData.conexoesRealizadas += numValue;
         } else if (['Profile Visits', 'Visitas a Perfil'].includes(metric.eventType)) {
-          weekData.visitas += value;
+          weekData.visitas += numValue;
         } else if (['Post Likes', 'Curtidas'].includes(metric.eventType)) {
-          weekData.likes += value;
+          weekData.likes += numValue;
         } else if (['Comments Done', 'Comentários'].includes(metric.eventType)) {
-          weekData.comentarios += value;
+          weekData.comentarios += numValue;
         } else if (metric.eventType === 'Follow-Ups 1') {
-          weekData.followUps1 += value;
+          weekData.followUps1 += numValue;
         } else if (metric.eventType === 'Follow-Ups 2') {
-          weekData.followUps2 += value;
+          weekData.followUps2 += numValue;
         } else if (metric.eventType === 'Follow-Ups 3') {
-          weekData.followUps3 += value;
+          weekData.followUps3 += numValue;
         }
       });
     });
