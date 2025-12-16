@@ -35,6 +35,9 @@ export interface FilePreviewData {
   campaignNames: string[];
   campaignProfileMappings?: CampaignProfileMapping[];
   error?: string;
+  detectedType?: 'campaign-input' | 'leads' | 'hybrid';
+  selectedType?: 'campaign-input' | 'leads' | 'hybrid';
+  acceptanceRate?: number;
 }
 
 interface DataImportPreviewProps {
@@ -44,6 +47,7 @@ interface DataImportPreviewProps {
   onConfirm: () => void;
   onCancel: () => void;
   onProfileSelect: (campaignName: string, profileName: string) => void;
+  onTypeSelect?: (fileName: string, type: 'campaign-input' | 'leads' | 'hybrid') => void;
   loading?: boolean;
 }
 
@@ -54,6 +58,7 @@ export default function DataImportPreview({
   onConfirm,
   onCancel,
   onProfileSelect,
+  onTypeSelect,
   loading = false,
 }: DataImportPreviewProps) {
   const totalCampaigns = previewData.reduce((sum, f) => sum + f.campaignsCount, 0);
@@ -148,6 +153,39 @@ export default function DataImportPreview({
                       <p className="text-sm text-destructive">{file.error}</p>
                     ) : (
                       <>
+                        {/* File Type Selection */}
+                        {onTypeSelect && (
+                          <div className="pb-2 border-b">
+                            <p className="text-xs text-muted-foreground mb-2 font-semibold">
+                              Tipo de importação:
+                            </p>
+                            <Select
+                              value={file.selectedType || file.detectedType || 'hybrid'}
+                              onValueChange={(value) => onTypeSelect(file.fileName, value as any)}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="hybrid" className="text-xs">
+                                  Misto (Leads + Campanhas)
+                                </SelectItem>
+                                <SelectItem value="campaign-input" className="text-xs">
+                                  Apenas Campanhas
+                                </SelectItem>
+                                <SelectItem value="leads" className="text-xs">
+                                  Apenas Leads
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {file.detectedType && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Tipo detectado: {file.detectedType === 'hybrid' ? 'Misto' : file.detectedType === 'campaign-input' ? 'Campanhas' : 'Leads'}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Campanhas:</span>
@@ -165,6 +203,12 @@ export default function DataImportPreview({
                             <span className="text-muted-foreground">Leads Negativos:</span>
                             <span className="font-medium text-red-600">{file.negativeLeadsCount}</span>
                           </div>
+                          {file.acceptanceRate !== undefined && (
+                            <div className="flex justify-between col-span-2">
+                              <span className="text-muted-foreground">Taxa de Aceite:</span>
+                              <span className="font-medium text-blue-600">{file.acceptanceRate.toFixed(2)}%</span>
+                            </div>
+                          )}
                         </div>
                         
                         {file.campaignProfileMappings && file.campaignProfileMappings.length > 0 ? (
