@@ -32,6 +32,7 @@ export interface FilePreviewData {
   metricsCount: number;
   positiveLeadsCount: number;
   negativeLeadsCount: number;
+  pendingLeadsCount?: number;
   campaignNames: string[];
   campaignProfileMappings?: CampaignProfileMapping[];
   error?: string;
@@ -196,13 +197,23 @@ export default function DataImportPreview({
                             <span className="font-medium">{file.metricsCount}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Leads Pendentes:</span>
-                            <span className="font-medium text-yellow-600">{file.positiveLeadsCount}</span>
+                            <span className="text-muted-foreground">Total de Leads:</span>
+                            <span className="font-medium">{(file.positiveLeadsCount || 0) + (file.negativeLeadsCount || 0) + (file.pendingLeadsCount || 0)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Leads Positivos:</span>
+                            <span className="font-medium text-green-600">{file.positiveLeadsCount}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Leads Negativos:</span>
                             <span className="font-medium text-red-600">{file.negativeLeadsCount}</span>
                           </div>
+                          {file.pendingLeadsCount !== undefined && file.pendingLeadsCount > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Leads Pendentes:</span>
+                              <span className="font-medium text-yellow-600">{file.pendingLeadsCount}</span>
+                            </div>
+                          )}
                           {file.acceptanceRate !== undefined && (
                             <div className="flex justify-between col-span-2">
                               <span className="text-muted-foreground">Taxa de Aceite:</span>

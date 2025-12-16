@@ -323,7 +323,17 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
       metricsMap.followUps2.set(fu2SendDate, current + 1);
     }
 
-    // Create lead record
+    // Create lead record - classify based on "Resposta" field
+    // "Resposta positiva" = positive lead (follow-up status)
+    // "Resposta negativa" = negative lead (sem-interesse status)
+    // No response yet = pending lead
+    let leadStatus = 'pending';
+    if (overallResponse === 'positive') {
+      leadStatus = 'follow-up';
+    } else if (overallResponse === 'negative') {
+      leadStatus = 'sem-interesse';
+    }
+
     const lead = {
       campaign: campaignName,
       linkedin,
@@ -332,7 +342,7 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
       company: null,
       source: 'Kontax',
       connectionDate: acceptDate,
-      status: overallResponse === 'negative' ? 'negative' : 'pending',
+      status: leadStatus,
       positiveResponseDate: overallResponse === 'positive' ? responseDate : null,
       negativeResponseDate: overallResponse === 'negative' ? responseDate : null,
       followUp1Date: fu1SendDate,
@@ -342,6 +352,8 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
       inviteSent,
       inviteSendDate,
       connectionAccepted,
+      isPositive: overallResponse === 'positive',
+      isNegative: overallResponse === 'negative',
     };
 
     leads.push(lead);

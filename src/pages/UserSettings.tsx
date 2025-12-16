@@ -281,6 +281,9 @@ export default function UserSettings() {
               const campaignName = fileRecord.file_name.replace(/\.(csv|xlsx|xls)$/i, '').replace(/_/g, ' ');
               const parsedData = parseHybridCsv(text, campaignName);
               
+              // Calculate pending leads (total - positive - negative)
+              const pendingLeads = parsedData.summary.totalLeads - parsedData.summary.positiveResponses - parsedData.summary.negativeResponses;
+              
               previews.push({
                 fileName: fileRecord.file_name,
                 campaignsCount: 1,
@@ -289,6 +292,7 @@ export default function UserSettings() {
                 ).length,
                 positiveLeadsCount: parsedData.summary.positiveResponses,
                 negativeLeadsCount: parsedData.summary.negativeResponses,
+                pendingLeadsCount: pendingLeads,
                 campaignNames: [campaignName],
                 detectedType: 'hybrid',
                 selectedType: 'hybrid',
@@ -412,6 +416,7 @@ export default function UserSettings() {
       
       if (newType === 'hybrid') {
         newParsedData = parseHybridCsv(csvText, campaignName);
+        const pendingLeads = newParsedData.summary.totalLeads - newParsedData.summary.positiveResponses - newParsedData.summary.negativeResponses;
         newPreview = {
           fileName: fileRecord.file_name,
           campaignsCount: 1,
@@ -420,6 +425,7 @@ export default function UserSettings() {
           ).length,
           positiveLeadsCount: newParsedData.summary.positiveResponses,
           negativeLeadsCount: newParsedData.summary.negativeResponses,
+          pendingLeadsCount: pendingLeads,
           campaignNames: [campaignName],
           detectedType: fileData.type,
           selectedType: newType,
