@@ -1,8 +1,15 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { METRICS_ORDER } from '@/constants/metrics';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Edit2, Plus } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface CampaignMetricsData {
   campaignName: string;
@@ -27,9 +34,51 @@ interface CampaignMetricsData {
 
 interface CampaignPivotTableProps {
   campaigns: CampaignMetricsData[];
+  onMetricUpdate?: (campaignName: string, metricKey: string, value: number) => void;
+  onAddMetricEntry?: (campaignName: string, metricKey: string, date: string, value: number) => void;
+  editable?: boolean;
 }
 
-export function CampaignPivotTable({ campaigns }: CampaignPivotTableProps) {
+// Metrics that can be edited (numeric, not calculated)
+const EDITABLE_METRICS = [
+  'convitesEnviados',
+  'conexoesRealizadas', 
+  'mensagensEnviadas',
+  'visitas',
+  'likes',
+  'comentarios',
+  'respostasPositivas',
+  'respostasNegativas',
+  'reunioes',
+  'propostas',
+  'vendas'
+];
+
+export function CampaignPivotTable({ 
+  campaigns, 
+  onMetricUpdate,
+  onAddMetricEntry,
+  editable = false 
+}: CampaignPivotTableProps) {
+  const [editDialog, setEditDialog] = useState<{
+    open: boolean;
+    campaignName: string;
+    metricKey: string;
+    metricLabel: string;
+    currentValue: number;
+  } | null>(null);
+
+  const [addDialog, setAddDialog] = useState<{
+    open: boolean;
+    campaignName: string;
+    metricKey: string;
+    metricLabel: string;
+  } | null>(null);
+
+  const [editValue, setEditValue] = useState('');
+  const [addDate, setAddDate] = useState('');
+  const [addValue, setAddValue] = useState('');
+
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-';
     try {
@@ -49,6 +98,64 @@ export function CampaignPivotTable({ campaigns }: CampaignPivotTableProps) {
       return `${value}%`;
     }
     return String(value);
+  };
+
+  const handleCellClick = (campaign: CampaignMetricsData, metric: typeof METRICS_ORDER[number]) => {
+    if (!editable || !EDITABLE_METRICS.includes(metric.key)) return;
+    
+    const currentValue = (campaign as any)[metric.key] || 0;
+    setEditValue(String(currentValue));
+    setEditDialog({
+      open: true,
+      campaignName: campaign.campaignName,
+      metricKey: metric.key,
+      metricLabel: metric.label,
+      currentValue
+    });
+  };
+
+  const handleAddClick = (campaign: CampaignMetricsData, metric: typeof METRICS_ORDER[number]) => {
+    if (!editable || !EDITABLE_METRICS.includes(metric.key)) return;
+    
+    setAddDate(format(new Date(), 'yyyy-MM-dd'));
+    setAddValue('');
+    setAddDialog({
+      open: true,
+      campaignName: campaign.campaignName,
+      metricKey: metric.key,
+      metricLabel: metric.label
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (!editDialog || !onMetricUpdate) return;
+    
+    const newValue = parseFloat(editValue);
+    if (isNaN(newValue) || newValue < 0) {
+      toast.error('Valor inválido');
+      return;
+    }
+
+    onMetricUpdate(editDialog.campaignName, editDialog.metricKey, newValue);
+    setEditDialog(null);
+  };
+
+  const handleSaveAdd = () => {
+    if (!addDialog || !onAddMetricEntry) return;
+    
+    const value = parseFloat(addValue);
+    if (isNaN(value) || value < 0) {
+      toast.error('Valor inválido');
+      return;
+    }
+
+    if (!addDate) {
+      toast.error('Data é obrigatória');
+      return;
+    }
+
+    onAddMetricEntry(addDialog.campaignName, addDialog.metricKey, addDate, value);
+    setAddDialog(null);
   };
 
   // Calculate global totals
@@ -99,52 +206,149 @@ export function CampaignPivotTable({ campaigns }: CampaignPivotTableProps) {
     );
   }
 
+  const isEditable = (metricKey: string) => editable && EDITABLE_METRICS.includes(metricKey);
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Visão Pivot por Campanha</CardTitle>
-        <CardDescription>
-          Métricas por tipo de dado, com campanhas nas colunas e resultado global
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">
-                  Tipo de Dado / Período
-                </TableHead>
-                {campaigns.map((campaign, idx) => (
-                  <TableHead key={idx} className="text-center min-w-[140px]">
-                    {campaign.campaignName}
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Visão Pivot por Campanha
+            {editable && (
+              <span className="text-xs font-normal text-muted-foreground">
+                (clique nas células para editar)
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Métricas por tipo de dado, com campanhas nas colunas e resultado global
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">
+                    Tipo de Dado / Período
                   </TableHead>
-                ))}
-                <TableHead className="text-center min-w-[140px] font-bold bg-primary/10">
-                  Resultado Global
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {METRICS_ORDER.map((metric) => (
-                <TableRow key={metric.key}>
-                  <TableCell className="sticky left-0 bg-background z-10 font-medium">
-                    {metric.label}
-                  </TableCell>
                   {campaigns.map((campaign, idx) => (
-                    <TableCell key={idx} className="text-center">
-                      {formatValue(metric, (campaign as any)[metric.key])}
-                    </TableCell>
+                    <TableHead key={idx} className="text-center min-w-[140px]">
+                      {campaign.campaignName}
+                    </TableHead>
                   ))}
-                  <TableCell className="text-center font-bold bg-primary/5">
-                    {formatValue(metric, globalTotals[metric.key])}
-                  </TableCell>
+                  <TableHead className="text-center min-w-[140px] font-bold bg-primary/10">
+                    Resultado Global
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+              </TableHeader>
+              <TableBody>
+                {METRICS_ORDER.map((metric) => (
+                  <TableRow key={metric.key}>
+                    <TableCell className="sticky left-0 bg-background z-10 font-medium">
+                      {metric.label}
+                    </TableCell>
+                    {campaigns.map((campaign, idx) => (
+                      <TableCell 
+                        key={idx} 
+                        className={`text-center ${isEditable(metric.key) ? 'cursor-pointer hover:bg-accent/50 group relative' : ''}`}
+                        onClick={() => handleCellClick(campaign, metric)}
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>{formatValue(metric, (campaign as any)[metric.key])}</span>
+                          {isEditable(metric.key) && (
+                            <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                              <Edit2 className="h-3 w-3 text-muted-foreground" />
+                              {onAddMetricEntry && (
+                                <Plus 
+                                  className="h-3 w-3 text-muted-foreground hover:text-primary" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddClick(campaign, metric);
+                                  }}
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                    ))}
+                    <TableCell className="text-center font-bold bg-primary/5">
+                      {formatValue(metric, globalTotals[metric.key])}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialog?.open || false} onOpenChange={(open) => !open && setEditDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar {editDialog?.metricLabel}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Campanha</Label>
+              <Input value={editDialog?.campaignName || ''} disabled />
+            </div>
+            <div className="space-y-2">
+              <Label>Valor Atual: {editDialog?.currentValue}</Label>
+              <Input 
+                type="number"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                placeholder="Novo valor"
+                min="0"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialog(null)}>Cancelar</Button>
+            <Button onClick={handleSaveEdit}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Entry Dialog */}
+      <Dialog open={addDialog?.open || false} onOpenChange={(open) => !open && setAddDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar {addDialog?.metricLabel}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Campanha</Label>
+              <Input value={addDialog?.campaignName || ''} disabled />
+            </div>
+            <div className="space-y-2">
+              <Label>Data</Label>
+              <Input 
+                type="date"
+                value={addDate}
+                onChange={(e) => setAddDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Valor</Label>
+              <Input 
+                type="number"
+                value={addValue}
+                onChange={(e) => setAddValue(e.target.value)}
+                placeholder="Valor"
+                min="0"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialog(null)}>Cancelar</Button>
+            <Button onClick={handleSaveAdd}>Adicionar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

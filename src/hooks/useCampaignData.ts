@@ -64,6 +64,7 @@ interface CampaignDataStore {
   addPositiveLead: (lead: Lead) => Promise<void>;
   addNegativeLead: (lead: Lead) => Promise<void>;
   updateLead: (id: string, updates: Partial<Lead>) => Promise<void>;
+  updateMetricValue: (campaignName: string, eventType: string, profileName: string, date: string, value: number) => Promise<void>;
   getAllLeads: () => Lead[];
   reset: () => Promise<void>;
 }
@@ -817,6 +818,91 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
     } catch (error) {
       console.error('Error updating lead:', error);
       toast.error('Erro ao atualizar lead');
+    }
+  },
+
+  updateMetricValue: async (campaignName: string, eventType: string, profileName: string, date: string, value: number) => {
+    // Update local state
+    set((state) => ({
+      campaignMetrics: state.campaignMetrics.map(metric => {
+        if (metric.campaignName === campaignName && 
+            metric.eventType === eventType && 
+            metric.profileName === profileName) {
+          return {
+            ...metric,
+            dailyData: {
+              ...metric.dailyData,
+              [date]: value
+            },
+            totalCount: Object.values({ ...metric.dailyData, [date]: value }).reduce((sum: number, v) => sum + (Number(v) || 0), 0)
+          };
+        }
+        return metric;
+      })
+    }));
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated');
+
+      // Find the metric in database
+      const { data: existingMetric, error: findError } = await supabase
+        .from('campaign_metrics')
+        .select('id, daily_data')
+        .eq('user_id', user.id)
+        .eq('campaign_name', campaignName)
+        .eq('event_type', eventType)
+        .eq('profile_name', profileName)
+        .maybeSingle();
+
+      if (findError) throw findError;
+
+      if (existingMetric) {
+        const updatedDailyData = { 
+          ...(existingMetric.daily_data as Record<string, number> || {}), 
+          [date]: value 
+        };
+        const newTotal = Object.values(updatedDailyData).reduce((sum: number, v) => sum + (Number(v) || 0), 0);
+
+        const { error: updateError } = await supabase
+          .from('campaign_metrics')
+          .update({ 
+            daily_data: updatedDailyData,
+            total_count: newTotal
+          })
+          .eq('id', existingMetric.id);
+
+        if (updateError) throw updateError;
+
+        // Also update daily_metrics table if it exists
+        const { data: dailyMetric } = await supabase
+          .from('daily_metrics')
+          .select('id')
+          .eq('campaign_metric_id', existingMetric.id)
+          .eq('date', date)
+          .maybeSingle();
+
+        if (dailyMetric) {
+          await supabase
+            .from('daily_metrics')
+            .update({ value })
+            .eq('id', dailyMetric.id);
+        } else {
+          await supabase
+            .from('daily_metrics')
+            .insert({
+              campaign_metric_id: existingMetric.id,
+              user_id: user.id,
+              date,
+              value
+            });
+        }
+      }
+
+      toast.success('Métrica atualizada');
+    } catch (error) {
+      console.error('Error updating metric value:', error);
+      toast.error('Erro ao atualizar métrica');
     }
   },
   

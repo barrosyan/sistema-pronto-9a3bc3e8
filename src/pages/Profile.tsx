@@ -78,7 +78,7 @@ const getLeadResponseType = (lead: any): 'positive' | 'negative' | 'pending' => 
 };
 
 export default function Profile() {
-  const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
+  const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading, updateMetricValue } = useCampaignData();
   const { selectedProfiles, availableProfiles } = useProfileFilter();
   const { selectedUserIds } = useAdminUser();
   const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
@@ -492,6 +492,50 @@ export default function Profile() {
   };
 
   const campaignPivotData = getCampaignPivotData();
+
+  // Handler to update metric value in pivot table
+  const handleMetricUpdate = async (campaignName: string, metricKey: string, value: number) => {
+    const metricToEventType: Record<string, string> = {
+      convitesEnviados: 'Connection Requests Sent',
+      conexoesRealizadas: 'Connection Requests Accepted',
+      mensagensEnviadas: 'Messages Sent',
+      visitas: 'Profile Visits',
+      likes: 'Post Likes',
+      comentarios: 'Comments Done',
+    };
+
+    const eventType = metricToEventType[metricKey];
+    if (eventType) {
+      const metric = campaignMetrics.find(m => m.campaignName === campaignName && m.eventType === eventType);
+      if (metric) {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        await updateMetricValue(campaignName, eventType, metric.profileName, today, value);
+        loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
+      }
+    }
+  };
+
+  // Handler to add new metric entry with date
+  const handleAddMetricEntry = async (campaignName: string, metricKey: string, date: string, value: number) => {
+    const metricToEventType: Record<string, string> = {
+      convitesEnviados: 'Connection Requests Sent',
+      conexoesRealizadas: 'Connection Requests Accepted',
+      mensagensEnviadas: 'Messages Sent',
+      visitas: 'Profile Visits',
+      likes: 'Post Likes',
+      comentarios: 'Comments Done',
+    };
+
+    const eventType = metricToEventType[metricKey];
+    if (eventType) {
+      const metric = campaignMetrics.find(m => m.campaignName === campaignName && m.eventType === eventType);
+      if (metric) {
+        await updateMetricValue(campaignName, eventType, metric.profileName, date, value);
+        loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
+      }
+    }
+  };
+
   const weeklyPivotData = getWeeklyPivotData();
 
   if (isLoading) {
@@ -580,7 +624,12 @@ export default function Profile() {
         </TabsList>
 
         <TabsContent value="pivot-campaign" className="space-y-6">
-          <CampaignPivotTable campaigns={campaignPivotData} />
+          <CampaignPivotTable 
+            campaigns={campaignPivotData}
+            editable={true}
+            onMetricUpdate={handleMetricUpdate}
+            onAddMetricEntry={handleAddMetricEntry}
+          />
         </TabsContent>
 
         <TabsContent value="pivot-weekly" className="space-y-6">

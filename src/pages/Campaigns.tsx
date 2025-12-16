@@ -116,7 +116,7 @@ const getLeadResponseType = (lead: any): 'positive' | 'negative' | 'pending' => 
 };
 
 export default function Campaigns() {
-  const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
+  const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading, updateMetricValue, updateLead } = useCampaignData();
   const { selectedProfiles } = useProfileFilter();
   const { selectedUserIds } = useAdminUser();
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
@@ -695,6 +695,51 @@ export default function Campaigns() {
   };
 
   const campaignPivotTableData = getCampaignPivotTableData();
+
+  // Handler to update metric value in pivot table
+  const handleMetricUpdate = async (campaignName: string, metricKey: string, value: number) => {
+    // Map metric keys to event types for campaign metrics
+    const metricToEventType: Record<string, string> = {
+      convitesEnviados: 'Connection Requests Sent',
+      conexoesRealizadas: 'Connection Requests Accepted',
+      mensagensEnviadas: 'Messages Sent',
+      visitas: 'Profile Visits',
+      likes: 'Post Likes',
+      comentarios: 'Comments Done',
+    };
+
+    const eventType = metricToEventType[metricKey];
+    if (eventType) {
+      // For campaign metrics, find the profile and update
+      const metric = campaignMetrics.find(m => m.campaignName === campaignName && m.eventType === eventType);
+      if (metric) {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        await updateMetricValue(campaignName, eventType, metric.profileName, today, value);
+        loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
+      }
+    }
+  };
+
+  // Handler to add new metric entry with date
+  const handleAddMetricEntry = async (campaignName: string, metricKey: string, date: string, value: number) => {
+    const metricToEventType: Record<string, string> = {
+      convitesEnviados: 'Connection Requests Sent',
+      conexoesRealizadas: 'Connection Requests Accepted',
+      mensagensEnviadas: 'Messages Sent',
+      visitas: 'Profile Visits',
+      likes: 'Post Likes',
+      comentarios: 'Comments Done',
+    };
+
+    const eventType = metricToEventType[metricKey];
+    if (eventType) {
+      const metric = campaignMetrics.find(m => m.campaignName === campaignName && m.eventType === eventType);
+      if (metric) {
+        await updateMetricValue(campaignName, eventType, metric.profileName, date, value);
+        loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
+      }
+    }
+  };
   
   // Determine which data to show based on calendar view
   const pivotData = calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly'
@@ -773,7 +818,12 @@ export default function Campaigns() {
       </Card>
 
       {/* Campaign Pivot Table - All campaigns comparison */}
-      <CampaignPivotTable campaigns={campaignPivotTableData} />
+      <CampaignPivotTable 
+        campaigns={campaignPivotTableData}
+        editable={true}
+        onMetricUpdate={handleMetricUpdate}
+        onAddMetricEntry={handleAddMetricEntry}
+      />
 
       {/* Campaign Details */}
       {selectedCampaigns.length > 0 && (
