@@ -3,6 +3,46 @@ import { CampaignMetrics, Lead } from '@/types/campaign';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// Helper function to create a unique key for a lead (for deduplication)
+const getLeadUniqueKey = (lead: { linkedin?: string; name: string; company?: string; campaign?: string }): string => {
+  // Normalize linkedin URL
+  const normalizeLinkedin = (url: string | undefined): string => {
+    if (!url) return '';
+    return url.toLowerCase().replace(/\/$/, '').replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '').trim();
+  };
+  
+  // Normalize name/company for comparison
+  const normalize = (str: string | undefined): string => {
+    if (!str) return '';
+    return str.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^\w\s]/g, '') // Remove special chars
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const linkedinKey = normalizeLinkedin(lead.linkedin);
+  if (linkedinKey) {
+    return `linkedin:${linkedinKey}`;
+  }
+  
+  // Fallback to name + company
+  return `name:${normalize(lead.name)}|company:${normalize(lead.company)}`;
+};
+
+// Deduplicate leads array, keeping the first occurrence
+const deduplicateLeads = <T extends { linkedin?: string; name: string; company?: string; campaign?: string }>(leads: T[]): T[] => {
+  const seen = new Set<string>();
+  return leads.filter(lead => {
+    const key = getLeadUniqueKey(lead);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+};
+
 interface CampaignDataStore {
   campaignMetrics: CampaignMetrics[];
   positiveLeads: Lead[];
@@ -367,14 +407,33 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
 
   addPositiveLeads: async (newLeads) => {
     const existingLeads = get().positiveLeads;
-    const mergedLeads = [...existingLeads, ...newLeads];
+    const allExistingLeads = get().getAllLeads();
+    
+    // Create set of existing lead keys
+    const existingKeys = new Set(allExistingLeads.map(l => getLeadUniqueKey(l)));
+    
+    // First deduplicate within new leads, then filter out existing
+    const deduplicatedNew = deduplicateLeads(newLeads);
+    const uniqueNewLeads = deduplicatedNew.filter(lead => !existingKeys.has(getLeadUniqueKey(lead)));
+    
+    const duplicatesCount = newLeads.length - uniqueNewLeads.length;
+    if (duplicatesCount > 0) {
+      console.log(`📋 Deduplication: ${duplicatesCount} duplicate leads removed from import`);
+    }
+    
+    if (uniqueNewLeads.length === 0) {
+      toast.info('Todos os leads já existem no sistema');
+      return;
+    }
+    
+    const mergedLeads = [...existingLeads, ...uniqueNewLeads];
     set({ positiveLeads: mergedLeads });
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User must be authenticated');
 
-      const leadsToInsert = newLeads.map(l => ({
+      const leadsToInsert = uniqueNewLeads.map(l => ({
         campaign: l.campaign,
         linkedin: l.linkedin,
         name: l.name,
@@ -420,6 +479,10 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         .insert(leadsToInsert);
 
       if (error) throw error;
+      
+      if (duplicatesCount > 0) {
+        toast.success(`${uniqueNewLeads.length} leads importados (${duplicatesCount} duplicatas ignoradas)`);
+      }
     } catch (error) {
       console.error('Error adding positive leads to database:', error);
     }
@@ -493,14 +556,33 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
 
   addNegativeLeads: async (newLeads) => {
     const existingLeads = get().negativeLeads;
-    const mergedLeads = [...existingLeads, ...newLeads];
+    const allExistingLeads = get().getAllLeads();
+    
+    // Create set of existing lead keys
+    const existingKeys = new Set(allExistingLeads.map(l => getLeadUniqueKey(l)));
+    
+    // First deduplicate within new leads, then filter out existing
+    const deduplicatedNew = deduplicateLeads(newLeads);
+    const uniqueNewLeads = deduplicatedNew.filter(lead => !existingKeys.has(getLeadUniqueKey(lead)));
+    
+    const duplicatesCount = newLeads.length - uniqueNewLeads.length;
+    if (duplicatesCount > 0) {
+      console.log(`📋 Deduplication: ${duplicatesCount} duplicate leads removed from import`);
+    }
+    
+    if (uniqueNewLeads.length === 0) {
+      toast.info('Todos os leads já existem no sistema');
+      return;
+    }
+    
+    const mergedLeads = [...existingLeads, ...uniqueNewLeads];
     set({ negativeLeads: mergedLeads });
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User must be authenticated');
 
-      const leadsToInsert = newLeads.map(l => ({
+      const leadsToInsert = uniqueNewLeads.map(l => ({
         campaign: l.campaign,
         linkedin: l.linkedin,
         name: l.name,
@@ -546,12 +628,26 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         .insert(leadsToInsert);
 
       if (error) throw error;
+      
+      if (duplicatesCount > 0) {
+        toast.success(`${uniqueNewLeads.length} leads importados (${duplicatesCount} duplicatas ignoradas)`);
+      }
     } catch (error) {
       console.error('Error adding negative leads to database:', error);
     }
   },
   
   addPositiveLead: async (lead) => {
+    // Check for duplicates first
+    const allExistingLeads = get().getAllLeads();
+    const existingKeys = new Set(allExistingLeads.map(l => getLeadUniqueKey(l)));
+    const newLeadKey = getLeadUniqueKey(lead);
+    
+    if (existingKeys.has(newLeadKey)) {
+      toast.error('Este lead já existe no sistema');
+      return;
+    }
+    
     // Add to correct list based on status
     const status = lead.status || 'pending';
     if (status === 'positive') {
@@ -614,6 +710,16 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
   },
   
   addNegativeLead: async (lead) => {
+    // Check for duplicates first
+    const allExistingLeads = get().getAllLeads();
+    const existingKeys = new Set(allExistingLeads.map(l => getLeadUniqueKey(l)));
+    const newLeadKey = getLeadUniqueKey(lead);
+    
+    if (existingKeys.has(newLeadKey)) {
+      toast.error('Este lead já existe no sistema');
+      return;
+    }
+    
     set((state) => ({ negativeLeads: [...state.negativeLeads, lead] }));
     
     try {
