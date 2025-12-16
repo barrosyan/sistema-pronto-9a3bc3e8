@@ -79,7 +79,7 @@ const getLeadResponseType = (lead: any): 'positive' | 'negative' | 'pending' => 
 };
 
 export default function Profile() {
-  const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading, updateMetricValue } = useCampaignData();
+  const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading, updateMetricValue, updateCampaignDates } = useCampaignData();
   const { selectedProfiles, availableProfiles } = useProfileFilter();
   const { selectedUserIds } = useAdminUser();
   const { toast } = useToast();
@@ -631,6 +631,13 @@ export default function Profile() {
             editable={true}
             onMetricUpdate={handleMetricUpdate}
             onAddMetricEntry={handleAddMetricEntry}
+            onDateUpdate={async (campaignName, field, value) => {
+              if (field === 'startDate') {
+                await updateCampaignDates(campaignName, value, undefined);
+              } else {
+                await updateCampaignDates(campaignName, undefined, value);
+              }
+            }}
           />
         </TabsContent>
 
@@ -638,10 +645,20 @@ export default function Profile() {
           <WeeklyPivotTable 
             weeks={weeklyPivotData} 
             editable={true}
-            onDateUpdate={(weekNumber, field, value) => {
-              // For now, toast to notify - full persistence would require additional DB schema
+            onDateUpdate={async (weekNumber, field, value) => {
+              const week = weeklyPivotData.find(w => w.weekNumber === weekNumber);
+              if (week && week.activeCampaigns.length > 0) {
+                // Update dates for all campaigns in this week
+                for (const campaignName of week.activeCampaigns) {
+                  if (field === 'startDate') {
+                    await updateCampaignDates(campaignName, value, undefined);
+                  } else {
+                    await updateCampaignDates(campaignName, undefined, value);
+                  }
+                }
+              }
               toast({
-                title: "Data atualizada",
+                title: "Data atualizada e salva",
                 description: `Semana ${weekNumber}: ${field === 'startDate' ? 'Início' : 'Fim'} alterado para ${value}`,
               });
             }}

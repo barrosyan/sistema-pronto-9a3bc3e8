@@ -65,6 +65,7 @@ interface CampaignDataStore {
   addNegativeLead: (lead: Lead) => Promise<void>;
   updateLead: (id: string, updates: Partial<Lead>) => Promise<void>;
   updateMetricValue: (campaignName: string, eventType: string, profileName: string, date: string, value: number) => Promise<void>;
+  updateCampaignDates: (campaignName: string, startDate?: string, endDate?: string) => Promise<void>;
   getAllLeads: () => Lead[];
   reset: () => Promise<void>;
 }
@@ -903,6 +904,54 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
     } catch (error) {
       console.error('Error updating metric value:', error);
       toast.error('Erro ao atualizar métrica');
+    }
+  },
+
+  updateCampaignDates: async (campaignName: string, startDate?: string, endDate?: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated');
+
+      // Find campaign in database
+      const { data: campaign, error: findError } = await supabase
+        .from('campaigns')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('name', campaignName)
+        .maybeSingle();
+
+      if (findError) throw findError;
+
+      if (campaign) {
+        // Update existing campaign
+        const updates: { start_date?: string; end_date?: string } = {};
+        if (startDate) updates.start_date = startDate;
+        if (endDate) updates.end_date = endDate;
+
+        const { error: updateError } = await supabase
+          .from('campaigns')
+          .update(updates)
+          .eq('id', campaign.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Create new campaign entry with dates
+        const { error: insertError } = await supabase
+          .from('campaigns')
+          .insert({
+            user_id: user.id,
+            name: campaignName,
+            start_date: startDate,
+            end_date: endDate
+          });
+
+        if (insertError) throw insertError;
+      }
+
+      toast.success('Datas da campanha atualizadas');
+    } catch (error) {
+      console.error('Error updating campaign dates:', error);
+      toast.error('Erro ao atualizar datas da campanha');
     }
   },
   

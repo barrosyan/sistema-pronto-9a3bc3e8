@@ -30,8 +30,21 @@ import { LeadEditDialog } from '@/components/LeadEditDialog';
 import { ManualLeadDialog } from '@/components/ManualLeadDialog';
 import { LeadDetailDialog } from '@/components/LeadDetailDialog';
 import { ExportOptions } from '@/components/ExportOptions';
+import { EditableCell } from '@/components/EditableCell';
+import { EditableSelectCell } from '@/components/EditableSelectCell';
 
 const ITEMS_PER_PAGE = 20;
+
+const STATUS_OPTIONS = [
+  { value: 'pending', label: 'Pendente' },
+  { value: 'positive', label: 'Positivo' },
+  { value: 'negative', label: 'Negativo' },
+  { value: 'follow-up', label: 'Follow-Up' },
+  { value: 'retomar-contato', label: 'Retomar Contato' },
+  { value: 'em-negociacao', label: 'Em Negociação' },
+  { value: 'sem-interesse', label: 'Sem Interesse' },
+  { value: 'sem-fit', label: 'Sem Fit' },
+];
 
 type SortField = 'name' | 'position' | 'company' | 'campaign' | 'status' | 'connectionDate';
 type SortOrder = 'asc' | 'desc';
@@ -560,6 +573,9 @@ const Leads = () => {
                     >
                       Status {getSortIcon('status')}
                     </TableHead>
+                    <TableHead>Data Reunião</TableHead>
+                    <TableHead>Proposta (R$)</TableHead>
+                    <TableHead>Venda (R$)</TableHead>
                     <TableHead className="text-center">Ação Rápida</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
@@ -579,7 +595,50 @@ const Leads = () => {
                       <TableCell className="font-medium">{lead.name}</TableCell>
                       <TableCell>{lead.company}</TableCell>
                       <TableCell>{lead.campaign}</TableCell>
-                      <TableCell>{getStatusBadge(lead.status)}</TableCell>
+                      <TableCell>
+                        <EditableSelectCell
+                          value={lead.status}
+                          options={STATUS_OPTIONS}
+                          onSave={async (newStatus) => {
+                            await updateLead(lead.id, { status: newStatus as Lead['status'] });
+                            toast.success('Status atualizado');
+                          }}
+                          renderValue={(val) => getStatusBadge(val as Lead['status'])}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <EditableCell
+                          value={lead.meetingDate || '-'}
+                          type="date"
+                          editable={true}
+                          onSave={async (newValue) => {
+                            await updateLead(lead.id, { meetingDate: String(newValue) });
+                            toast.success('Data de reunião atualizada');
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <EditableCell
+                          value={lead.proposalValue || 0}
+                          type="number"
+                          editable={true}
+                          onSave={async (newValue) => {
+                            await updateLead(lead.id, { proposalValue: Number(newValue) });
+                            toast.success('Valor da proposta atualizado');
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <EditableCell
+                          value={lead.saleValue || 0}
+                          type="number"
+                          editable={true}
+                          onSave={async (newValue) => {
+                            await updateLead(lead.id, { saleValue: Number(newValue) });
+                            toast.success('Valor da venda atualizado');
+                          }}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-center gap-1">
                           <Button 
