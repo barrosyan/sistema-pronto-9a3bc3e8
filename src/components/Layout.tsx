@@ -1,12 +1,15 @@
 import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NavLink } from './NavLink';
-import { Merge, Users, Sparkles, LogOut, User, Settings, Target, Calendar } from 'lucide-react';
+import { Merge, Users, Sparkles, LogOut, User, Settings, Target, Calendar, Check, ChevronsUpDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from './ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Checkbox } from './ui/checkbox';
+import { Label } from './ui/label';
 import { toast } from 'sonner';
 import { useProfileFilter } from '@/contexts/ProfileFilterContext';
+import { cn } from '@/lib/utils';
 
 interface LayoutProps {
   children: ReactNode;
@@ -14,7 +17,7 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
-  const { selectedProfile, setSelectedProfile, availableProfiles } = useProfileFilter();
+  const { selectedProfiles, toggleProfile, selectAllProfiles, clearProfiles, availableProfiles } = useProfileFilter();
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -24,6 +27,13 @@ export const Layout = ({ children }: LayoutProps) => {
       toast.success("Logout realizado com sucesso!");
       navigate("/auth");
     }
+  };
+
+  const getProfileLabel = () => {
+    if (selectedProfiles.length === 0) return "Nenhum perfil";
+    if (selectedProfiles.length === 1) return selectedProfiles[0];
+    if (selectedProfiles.length === availableProfiles.length) return "Todos os perfis";
+    return `${selectedProfiles.length} perfis`;
   };
 
   return (
@@ -42,22 +52,62 @@ export const Layout = ({ children }: LayoutProps) => {
               
               {availableProfiles.length > 0 && (
                 <div className="flex items-center gap-2 ml-6">
-                  <span className="text-sm text-muted-foreground">Perfil:</span>
-                  <Select 
-                    value={selectedProfile || undefined} 
-                    onValueChange={setSelectedProfile}
-                  >
-                    <SelectTrigger className="w-[200px] bg-background">
-                      <SelectValue placeholder="Selecione um perfil" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-background border-border shadow-lg z-[100]">
-                      {availableProfiles.map((profile) => (
-                        <SelectItem key={profile} value={profile} className="hover:bg-accent">
-                          {profile}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <span className="text-sm text-muted-foreground">Perfis:</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-[200px] justify-between bg-background"
+                      >
+                        <span className="truncate">{getProfileLabel()}</span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0 bg-background border-border shadow-lg z-[100]">
+                      <div className="p-2 space-y-2">
+                        <div className="flex gap-2 pb-2 border-b">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="flex-1 h-7 text-xs"
+                            onClick={selectAllProfiles}
+                          >
+                            Todos
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="flex-1 h-7 text-xs"
+                            onClick={clearProfiles}
+                          >
+                            Limpar
+                          </Button>
+                        </div>
+                        <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                          {availableProfiles.map((profile) => (
+                            <div
+                              key={profile}
+                              className="flex items-center space-x-2 p-2 rounded hover:bg-accent cursor-pointer"
+                              onClick={() => toggleProfile(profile)}
+                            >
+                              <Checkbox
+                                id={`profile-${profile}`}
+                                checked={selectedProfiles.includes(profile)}
+                                onCheckedChange={() => toggleProfile(profile)}
+                              />
+                              <Label
+                                htmlFor={`profile-${profile}`}
+                                className="text-sm cursor-pointer flex-1"
+                              >
+                                {profile}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               )}
             </div>

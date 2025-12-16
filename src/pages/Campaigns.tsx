@@ -57,7 +57,7 @@ interface WeeklyData {
 
 export default function Campaigns() {
   const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
-  const { selectedProfile } = useProfileFilter();
+  const { selectedProfiles } = useProfileFilter();
   const { selectedUserIds } = useAdminUser();
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [granularity, setGranularity] = useState<'daily' | 'weekly'>('weekly');
@@ -131,11 +131,11 @@ export default function Campaigns() {
     }
   };
 
-  // Extract unique campaigns - filter by selected profile
+  // Extract unique campaigns - filter by selected profiles
   const allCampaigns = Array.from(
     new Set(
       campaignMetrics
-        .filter(m => !selectedProfile || m.profileName === selectedProfile)
+        .filter(m => selectedProfiles.length === 0 || selectedProfiles.includes(m.profileName))
         .map(m => m.campaignName)
         .filter(Boolean)
     )
@@ -154,7 +154,7 @@ export default function Campaigns() {
         setSelectedCampaigns(validCampaigns);
       }
     }
-  }, [allCampaigns, selectedProfile]);
+  }, [allCampaigns, selectedProfiles]);
 
   const toggleCampaign = (campaign: string) => {
     setSelectedCampaigns(prev => 
