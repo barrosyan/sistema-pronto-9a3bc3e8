@@ -116,7 +116,7 @@ const getLeadResponseType = (lead: any): 'positive' | 'negative' | 'pending' => 
 };
 
 export default function Campaigns() {
-  const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading, updateMetricValue, updateLead } = useCampaignData();
+  const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading, updateMetricValue, updateLead, updateCampaignDates } = useCampaignData();
   const { selectedProfiles } = useProfileFilter();
   const { selectedUserIds } = useAdminUser();
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
@@ -823,6 +823,13 @@ export default function Campaigns() {
         editable={true}
         onMetricUpdate={handleMetricUpdate}
         onAddMetricEntry={handleAddMetricEntry}
+        onDateUpdate={async (campaignName, field, value) => {
+          if (field === 'startDate') {
+            await updateCampaignDates(campaignName, value, undefined);
+          } else {
+            await updateCampaignDates(campaignName, undefined, value);
+          }
+        }}
       />
 
       {/* Campaign Details */}

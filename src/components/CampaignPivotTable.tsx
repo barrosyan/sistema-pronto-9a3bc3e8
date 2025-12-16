@@ -10,6 +10,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Edit2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { EditableCell } from './EditableCell';
 
 interface CampaignMetricsData {
   campaignName: string;
@@ -36,6 +37,7 @@ interface CampaignPivotTableProps {
   campaigns: CampaignMetricsData[];
   onMetricUpdate?: (campaignName: string, metricKey: string, value: number) => void;
   onAddMetricEntry?: (campaignName: string, metricKey: string, date: string, value: number) => void;
+  onDateUpdate?: (campaignName: string, field: 'startDate' | 'endDate', value: string) => void;
   editable?: boolean;
 }
 
@@ -54,10 +56,13 @@ const EDITABLE_METRICS = [
   'vendas'
 ];
 
+const EDITABLE_DATE_FIELDS = ['startDate', 'endDate'];
+
 export function CampaignPivotTable({ 
   campaigns, 
   onMetricUpdate,
   onAddMetricEntry,
+  onDateUpdate,
   editable = false 
 }: CampaignPivotTableProps) {
   const [editDialog, setEditDialog] = useState<{
@@ -207,6 +212,7 @@ export function CampaignPivotTable({
   }
 
   const isEditable = (metricKey: string) => editable && EDITABLE_METRICS.includes(metricKey);
+  const isDateEditable = (metricKey: string) => editable && EDITABLE_DATE_FIELDS.includes(metricKey) && onDateUpdate;
 
   return (
     <>
@@ -252,25 +258,36 @@ export function CampaignPivotTable({
                       <TableCell 
                         key={idx} 
                         className={`text-center ${isEditable(metric.key) ? 'cursor-pointer hover:bg-accent/50 group relative' : ''}`}
-                        onClick={() => handleCellClick(campaign, metric)}
+                        onClick={() => !isDateEditable(metric.key) && handleCellClick(campaign, metric)}
                       >
-                        <div className="flex items-center justify-center gap-1">
-                          <span>{formatValue(metric, (campaign as any)[metric.key])}</span>
-                          {isEditable(metric.key) && (
-                            <div className="opacity-0 group-hover:opacity-100 flex gap-1">
-                              <Edit2 className="h-3 w-3 text-muted-foreground" />
-                              {onAddMetricEntry && (
-                                <Plus 
-                                  className="h-3 w-3 text-muted-foreground hover:text-primary" 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAddClick(campaign, metric);
-                                  }}
-                                />
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        {isDateEditable(metric.key) ? (
+                          <EditableCell
+                            value={(campaign as any)[metric.key] || '-'}
+                            type="date"
+                            editable={true}
+                            onSave={(newValue) => {
+                              onDateUpdate?.(campaign.campaignName, metric.key as 'startDate' | 'endDate', String(newValue));
+                            }}
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center gap-1">
+                            <span>{formatValue(metric, (campaign as any)[metric.key])}</span>
+                            {isEditable(metric.key) && (
+                              <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                                <Edit2 className="h-3 w-3 text-muted-foreground" />
+                                {onAddMetricEntry && (
+                                  <Plus 
+                                    className="h-3 w-3 text-muted-foreground hover:text-primary" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAddClick(campaign, metric);
+                                    }}
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </TableCell>
                     ))}
                     <TableCell className="text-center font-bold bg-primary/5">
