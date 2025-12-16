@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { format, parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarDays } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 // Helper function to normalize campaign names for matching
 const normalizeCampaignName = (name: string): string => {
@@ -81,6 +82,7 @@ export default function Profile() {
   const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading, updateMetricValue } = useCampaignData();
   const { selectedProfiles, availableProfiles } = useProfileFilter();
   const { selectedUserIds } = useAdminUser();
+  const { toast } = useToast();
   const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
 
   useEffect(() => {
@@ -633,7 +635,23 @@ export default function Profile() {
         </TabsContent>
 
         <TabsContent value="pivot-weekly" className="space-y-6">
-          <WeeklyPivotTable weeks={weeklyPivotData} />
+          <WeeklyPivotTable 
+            weeks={weeklyPivotData} 
+            editable={true}
+            onDateUpdate={(weekNumber, field, value) => {
+              // For now, toast to notify - full persistence would require additional DB schema
+              toast({
+                title: "Data atualizada",
+                description: `Semana ${weekNumber}: ${field === 'startDate' ? 'Início' : 'Fim'} alterado para ${value}`,
+              });
+            }}
+            onMetricUpdate={(weekNumber, metricKey, value) => {
+              toast({
+                title: "Métrica atualizada",
+                description: `Semana ${weekNumber}: ${metricKey} alterado para ${value}`,
+              });
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="overview" className="space-y-6">

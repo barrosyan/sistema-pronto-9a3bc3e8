@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { EditableCell } from './EditableCell';
 
 interface WeeklyMetricsData {
   weekNumber: number;
@@ -27,6 +28,9 @@ interface WeeklyMetricsData {
 
 interface WeeklyPivotTableProps {
   weeks: WeeklyMetricsData[];
+  editable?: boolean;
+  onDateUpdate?: (weekNumber: number, field: 'startDate' | 'endDate', value: string) => void;
+  onMetricUpdate?: (weekNumber: number, metricKey: string, value: number) => void;
 }
 
 const WEEKLY_METRICS = [
@@ -49,7 +53,13 @@ const WEEKLY_METRICS = [
   { key: 'vendas', label: 'Vendas', type: 'number' },
 ] as const;
 
-export function WeeklyPivotTable({ weeks }: WeeklyPivotTableProps) {
+const EDITABLE_NUMBER_METRICS = [
+  'activeDays', 'convitesEnviados', 'conexoesRealizadas', 'mensagensEnviadas',
+  'visitas', 'likes', 'comentarios', 'respostasPositivas', 'leadsProcessados',
+  'reunioes', 'propostas', 'vendas'
+];
+
+export function WeeklyPivotTable({ weeks, editable = false, onDateUpdate, onMetricUpdate }: WeeklyPivotTableProps) {
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-';
     try {
@@ -59,12 +69,38 @@ export function WeeklyPivotTable({ weeks }: WeeklyPivotTableProps) {
     }
   };
 
-  const formatValue = (metric: typeof WEEKLY_METRICS[number], value: any): React.ReactNode => {
+  const formatValue = (metric: typeof WEEKLY_METRICS[number], value: any, weekNumber: number): React.ReactNode => {
     if (value === null || value === undefined) return '-';
     
+    // Editable date fields
+    if (metric.type === 'date' && editable && onDateUpdate) {
+      return (
+        <EditableCell
+          value={value || '-'}
+          type="date"
+          editable={true}
+          onSave={(newValue) => onDateUpdate(weekNumber, metric.key as 'startDate' | 'endDate', String(newValue))}
+        />
+      );
+    }
+    
+    // Non-editable date display
     if (metric.type === 'date') {
       return formatDate(value);
     }
+    
+    // Editable number fields
+    if (metric.type === 'number' && editable && onMetricUpdate && EDITABLE_NUMBER_METRICS.includes(metric.key)) {
+      return (
+        <EditableCell
+          value={value}
+          type="number"
+          editable={true}
+          onSave={(newValue) => onMetricUpdate(weekNumber, metric.key, Number(newValue))}
+        />
+      );
+    }
+    
     if (metric.type === 'percent') {
       return `${value}%`;
     }
@@ -100,6 +136,7 @@ export function WeeklyPivotTable({ weeks }: WeeklyPivotTableProps) {
         <CardTitle>Visão Pivot por Semana</CardTitle>
         <CardDescription>
           Métricas agregadas por semana, com dados de todas as campanhas consolidados
+          {editable && <span className="text-primary ml-2">(Duplo clique para editar)</span>}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -125,7 +162,7 @@ export function WeeklyPivotTable({ weeks }: WeeklyPivotTableProps) {
                   </TableCell>
                   {weeks.map((week) => (
                     <TableCell key={week.weekNumber} className="text-center">
-                      {formatValue(metric, (week as any)[metric.key])}
+                      {formatValue(metric, (week as any)[metric.key], week.weekNumber)}
                     </TableCell>
                   ))}
                 </TableRow>
