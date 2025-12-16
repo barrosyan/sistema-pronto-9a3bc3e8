@@ -107,19 +107,37 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         }
       }
       
-      // Load leads
-      let leadsQuery = supabase
-        .from('leads')
-        .select('*');
-      
-      if (effectiveUserIds.length === 1) {
-        leadsQuery = leadsQuery.eq('user_id', effectiveUserIds[0]);
-      } else {
-        leadsQuery = leadsQuery.in('user_id', effectiveUserIds);
+      // Load leads with pagination to bypass the 1000 row limit
+      let allLeads: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        let leadsQuery = supabase
+          .from('leads')
+          .select('*')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+        if (effectiveUserIds.length === 1) {
+          leadsQuery = leadsQuery.eq('user_id', effectiveUserIds[0]);
+        } else {
+          leadsQuery = leadsQuery.in('user_id', effectiveUserIds);
+        }
+        
+        const { data: leadsData, error: leadsError } = await leadsQuery;
+        if (leadsError) throw leadsError;
+        
+        if (leadsData && leadsData.length > 0) {
+          allLeads = [...allLeads, ...leadsData];
+          hasMore = leadsData.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
       }
       
-      const { data: leadsData, error: leadsError } = await leadsQuery;
-      if (leadsError) throw leadsError;
+      console.log(`📊 Loaded ${allLeads.length} leads from database`);
       
       // Transform database data to app format
       const metrics: CampaignMetrics[] = metricsData?.map(m => {
@@ -135,7 +153,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         };
       }) || [];
       
-      const leads: Lead[] = leadsData?.map(l => ({
+      const leads: Lead[] = allLeads.map(l => ({
         id: l.id,
         campaign: l.campaign,
         linkedin: l.linkedin || '',
