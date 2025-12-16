@@ -14,6 +14,7 @@ export interface HybridParsedData {
     followUps2Sent: number;
     positiveResponses: number;
     negativeResponses: number;
+    acceptanceRate: number; // Calculated as connectionsAccepted / invitesSent
   };
 }
 
@@ -152,6 +153,10 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
   const leads: any[] = [];
   let totalPositive = 0;
   let totalNegative = 0;
+  
+  // Count "Sim" responses for acceptance rate calculation
+  let totalInvitesSim = 0;
+  let totalAceitoSim = 0;
 
   rows.forEach((row, index) => {
     // Extract lead info
@@ -166,6 +171,7 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
     // Parse invite data
     const inviteValue = row[inviteCol || 'Invite'] || row['Invite'] || row['invite'] || '';
     const inviteSent = isYes(inviteValue);
+    if (inviteSent) totalInvitesSim++;
     
     // Find invite send date - look for first "Data de envio" or "Data do envio"
     let inviteSendDate: string | null = null;
@@ -184,6 +190,7 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
     // Parse connection accepted data
     const aceitoValue = row[aceitoCol || 'Aceito'] || row['Aceito'] || row['aceito'] || '';
     const connectionAccepted = isYes(aceitoValue);
+    if (connectionAccepted) totalAceitoSim++;
     
     // Find accept date - look for "Data de aceite"
     let acceptDate: string | null = null;
@@ -360,15 +367,18 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
     },
   ];
 
-  // Calculate summary
+  // Calculate summary - acceptance rate based on "Sim" counts
+  const acceptanceRate = totalInvitesSim > 0 ? (totalAceitoSim / totalInvitesSim) * 100 : 0;
+  
   const summary = {
     totalLeads: leads.length,
-    invitesSent: Array.from(metricsMap.invitesSent.values()).reduce((a, b) => a + b, 0),
-    connectionsAccepted: Array.from(metricsMap.connectionsAccepted.values()).reduce((a, b) => a + b, 0),
+    invitesSent: totalInvitesSim, // Use count of "Sim" in Invite column
+    connectionsAccepted: totalAceitoSim, // Use count of "Sim" in Aceito column
     followUps1Sent: Array.from(metricsMap.followUps1.values()).reduce((a, b) => a + b, 0),
     followUps2Sent: Array.from(metricsMap.followUps2.values()).reduce((a, b) => a + b, 0),
     positiveResponses: totalPositive,
     negativeResponses: totalNegative,
+    acceptanceRate: Math.round(acceptanceRate * 100) / 100, // Round to 2 decimal places
   };
 
   console.log('✅ Hybrid CSV parsing complete:', summary);

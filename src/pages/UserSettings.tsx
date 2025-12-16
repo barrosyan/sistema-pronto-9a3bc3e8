@@ -265,6 +265,8 @@ export default function UserSettings() {
                 negativeLeadsCount: 0,
                 campaignNames,
                 campaignProfileMappings,
+                detectedType: 'campaign-input',
+                selectedType: 'campaign-input',
               });
 
               parsedDataArray.push({
@@ -272,6 +274,7 @@ export default function UserSettings() {
                 parsedData,
                 user,
                 type: 'campaign-input',
+                csvText: text, // Save original text for re-parsing if type changes
               });
             } else if (detection.type === 'hybrid') {
               // Process hybrid CSV (leads + campaign metrics combined)
@@ -287,6 +290,9 @@ export default function UserSettings() {
                 positiveLeadsCount: parsedData.summary.positiveResponses,
                 negativeLeadsCount: parsedData.summary.negativeResponses,
                 campaignNames: [campaignName],
+                detectedType: 'hybrid',
+                selectedType: 'hybrid',
+                acceptanceRate: parsedData.summary.acceptanceRate,
               });
 
               parsedDataArray.push({
@@ -295,6 +301,7 @@ export default function UserSettings() {
                 user,
                 type: 'hybrid',
                 campaignName,
+                csvText: text, // Save original text for re-parsing if type changes
               });
             } else if (detection.type === 'leads') {
               // Process leads CSV
@@ -314,6 +321,8 @@ export default function UserSettings() {
                 positiveLeadsCount: parsedData.positiveLeads.length,
                 negativeLeadsCount: parsedData.negativeLeads.length,
                 campaignNames,
+                detectedType: 'leads',
+                selectedType: 'leads',
               });
 
               parsedDataArray.push({
@@ -321,6 +330,7 @@ export default function UserSettings() {
                 parsedData,
                 user,
                 type: 'leads',
+                csvText: text, // Save original text for re-parsing if type changes
               });
             } else {
               throw new Error('Tipo de CSV não reconhecido. Verifique se o arquivo possui as colunas corretas.');
@@ -376,6 +386,121 @@ export default function UserSettings() {
           : mapping
       )
     })));
+  };
+
+  const handleTypeSelect = async (fileName: string, newType: 'campaign-input' | 'leads' | 'hybrid') => {
+    console.log(`🔄 Mudando tipo de ${fileName} para ${newType}`);
+    
+    // Find the file data and re-parse with new type
+    const fileDataIndex = parsedFilesData.findIndex((f: any) => f.fileRecord.file_name === fileName);
+    if (fileDataIndex === -1) return;
+    
+    const fileData = parsedFilesData[fileDataIndex];
+    const csvText = fileData.csvText;
+    const fileRecord = fileData.fileRecord;
+    const user = fileData.user;
+    
+    if (!csvText) {
+      console.error('CSV text not found for re-parsing');
+      return;
+    }
+    
+    try {
+      let newParsedData: any;
+      let newPreview: any;
+      const campaignName = fileRecord.file_name.replace(/\.(csv|xlsx|xls)$/i, '').replace(/_/g, ' ');
+      
+      if (newType === 'hybrid') {
+        newParsedData = parseHybridCsv(csvText, campaignName);
+        newPreview = {
+          fileName: fileRecord.file_name,
+          campaignsCount: 1,
+          metricsCount: newParsedData.campaignMetrics.filter((m: any) => 
+            Object.keys(m.dailyData).length > 0
+          ).length,
+          positiveLeadsCount: newParsedData.summary.positiveResponses,
+          negativeLeadsCount: newParsedData.summary.negativeResponses,
+          campaignNames: [campaignName],
+          detectedType: fileData.type,
+          selectedType: newType,
+          acceptanceRate: newParsedData.summary.acceptanceRate,
+        };
+      } else if (newType === 'campaign-input') {
+        newParsedData = parseCampaignCsv(csvText);
+        const profileNames = Array.from(new Set(newParsedData.map((d: any) => d.profileName)));
+        const campaignNames = Array.from(new Set(newParsedData.map((d: any) => d.campaignName)));
+        
+        const campaignProfileMap = new Map<string, Set<string>>();
+        newParsedData.forEach((d: any) => {
+          if (!campaignProfileMap.has(d.campaignName)) {
+            campaignProfileMap.set(d.campaignName, new Set());
+          }
+          campaignProfileMap.get(d.campaignName)!.add(d.profileName);
+        });
+        
+        const campaignProfileMappings = Array.from(campaignProfileMap.entries()).map(([cName, profiles]) => {
+          const profilesArray = Array.from(profiles);
+          return {
+            campaignName: cName,
+            profiles: profilesArray,
+            selectedProfile: profilesArray.length === 1 ? profilesArray[0] : undefined,
+          };
+        });
+        
+        newPreview = {
+          fileName: fileRecord.file_name,
+          campaignsCount: campaignNames.length,
+          metricsCount: newParsedData.reduce((sum: number, d: any) => sum + d.metrics.length, 0),
+          positiveLeadsCount: 0,
+          negativeLeadsCount: 0,
+          campaignNames,
+          campaignProfileMappings,
+          detectedType: fileData.type,
+          selectedType: newType,
+        };
+      } else if (newType === 'leads') {
+        newParsedData = parseLeadsCsv(csvText, fileRecord.file_name);
+        const campaignNames = Array.from(
+          new Set([
+            ...newParsedData.positiveLeads.map((l: any) => l.campaign),
+            ...newParsedData.negativeLeads.map((l: any) => l.campaign)
+          ])
+        ).filter(Boolean);
+        
+        newPreview = {
+          fileName: fileRecord.file_name,
+          campaignsCount: 0,
+          metricsCount: 0,
+          positiveLeadsCount: newParsedData.positiveLeads.length,
+          negativeLeadsCount: newParsedData.negativeLeads.length,
+          campaignNames,
+          detectedType: fileData.type,
+          selectedType: newType,
+        };
+      }
+      
+      // Update parsed data array
+      const newParsedFilesData = [...parsedFilesData];
+      newParsedFilesData[fileDataIndex] = {
+        fileRecord,
+        parsedData: newParsedData,
+        user,
+        type: newType,
+        campaignName: newType === 'hybrid' ? campaignName : undefined,
+        csvText,
+      };
+      setParsedFilesData(newParsedFilesData);
+      
+      // Update preview data
+      setPreviewData(prev => prev.map(p => 
+        p.fileName === fileName ? newPreview : p
+      ));
+      
+      console.log(`✅ Arquivo ${fileName} re-parseado como ${newType}`);
+    } catch (error) {
+      console.error('Error re-parsing file:', error);
+      toast.error(`Erro ao processar arquivo como ${newType}`);
+    }
   };
 
   const confirmImport = async (incrementalMode: boolean = true) => {
@@ -634,9 +759,12 @@ export default function UserSettings() {
         } else if (type === 'hybrid') {
           // Process hybrid CSV (leads + campaign metrics combined)
           const { leads, campaignMetrics, summary } = parsedData;
-          const campaignName = (parsedFilesData.find((p: any) => p.type === 'hybrid') as any)?.campaignName || 'Campanha Importada';
+          // Use campaignName from the current file's parsed data, not find() which returns first match
+          const fileData = parsedFilesData.find((p: any) => p.parsedData === parsedData);
+          const campaignName = fileData?.campaignName || 'Campanha Importada';
           
-          console.log(`🔀 Processando formato híbrido: ${leads.length} leads, ${campaignMetrics.length} tipos de métricas`);
+          console.log(`🔀 Processando formato híbrido para campanha: ${campaignName}`);
+          console.log(`👥 ${leads.length} leads, ${campaignMetrics.length} tipos de métricas`);
           console.log('📊 Resumo:', summary);
 
           // Create a default profile name based on campaign
@@ -949,6 +1077,7 @@ export default function UserSettings() {
           setProfileSelections({});
         }}
         onProfileSelect={handleProfileSelect}
+        onTypeSelect={handleTypeSelect}
         loading={processing}
       />
     </div>
