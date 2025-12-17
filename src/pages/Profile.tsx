@@ -195,9 +195,10 @@ export default function Profile() {
     filteredMetrics.forEach(metric => {
       const targetKey = eventMappings[metric.eventType];
       if (targetKey) {
-        Object.values(metric.dailyData || {}).forEach(value => {
-          totals[targetKey] += value;
-        });
+        const dailyValues = Object.values(metric.dailyData || {});
+        const dailySum = dailyValues.reduce((sum, val) => sum + (Number(val) || 0), 0);
+        // Use dailyData sum if available, otherwise fallback to totalCount
+        totals[targetKey] += dailySum > 0 ? dailySum : (metric.totalCount || 0);
       }
     });
 
@@ -264,40 +265,39 @@ export default function Profile() {
       // Get profile for this campaign
       const profile = campaignMetricsData[0]?.profileName || '-';
 
-      // Calculate totals - use Set to track dates with activity (value > 0)
-      let convites = 0, conexoes = 0, mensagens = 0, visitas = 0;
-      let followUps1 = 0, followUps2 = 0, followUps3 = 0;
-      const datesWithActivity = new Set<string>();
+      // Helper to get metric value (dailyData sum or totalCount fallback)
+      const getMetricTotal = (eventTypes: string[]) => {
+        let total = 0;
+        eventTypes.forEach(eventType => {
+          const metric = campaignMetricsData.find(m => m.eventType === eventType);
+          if (metric) {
+            const dailyValues = Object.values(metric.dailyData || {});
+            const dailySum = dailyValues.reduce((sum, val) => sum + (Number(val) || 0), 0);
+            total += dailySum > 0 ? dailySum : (metric.totalCount || 0);
+          }
+        });
+        return total;
+      };
 
+      // Calculate totals - use Set to track dates with activity (value > 0)
+      const datesWithActivity = new Set<string>();
       campaignMetricsData.forEach(metric => {
         Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
           if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
-          
-          const numValue = Number(value) || 0;
-          
-          // Track dates with activity (value > 0)
-          if (numValue > 0) {
+          if (Number(value) > 0) {
             datesWithActivity.add(date);
-          }
-          
-          if (['Connection Requests Sent', 'Convites Enviados'].includes(metric.eventType)) {
-            convites += numValue;
-          } else if (['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made'].includes(metric.eventType)) {
-            conexoes += numValue;
-          } else if (['Profile Visits', 'Visitas a Perfil'].includes(metric.eventType)) {
-            visitas += numValue;
-          } else if (metric.eventType === 'Follow-Ups 1') {
-            followUps1 += numValue;
-          } else if (metric.eventType === 'Follow-Ups 2') {
-            followUps2 += numValue;
-          } else if (metric.eventType === 'Follow-Ups 3') {
-            followUps3 += numValue;
           }
         });
       });
 
-      mensagens = followUps1 + followUps2 + followUps3;
-      // Start/End = first/last date where ANY metric value > 0
+      const convites = getMetricTotal(['Connection Requests Sent', 'Convites Enviados']);
+      const conexoes = getMetricTotal(['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made']);
+      const visitas = getMetricTotal(['Profile Visits', 'Visitas a Perfil']);
+      const followUps1 = getMetricTotal(['Follow-Ups 1']);
+      const followUps2 = getMetricTotal(['Follow-Ups 2']);
+      const followUps3 = getMetricTotal(['Follow-Ups 3']);
+      const mensagens = followUps1 + followUps2 + followUps3 || getMetricTotal(['Messages Sent', 'Mensagens Enviadas']);
+
       const sortedActiveDates = Array.from(datesWithActivity).sort();
 
       return {
@@ -332,45 +332,41 @@ export default function Profile() {
       const positiveLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'positive');
       const negativeLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'negative');
 
-      let convites = 0, conexoes = 0, mensagens = 0, visitas = 0, likes = 0, comentarios = 0;
-      let followUps1 = 0, followUps2 = 0, followUps3 = 0;
+      // Helper to get metric value (dailyData sum or totalCount fallback)
+      const getMetricTotal = (eventTypes: string[]) => {
+        let total = 0;
+        eventTypes.forEach(eventType => {
+          const metric = campaignMetricsData.find(m => m.eventType === eventType);
+          if (metric) {
+            const dailyValues = Object.values(metric.dailyData || {});
+            const dailySum = dailyValues.reduce((sum, val) => sum + (Number(val) || 0), 0);
+            total += dailySum > 0 ? dailySum : (metric.totalCount || 0);
+          }
+        });
+        return total;
+      };
       
       // Use Set to track unique dates with activity (any metric > 0)
       const datesWithActivity = new Set<string>();
-
       campaignMetricsData.forEach(metric => {
         Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
           if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
-          
-          const numValue = Number(value) || 0;
-          
-          // Track dates with activity (value > 0)
-          if (numValue > 0) {
+          if (Number(value) > 0) {
             datesWithActivity.add(date);
-          }
-          
-          if (['Connection Requests Sent', 'Convites Enviados'].includes(metric.eventType)) {
-            convites += numValue;
-          } else if (['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made'].includes(metric.eventType)) {
-            conexoes += numValue;
-          } else if (['Profile Visits', 'Visitas a Perfil'].includes(metric.eventType)) {
-            visitas += numValue;
-          } else if (['Post Likes', 'Curtidas'].includes(metric.eventType)) {
-            likes += numValue;
-          } else if (['Comments Done', 'Comentários'].includes(metric.eventType)) {
-            comentarios += numValue;
-          } else if (metric.eventType === 'Follow-Ups 1') {
-            followUps1 += numValue;
-          } else if (metric.eventType === 'Follow-Ups 2') {
-            followUps2 += numValue;
-          } else if (metric.eventType === 'Follow-Ups 3') {
-            followUps3 += numValue;
           }
         });
       });
 
-      mensagens = followUps1 + followUps2 + followUps3;
-      // Start/End = first/last date where ANY metric value > 0
+      const convites = getMetricTotal(['Connection Requests Sent', 'Convites Enviados']);
+      const conexoes = getMetricTotal(['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made']);
+      const visitas = getMetricTotal(['Profile Visits', 'Visitas a Perfil']);
+      const likes = getMetricTotal(['Post Likes', 'Curtidas']);
+      const comentarios = getMetricTotal(['Comments Done', 'Comentários']);
+      const followUps1 = getMetricTotal(['Follow-Ups 1']);
+      const followUps2 = getMetricTotal(['Follow-Ups 2']);
+      const followUps3 = getMetricTotal(['Follow-Ups 3']);
+      const mensagens = followUps1 + followUps2 + followUps3 || getMetricTotal(['Messages Sent', 'Mensagens Enviadas']);
+
       const sortedActiveDates = Array.from(datesWithActivity).sort();
       const activeDays = sortedActiveDates.length;
 
