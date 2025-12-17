@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Presentation, Loader2 } from 'lucide-react';
+import { Presentation, Loader2, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -29,6 +29,59 @@ interface CampaignSummary {
 
 export function ExportOptions({ data, filename = 'campanhas', campaignSummaries = [] }: ExportOptionsProps) {
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
+
+  const exportToCsv = () => {
+    setIsExportingCsv(true);
+    try {
+      if (data.length === 0) {
+        toast.error('Nenhum dado para exportar');
+        return;
+      }
+
+      // Get all unique keys from data
+      const allKeys = new Set<string>();
+      data.forEach(row => {
+        Object.keys(row).forEach(key => allKeys.add(key));
+      });
+      const headers = Array.from(allKeys);
+
+      // Create CSV content
+      const csvRows = [
+        headers.join(','),
+        ...data.map(row => 
+          headers.map(header => {
+            const value = row[header];
+            if (value === null || value === undefined) return '';
+            const stringValue = String(value);
+            // Escape quotes and wrap in quotes if contains comma, newline, or quote
+            if (stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('"')) {
+              return `"${stringValue.replace(/"/g, '""')}"`;
+            }
+            return stringValue;
+          }).join(',')
+        )
+      ];
+
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${filename}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success('CSV exportado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao exportar CSV');
+      console.error(error);
+    } finally {
+      setIsExportingCsv(false);
+    }
+  };
 
   const exportToPowerPoint = async () => {
     setIsExporting(true);
@@ -362,21 +415,31 @@ export function ExportOptions({ data, filename = 'campanhas', campaignSummaries 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Exportar Apresentação</CardTitle>
+        <CardTitle>Exportar Dados</CardTitle>
       </CardHeader>
-      <CardContent>
-        <Button onClick={exportToPowerPoint} className="w-full" size="lg" disabled={isExporting}>
-          {isExporting ? (
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-          ) : (
-            <Presentation className="mr-2 h-5 w-5" />
-          )}
-          {isExporting ? 'Gerando...' : 'Baixar PowerPoint'}
-        </Button>
-        <p className="text-sm text-muted-foreground mt-4 text-center">
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <Button onClick={exportToCsv} variant="outline" size="lg" disabled={isExportingCsv}>
+            {isExportingCsv ? (
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="mr-2 h-5 w-5" />
+            )}
+            {isExportingCsv ? 'Gerando...' : 'Baixar CSV'}
+          </Button>
+          <Button onClick={exportToPowerPoint} size="lg" disabled={isExporting}>
+            {isExporting ? (
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            ) : (
+              <Presentation className="mr-2 h-5 w-5" />
+            )}
+            {isExporting ? 'Gerando...' : 'Baixar PowerPoint'}
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground text-center">
           {campaignSummaries.length > 0 
-            ? `${campaignSummaries.length} campanha(s) incluída(s) na apresentação`
-            : `${data.length} registros prontos para apresentação`
+            ? `${campaignSummaries.length} campanha(s) incluída(s)`
+            : `${data.length} registros prontos para exportação`
           }
         </p>
       </CardContent>
