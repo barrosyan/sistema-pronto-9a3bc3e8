@@ -441,6 +441,45 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_details: {
+        Row: {
+          ajustes_na_pesquisa: string | null
+          analise_comparativa: string | null
+          created_at: string
+          id: string
+          observacoes: string | null
+          problemas_tecnicos: string | null
+          profile_name: string
+          updated_at: string
+          user_id: string
+          week_start_date: string
+        }
+        Insert: {
+          ajustes_na_pesquisa?: string | null
+          analise_comparativa?: string | null
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          problemas_tecnicos?: string | null
+          profile_name: string
+          updated_at?: string
+          user_id: string
+          week_start_date: string
+        }
+        Update: {
+          ajustes_na_pesquisa?: string | null
+          analise_comparativa?: string | null
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          problemas_tecnicos?: string | null
+          profile_name?: string
+          updated_at?: string
+          user_id?: string
+          week_start_date?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { useProfileFilter } from '@/contexts/ProfileFilterContext';
 import { useAdminUser } from '@/contexts/AdminUserContext';
+import { useWeeklyDetails } from '@/hooks/useWeeklyDetails';
 import { Separator } from '@/components/ui/separator';
 import { ExportOptions } from '@/components/ExportOptions';
 import { ProfileComparison } from '@/components/ProfileComparison';
@@ -30,11 +31,20 @@ export default function Profile() {
   const { selectedProfiles, availableProfiles } = useProfileFilter();
   const { selectedUserIds } = useAdminUser();
   const { toast } = useToast();
+  const { weeklyDetails, loadWeeklyDetails, saveWeeklyDetail } = useWeeklyDetails();
   const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
+
+  // Get the current profile name for weekly details
+  const currentProfileName = selectedProfiles.length > 0 ? selectedProfiles[0] : 'default';
 
   useEffect(() => {
     loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
   }, [loadFromDatabase, selectedUserIds]);
+
+  // Load weekly details when profile changes
+  useEffect(() => {
+    loadWeeklyDetails(currentProfileName);
+  }, [currentProfileName, loadWeeklyDetails]);
 
   // Extract unique campaigns from database - filter by selected profiles
   const uniqueCampaigns = Array.from(
@@ -413,23 +423,50 @@ export default function Profile() {
       .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
     return sortedWeeks.map((week, index) => {
-      // Filter leads by week date range
+      // Filter leads by week date range using ONLY connection_date
       const weekStartDate = parseISO(week.startDate);
       const weekEndDate = parseISO(week.endDate);
       
+      // Leads processados = leads que tiveram connection_date nessa semana
       const weekLeads = filteredLeads.filter(lead => {
-        const dateToCheck = lead.connectionDate || lead.positiveResponseDate || (lead as any).createdAt || (lead as any).created_at;
-        if (!dateToCheck) return false;
+        // Use only connectionDate for leads processados
+        const connectionDate = lead.connectionDate;
+        if (!connectionDate) return false;
         try {
-          const leadDate = new Date(dateToCheck);
+          const leadDate = new Date(connectionDate);
           return leadDate >= weekStartDate && leadDate <= weekEndDate;
         } catch {
           return false;
         }
       });
       
-      const positiveLeads = weekLeads.filter(l => getLeadResponseType(l) === 'positive');
+      // For respostas positivas, reuniões etc - filter by positiveResponseDate or meetingDate within week
+      const positiveLeadsInWeek = filteredLeads.filter(lead => {
+        if (getLeadResponseType(lead) !== 'positive') return false;
+        const responseDate = lead.positiveResponseDate;
+        if (!responseDate) {
+          // If no positive response date, check connection date
+          const connDate = lead.connectionDate;
+          if (!connDate) return false;
+          try {
+            const d = new Date(connDate);
+            return d >= weekStartDate && d <= weekEndDate;
+          } catch {
+            return false;
+          }
+        }
+        try {
+          const d = new Date(responseDate);
+          return d >= weekStartDate && d <= weekEndDate;
+        } catch {
+          return false;
+        }
+      });
+      
       const mensagens = week.followUps1 + week.followUps2 + week.followUps3;
+      
+      // Get weekly details from database
+      const weekDetails = weeklyDetails[week.startDate];
       
       return {
         weekNumber: index + 1,
@@ -448,11 +485,16 @@ export default function Profile() {
         comentarios: week.comentarios,
         // Total de atividades NÃO inclui conexões (conexões são ações do lead, não do perfil)
         totalAtividades: week.convitesEnviados + mensagens + week.visitas + week.likes + week.comentarios,
-        respostasPositivas: positiveLeads.length,
+        respostasPositivas: positiveLeadsInWeek.length,
         leadsProcessados: weekLeads.length,
-        reunioes: positiveLeads.filter(l => l.meetingDate).length,
-        propostas: positiveLeads.filter(l => l.proposalDate).length,
-        vendas: positiveLeads.filter(l => l.saleDate).length,
+        reunioes: positiveLeadsInWeek.filter(l => l.meetingDate).length,
+        propostas: positiveLeadsInWeek.filter(l => l.proposalDate).length,
+        vendas: positiveLeadsInWeek.filter(l => l.saleDate).length,
+        // Detalhamento from database
+        observacoes: weekDetails?.observacoes || '',
+        problemasTecnicos: weekDetails?.problemasTecnicos || '',
+        ajustesNaPesquisa: weekDetails?.ajustesNaPesquisa || '',
+        analiseComparativa: weekDetails?.analiseComparativa || '',
       };
     });
   };
@@ -631,6 +673,17 @@ export default function Profile() {
                 title: "Métrica atualizada",
                 description: `Semana ${weekNumber}: ${metricKey} alterado para ${value}`,
               });
+            }}
+            onDetailUpdate={async (weekNumber, field, value) => {
+              const week = weeklyPivotData.find(w => w.weekNumber === weekNumber);
+              if (week) {
+                await saveWeeklyDetail({
+                  weekStartDate: week.startDate,
+                  profileName: currentProfileName,
+                  ...(weeklyDetails[week.startDate] || {}),
+                  [field]: value,
+                });
+              }
             }}
           />
         </TabsContent>
