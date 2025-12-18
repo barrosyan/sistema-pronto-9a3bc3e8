@@ -586,16 +586,16 @@ const Leads = () => {
                       key={lead.id}
                       className={selectedLeads.includes(lead.id) ? 'bg-primary/5' : ''}
                     >
-                      <TableCell>
+                      <TableCell className="align-middle">
                         <Checkbox 
                           checked={selectedLeads.includes(lead.id)}
                           onCheckedChange={() => toggleLeadSelection(lead.id)}
                         />
                       </TableCell>
-                      <TableCell className="font-medium">{lead.name}</TableCell>
-                      <TableCell>{lead.company}</TableCell>
-                      <TableCell>{lead.campaign}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium align-middle">{lead.name}</TableCell>
+                      <TableCell className="align-middle">{lead.company}</TableCell>
+                      <TableCell className="align-middle">{lead.campaign}</TableCell>
+                      <TableCell className="align-middle">
                         <EditableSelectCell
                           value={lead.status}
                           options={STATUS_OPTIONS}
@@ -606,7 +606,7 @@ const Leads = () => {
                           renderValue={(val) => getStatusBadge(val as Lead['status'])}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-middle">
                         <EditableCell
                           value={lead.meetingDate || '-'}
                           type="date"
@@ -617,7 +617,7 @@ const Leads = () => {
                           }}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-middle">
                         <EditableCell
                           value={lead.proposalValue || 0}
                           type="number"
@@ -628,7 +628,7 @@ const Leads = () => {
                           }}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-middle">
                         <EditableCell
                           value={lead.saleValue || 0}
                           type="number"
@@ -639,7 +639,7 @@ const Leads = () => {
                           }}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-middle">
                         <div className="flex items-center justify-center gap-1">
                           <Button 
                             variant={lead.status === 'positive' ? 'default' : 'outline'}
@@ -661,7 +661,7 @@ const Leads = () => {
                           </Button>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-middle">
                         <Button 
                           variant="ghost" 
                           size="sm"

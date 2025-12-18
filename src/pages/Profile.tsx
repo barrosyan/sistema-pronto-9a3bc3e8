@@ -433,7 +433,10 @@ export default function Profile() {
         const connectionDate = lead.connectionDate;
         if (!connectionDate) return false;
         try {
-          const leadDate = new Date(connectionDate);
+          // Parse the connection date and extract just the date part (YYYY-MM-DD)
+          const leadDateStr = connectionDate.split('T')[0].split(' ')[0];
+          const leadDate = parseISO(leadDateStr);
+          // Compare dates (inclusive of start and end)
           return leadDate >= weekStartDate && leadDate <= weekEndDate;
         } catch {
           return false;

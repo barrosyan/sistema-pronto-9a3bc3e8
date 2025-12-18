@@ -290,19 +290,19 @@ const CampaignDetails = () => {
                         const dayOfWeek = format(new Date(date), 'EEEE', { locale: ptBR });
                         
                         return (
-                          <TableRow key={date}>
-                            <TableCell className="font-medium">
+                        <TableRow key={date}>
+                            <TableCell className="font-medium align-middle">
                               <div className="flex flex-col">
                                 <span>{formattedDate}</span>
                                 <span className="text-xs text-muted-foreground capitalize">{dayOfWeek}</span>
                               </div>
                             </TableCell>
-                            <TableCell className="text-right">{metrics.invitations}</TableCell>
-                            <TableCell className="text-right">{metrics.connections}</TableCell>
-                            <TableCell className="text-right">{metrics.messages}</TableCell>
-                            <TableCell className="text-right">{metrics.profileVisits}</TableCell>
-                            <TableCell className="text-right">{metrics.likes}</TableCell>
-                            <TableCell className="text-right">{metrics.comments}</TableCell>
+                            <TableCell className="text-right align-middle">{metrics.invitations}</TableCell>
+                            <TableCell className="text-right align-middle">{metrics.connections}</TableCell>
+                            <TableCell className="text-right align-middle">{metrics.messages}</TableCell>
+                            <TableCell className="text-right align-middle">{metrics.profileVisits}</TableCell>
+                            <TableCell className="text-right align-middle">{metrics.likes}</TableCell>
+                            <TableCell className="text-right align-middle">{metrics.comments}</TableCell>
                           </TableRow>
                         );
                       })}
@@ -392,15 +392,15 @@ const CampaignDetails = () => {
                       .slice((weeklyPage - 1) * ITEMS_PER_PAGE, weeklyPage * ITEMS_PER_PAGE)
                       .map((week, idx) => (
                         <TableRow key={idx}>
-                          <TableCell className="font-medium">
+                          <TableCell className="font-medium align-middle">
                             {week.weekStart} - {week.weekEnd}
                           </TableCell>
-                          <TableCell className="text-right">{week.invitations}</TableCell>
-                          <TableCell className="text-right">{week.connections}</TableCell>
-                          <TableCell className="text-right">{week.messages}</TableCell>
-                          <TableCell className="text-right">{week.profileVisits}</TableCell>
-                          <TableCell className="text-right">{week.likes}</TableCell>
-                          <TableCell className="text-right">{week.comments}</TableCell>
+                          <TableCell className="text-right align-middle">{week.invitations}</TableCell>
+                          <TableCell className="text-right align-middle">{week.connections}</TableCell>
+                          <TableCell className="text-right align-middle">{week.messages}</TableCell>
+                          <TableCell className="text-right align-middle">{week.profileVisits}</TableCell>
+                          <TableCell className="text-right align-middle">{week.likes}</TableCell>
+                          <TableCell className="text-right align-middle">{week.comments}</TableCell>
                         </TableRow>
                       ))}
                   </TableBody>
@@ -479,16 +479,16 @@ const CampaignDetails = () => {
               <TableBody>
                 {campaignLeads.slice(0, 10).map((lead) => (
                   <TableRow key={lead.id}>
-                    <TableCell className="font-medium">{lead.name}</TableCell>
-                    <TableCell>{lead.company}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium align-middle">{lead.name}</TableCell>
+                    <TableCell className="align-middle">{lead.company}</TableCell>
+                    <TableCell className="align-middle">
                       {lead.status === 'positive' ? (
                         <Badge className="bg-success text-success-foreground">Positivo</Badge>
                       ) : (
                         <Badge variant="destructive">Negativo</Badge>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-middle">
                       <a href={lead.linkedin} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm">
                         Ver Perfil
                       </a>

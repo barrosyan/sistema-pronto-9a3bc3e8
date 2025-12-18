@@ -199,15 +199,15 @@ export function ProfileCrud({ onProfilesChange }: ProfileCrudProps) {
               <TableBody>
                 {profiles.map((profile) => (
                   <TableRow key={profile.id}>
-                    <TableCell className="font-medium">{profile.profile_name}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium align-middle">{profile.profile_name}</TableCell>
+                    <TableCell className="align-middle">
                       {new Date(profile.created_at).toLocaleDateString('pt-BR', {
                         day: '2-digit',
                         month: '2-digit',
                         year: 'numeric',
                       })}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right align-middle">
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="ghost"
