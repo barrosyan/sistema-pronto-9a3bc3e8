@@ -81,6 +81,9 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
     // Extract sequence generated date
     const sequenceDate = row['Sequence Generated At'] || row['sequence_generated_at'] || null;
 
+    // Extract Imported At date (when lead was imported from LinkedIn to Kontax)
+    const importedAt = row['Imported At'] || row['imported_at'] || null;
+
     const baseLead = {
       campaign,
       linkedin,
@@ -90,6 +93,7 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
       source: 'Kontax',
       connectionDate,
       sequenceDate,
+      importedAt,
     };
 
     if (hasPositiveResponse) {

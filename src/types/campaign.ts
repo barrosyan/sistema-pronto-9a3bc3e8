@@ -39,6 +39,7 @@ export interface Lead {
   
   // Connection data
   connectionDate?: string;
+  importedAt?: string; // Date lead was imported from LinkedIn to Kontax
   
   // Positive lead fields
   positiveResponseDate?: string;

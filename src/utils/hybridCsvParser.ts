@@ -417,6 +417,7 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
       company: null,
       source: 'Kontax',
       connectionDate: acceptDate,
+      importedAt: inviteSendDate, // Use invite send date as import date
       status: leadStatus,
       positiveResponseDate: overallResponse === 'positive' ? responseDate : null,
       negativeResponseDate: overallResponse === 'negative' ? responseDate : null,

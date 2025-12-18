@@ -64,7 +64,7 @@ export function EditableSelectCell({
     <span
       onClick={() => setIsEditing(true)}
       className={cn(
-        "cursor-pointer hover:bg-accent/50 px-2 py-1 rounded inline-block",
+        "cursor-pointer hover:bg-accent/50 px-2 py-1 rounded inline-flex items-center justify-center",
         className
       )}
       title="Clique para editar"

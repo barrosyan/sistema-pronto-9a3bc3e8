@@ -423,18 +423,19 @@ export default function Profile() {
       .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
     return sortedWeeks.map((week, index) => {
-      // Filter leads by week date range using ONLY connection_date
+      // Filter leads by week date range using IMPORTED_AT for "Leads Processados"
       const weekStartDate = parseISO(week.startDate);
       const weekEndDate = parseISO(week.endDate);
       
-      // Leads processados = leads que tiveram connection_date nessa semana
+      // Leads processados = leads que têm importedAt (Imported At) nessa semana
+      // Este é o campo que indica quando o lead foi importado do LinkedIn para a Kontax
       const weekLeads = filteredLeads.filter(lead => {
-        // Use only connectionDate for leads processados
-        const connectionDate = lead.connectionDate;
-        if (!connectionDate) return false;
+        // Use importedAt for leads processados (data de importação do LinkedIn)
+        const importedAt = lead.importedAt;
+        if (!importedAt) return false;
         try {
-          // Parse the connection date and extract just the date part (YYYY-MM-DD)
-          const leadDateStr = connectionDate.split('T')[0].split(' ')[0];
+          // Parse the imported at date and extract just the date part (YYYY-MM-DD)
+          const leadDateStr = importedAt.split('T')[0].split(' ')[0];
           const leadDate = parseISO(leadDateStr);
           // Compare dates (inclusive of start and end)
           return leadDate >= weekStartDate && leadDate <= weekEndDate;

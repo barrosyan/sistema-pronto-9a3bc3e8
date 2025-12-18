@@ -311,6 +311,7 @@ function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Le
       position: normalizeAndValidate(row.Position),
       company: normalizeAndValidate(row.Company),
       connectionDate: connectionDate, // Data de conexão extraída
+      importedAt: row['Imported At'] || null, // Data de importação do LinkedIn para Kontax
       positiveResponseDate: connectionDate, // Data de conexão extraída
       transferDate: null,
       status: 'pending' as const, // Leads importados via CSV começam como Pendente
@@ -336,7 +337,7 @@ function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Le
       classification: 'positive', // Classificação inicial como positivo
       attendedWebinar: false,
       whatsapp: normalizeAndValidate(row.Email),
-      standDay: row['Imported At'] || null,
+      standDay: null,
       pavilion: '',
       stand: ''
     };

@@ -110,13 +110,12 @@ export function EditableCell({
           <span
             onDoubleClick={handleDoubleClick}
             className={cn(
-              "cursor-pointer hover:bg-accent/50 px-2 py-1 rounded inline-flex items-center gap-1",
+              "cursor-pointer hover:bg-accent/50 px-2 py-1 rounded inline-flex items-center justify-center",
               className
             )}
             title="Duplo clique para editar"
           >
             {formatDisplayDate(String(value))}
-            <CalendarIcon className="h-3 w-3 text-muted-foreground" />
           </span>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">

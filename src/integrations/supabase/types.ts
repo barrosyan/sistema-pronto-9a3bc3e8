@@ -247,6 +247,7 @@ export type Database = {
           follow_up_reason: string | null
           had_follow_up: boolean | null
           id: string
+          imported_at: string | null
           linkedin: string | null
           meeting_date: string | null
           meeting_schedule_date: string | null
@@ -291,6 +292,7 @@ export type Database = {
           follow_up_reason?: string | null
           had_follow_up?: boolean | null
           id?: string
+          imported_at?: string | null
           linkedin?: string | null
           meeting_date?: string | null
           meeting_schedule_date?: string | null
@@ -335,6 +337,7 @@ export type Database = {
           follow_up_reason?: string | null
           had_follow_up?: boolean | null
           id?: string
+          imported_at?: string | null
           linkedin?: string | null
           meeting_date?: string | null
           meeting_schedule_date?: string | null

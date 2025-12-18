@@ -255,7 +255,8 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         stand: l.stand,
         negativeResponseDate: l.negative_response_date,
         hadFollowUp: l.had_follow_up,
-        followUpReason: l.follow_up_reason
+        followUpReason: l.follow_up_reason,
+        importedAt: l.imported_at
       })) || [];
       
       set({
@@ -417,6 +418,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         negative_response_date: l.negativeResponseDate,
         had_follow_up: l.hadFollowUp,
         follow_up_reason: l.followUpReason,
+        imported_at: l.importedAt,
       }));
 
       const { error: insertError } = await supabase
@@ -496,6 +498,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         negative_response_date: l.negativeResponseDate,
         had_follow_up: l.hadFollowUp,
         follow_up_reason: l.followUpReason,
+        imported_at: l.importedAt,
       }));
 
       const { error } = await supabase
@@ -566,6 +569,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         negative_response_date: l.negativeResponseDate,
         had_follow_up: l.hadFollowUp,
         follow_up_reason: l.followUpReason,
+        imported_at: l.importedAt,
       }));
 
       const { error: insertError } = await supabase
@@ -645,6 +649,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         negative_response_date: l.negativeResponseDate,
         had_follow_up: l.hadFollowUp,
         follow_up_reason: l.followUpReason,
+        imported_at: l.importedAt,
       }));
 
       const { error } = await supabase
@@ -725,6 +730,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         negative_response_date: lead.negativeResponseDate,
         had_follow_up: lead.hadFollowUp,
         follow_up_reason: lead.followUpReason,
+        imported_at: lead.importedAt,
       });
       if (error) throw error;
     } catch (error) {
@@ -789,6 +795,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         negative_response_date: lead.negativeResponseDate,
         had_follow_up: lead.hadFollowUp,
         follow_up_reason: lead.followUpReason,
+        imported_at: lead.importedAt,
       });
       if (error) throw error;
     } catch (error) {
