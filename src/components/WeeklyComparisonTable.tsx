@@ -122,15 +122,15 @@ export function WeeklyComparisonTable({ weeklyData, availableCampaigns, view }: 
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">
+                    <TableHead className="sticky left-0 bg-background z-10 min-w-[200px] text-left align-middle">
                       Campanha / Métrica
                     </TableHead>
                     {Array.from({ length: maxPeriods }, (_, i) => (
-                      <TableHead key={i} className="text-center min-w-[120px]">
+                      <TableHead key={i} className="text-center min-w-[120px] align-middle">
                         {view === 'weekly' ? `${i + 1}ª Semana` : `Dia ${i + 1}`}
                       </TableHead>
                     ))}
-                    <TableHead className="text-center min-w-[100px] font-bold">
+                    <TableHead className="text-center min-w-[100px] font-bold align-middle">
                       Total
                     </TableHead>
                   </TableRow>
@@ -142,7 +142,7 @@ export function WeeklyComparisonTable({ weeklyData, availableCampaigns, view }: 
                       <TableRow key={`header-${campaignIdx}`} className="bg-muted/50">
                         <TableCell 
                           colSpan={maxPeriods + 2} 
-                          className="sticky left-0 bg-muted/50 z-10 font-bold"
+                          className="sticky left-0 bg-muted/50 z-10 font-bold align-middle"
                         >
                           <Badge variant="outline" className="mr-2">
                             {campaignIdx + 1}
@@ -164,11 +164,11 @@ export function WeeklyComparisonTable({ weeklyData, availableCampaigns, view }: 
 
                         return (
                           <TableRow key={`${campaignIdx}-${metricIdx}`}>
-                            <TableCell className="sticky left-0 bg-background z-10 pl-8">
+                            <TableCell className="sticky left-0 bg-background z-10 pl-8 text-left align-middle">
                               {metric.label}
                             </TableCell>
                             {Array.from({ length: maxPeriods }, (_, i) => (
-                              <TableCell key={i} className="text-center">
+                              <TableCell key={i} className="text-center align-middle">
                                 {values[i] !== undefined 
                                   ? metric.key === 'taxaDeAceiteDeConexao'
                                     ? `${values[i].toFixed(1)}%`
@@ -176,7 +176,7 @@ export function WeeklyComparisonTable({ weeklyData, availableCampaigns, view }: 
                                   : '-'}
                               </TableCell>
                             ))}
-                            <TableCell className="text-center font-bold">
+                            <TableCell className="text-center font-bold align-middle">
                               {metric.key === 'taxaDeAceiteDeConexao' ? `${total}%` : total}
                             </TableCell>
                           </TableRow>

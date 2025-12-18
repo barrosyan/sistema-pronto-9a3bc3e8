@@ -114,7 +114,8 @@ export const calculateCampaignTotals = (
     followUps2,
     followUps3,
     taxaAceite: taxaAceite.toFixed(1),
-    totalAtividades: convites + conexoes + mensagens + visitas + likes + comentarios,
+    // Total de atividades NÃO inclui conexões (conexões são ações do lead, não do perfil)
+    totalAtividades: convites + mensagens + visitas + likes + comentarios,
   };
 };
 
