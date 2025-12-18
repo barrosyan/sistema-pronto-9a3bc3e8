@@ -235,15 +235,15 @@ export function CampaignPivotTable({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">
+                  <TableHead className="sticky left-0 bg-background z-10 min-w-[200px] text-left align-middle">
                     Tipo de Dado / Período
                   </TableHead>
                   {campaigns.map((campaign, idx) => (
-                    <TableHead key={idx} className="text-center min-w-[140px]">
+                    <TableHead key={idx} className="text-center min-w-[140px] align-middle">
                       {campaign.campaignName}
                     </TableHead>
                   ))}
-                  <TableHead className="text-center min-w-[140px] font-bold bg-primary/10">
+                  <TableHead className="text-center min-w-[140px] font-bold bg-primary/10 align-middle">
                     Resultado Global
                   </TableHead>
                 </TableRow>
@@ -251,13 +251,13 @@ export function CampaignPivotTable({
               <TableBody>
                 {METRICS_ORDER.map((metric) => (
                   <TableRow key={metric.key}>
-                    <TableCell className="sticky left-0 bg-background z-10 font-medium">
+                    <TableCell className="sticky left-0 bg-background z-10 font-medium text-left align-middle">
                       {metric.label}
                     </TableCell>
                     {campaigns.map((campaign, idx) => (
                       <TableCell 
                         key={idx} 
-                        className={`text-center ${isEditable(metric.key) ? 'cursor-pointer hover:bg-accent/50 group relative' : ''}`}
+                        className={`text-center align-middle ${isEditable(metric.key) ? 'cursor-pointer hover:bg-accent/50 group relative' : ''}`}
                         onClick={() => !isDateEditable(metric.key) && handleCellClick(campaign, metric)}
                       >
                         {isDateEditable(metric.key) ? (
@@ -290,7 +290,7 @@ export function CampaignPivotTable({
                         )}
                       </TableCell>
                     ))}
-                    <TableCell className="text-center font-bold bg-primary/5">
+                    <TableCell className="text-center font-bold bg-primary/5 align-middle">
                       {formatValue(metric, globalTotals[metric.key])}
                     </TableCell>
                   </TableRow>

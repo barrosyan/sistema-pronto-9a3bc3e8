@@ -172,7 +172,8 @@ export default function Profile() {
       propostas,
       vendas,
       taxaAceite,
-      totalAtividades: totals.convitesEnviados + totals.conexoesRealizadas + totals.mensagensEnviadas + 
+      // Total de atividades NÃO inclui conexões (conexões são ações do lead, não do perfil)
+      totalAtividades: totals.convitesEnviados + totals.mensagensEnviadas + 
                        totals.visitas + totals.likes + totals.comentarios
     };
   };
@@ -329,7 +330,8 @@ export default function Profile() {
         visitas,
         likes,
         comentarios,
-        totalAtividades: convites + conexoes + mensagens + visitas + likes + comentarios,
+        // Total de atividades NÃO inclui conexões (conexões são ações do lead, não do perfil)
+        totalAtividades: convites + mensagens + visitas + likes + comentarios,
         respostasPositivas: positiveLeads.length,
         respostasNegativas: negativeLeads.length,
         leadsProcessados: campaignLeads.length,
@@ -410,30 +412,49 @@ export default function Profile() {
     const sortedWeeks = Array.from(weeklyMap.values())
       .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
-    return sortedWeeks.map((week, index) => ({
-      weekNumber: index + 1,
-      startDate: week.startDate,
-      endDate: week.endDate,
-      activeCampaigns: Array.from(week.activeCampaigns) as string[],
-      activeDays: week.activeDays.size,
-      convitesEnviados: week.convitesEnviados,
-      conexoesRealizadas: week.conexoesRealizadas,
-      taxaAceite: week.convitesEnviados > 0 
-        ? ((week.conexoesRealizadas / week.convitesEnviados) * 100).toFixed(1)
-        : '0.0',
-      mensagensEnviadas: week.followUps1 + week.followUps2 + week.followUps3,
-      visitas: week.visitas,
-      likes: week.likes,
-      comentarios: week.comentarios,
-      totalAtividades: week.convitesEnviados + week.conexoesRealizadas + 
-        (week.followUps1 + week.followUps2 + week.followUps3) + 
-        week.visitas + week.likes + week.comentarios,
-      respostasPositivas: 0, // Would need leads filtering by date
-      leadsProcessados: 0,
-      reunioes: 0,
-      propostas: 0,
-      vendas: 0,
-    }));
+    return sortedWeeks.map((week, index) => {
+      // Filter leads by week date range
+      const weekStartDate = parseISO(week.startDate);
+      const weekEndDate = parseISO(week.endDate);
+      
+      const weekLeads = filteredLeads.filter(lead => {
+        const dateToCheck = lead.connectionDate || lead.positiveResponseDate || (lead as any).createdAt || (lead as any).created_at;
+        if (!dateToCheck) return false;
+        try {
+          const leadDate = new Date(dateToCheck);
+          return leadDate >= weekStartDate && leadDate <= weekEndDate;
+        } catch {
+          return false;
+        }
+      });
+      
+      const positiveLeads = weekLeads.filter(l => getLeadResponseType(l) === 'positive');
+      const mensagens = week.followUps1 + week.followUps2 + week.followUps3;
+      
+      return {
+        weekNumber: index + 1,
+        startDate: week.startDate,
+        endDate: week.endDate,
+        activeCampaigns: Array.from(week.activeCampaigns) as string[],
+        activeDays: week.activeDays.size,
+        convitesEnviados: week.convitesEnviados,
+        conexoesRealizadas: week.conexoesRealizadas,
+        taxaAceite: week.convitesEnviados > 0 
+          ? ((week.conexoesRealizadas / week.convitesEnviados) * 100).toFixed(1)
+          : '0.0',
+        mensagensEnviadas: mensagens,
+        visitas: week.visitas,
+        likes: week.likes,
+        comentarios: week.comentarios,
+        // Total de atividades NÃO inclui conexões (conexões são ações do lead, não do perfil)
+        totalAtividades: week.convitesEnviados + mensagens + week.visitas + week.likes + week.comentarios,
+        respostasPositivas: positiveLeads.length,
+        leadsProcessados: weekLeads.length,
+        reunioes: positiveLeads.filter(l => l.meetingDate).length,
+        propostas: positiveLeads.filter(l => l.proposalDate).length,
+        vendas: positiveLeads.filter(l => l.saleDate).length,
+      };
+    });
   };
 
   const campaignPivotData = getCampaignPivotData();
