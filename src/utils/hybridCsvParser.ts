@@ -67,12 +67,40 @@ const isYes = (value: string | null | undefined): boolean => {
   return normalized === 'sim' || normalized === 'yes' || normalized === 's' || normalized === 'y' || normalized === '1' || normalized === 'true';
 };
 
-// Check response type
+// Check response type - detect "positive" or "negative" responses
 const getResponseType = (value: string | null | undefined): 'positive' | 'negative' | null => {
   if (!value) return null;
   const normalized = value.toLowerCase().trim();
-  if (normalized.includes('positiv')) return 'positive';
-  if (normalized.includes('negativ')) return 'negative';
+  if (!normalized || normalized === '-' || normalized === 'n/a') return null;
+  
+  // Check for positive indicators
+  if (
+    normalized.includes('positiv') || // positivo, positiva, positive
+    normalized.includes('interes') ||  // interessado, interesse, interested
+    normalized === 'sim' ||
+    normalized === 'yes' ||
+    normalized === 's' ||
+    normalized === 'y' ||
+    normalized === '1' ||
+    normalized === 'true'
+  ) {
+    return 'positive';
+  }
+  
+  // Check for negative indicators
+  if (
+    normalized.includes('negativ') || // negativo, negativa, negative
+    normalized.includes('sem interesse') ||
+    normalized.includes('não') ||
+    normalized.includes('nao') ||
+    normalized === 'no' ||
+    normalized === 'n' ||
+    normalized === '0' ||
+    normalized === 'false'
+  ) {
+    return 'negative';
+  }
+  
   return null;
 };
 

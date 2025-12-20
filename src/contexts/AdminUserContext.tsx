@@ -18,24 +18,44 @@ export function AdminUserProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAdminStatus();
+    // Get initial session
+    const checkInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await checkAdminStatus(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    };
+    
+    checkInitialSession();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        await checkAdminStatus(session.user.id);
+      } else {
+        setCurrentUserId(null);
+        setIsAdmin(false);
+        setSelectedUserIds([]);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const checkAdminStatus = async () => {
+  const checkAdminStatus = async (userId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      setCurrentUserId(user.id);
+      setCurrentUserId(userId);
 
       // Check if user has admin role
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('role', 'admin')
         .maybeSingle();
 
@@ -43,7 +63,7 @@ export function AdminUserProvider({ children }: { children: React.ReactNode }) {
       setIsAdmin(adminStatus);
       
       // Always initialize with current user's ID (even for admin)
-      setSelectedUserIds([user.id]);
+      setSelectedUserIds([userId]);
     } catch (error) {
       console.error('Error checking admin status:', error);
     } finally {
