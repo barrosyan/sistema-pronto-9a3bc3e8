@@ -577,54 +577,60 @@ export default function UserSettings() {
             totalProfiles++;
             console.log(`✅ Profile: ${data.profileName}`);
 
-            // Create campaign
+            // Create campaign (upsert to avoid duplicate key errors)
             const { data: campaign, error: campaignError } = await supabase
               .from('campaigns')
-              .insert({
+              .upsert({
                 user_id: user.id,
                 profile_id: profile.id,
                 name: data.campaignName,
                 profile_name: data.profileName,
+              }, {
+                onConflict: 'user_id,name',
+                ignoreDuplicates: false,
               })
               .select()
               .single();
 
             if (campaignError) {
-              console.error('❌ Error creating campaign:', campaignError);
+              console.error('❌ Error upserting campaign:', campaignError);
               continue;
             }
 
             totalCampaigns++;
             console.log(`✅ Campaign: ${data.campaignName}`);
 
-            // Insert metrics
+            // Insert metrics (upsert to avoid duplicate key errors)
             for (const metric of data.metrics) {
-              // Insert campaign_metric without daily_data (will be stored in daily_metrics table)
-              const { data: insertedMetric, error: metricError } = await supabase
+              // Upsert campaign_metric without daily_data (will be stored in daily_metrics table)
+              const { data: upsertedMetric, error: metricError } = await supabase
                 .from('campaign_metrics')
-                .insert({
+                .upsert({
                   user_id: user.id,
                   campaign_name: data.campaignName,
                   profile_name: data.profileName,
                   event_type: metric.eventType,
                   total_count: metric.totalCount,
                   daily_data: {}, // Empty - daily data goes to daily_metrics table
+                }, {
+                  onConflict: 'user_id,campaign_name,event_type,profile_name',
+                  ignoreDuplicates: false,
                 })
                 .select()
                 .single();
 
               if (metricError) {
-                console.error(`❌ Error inserting metric ${metric.eventType}:`, metricError);
+                console.error(`❌ Error upserting metric ${metric.eventType}:`, metricError);
               } else {
                 totalMetrics++;
                 console.log(`✅ Metric: ${metric.eventType}`);
 
-                // Insert daily data into daily_metrics table
-                if (insertedMetric && metric.dailyData) {
+                // Upsert daily data into daily_metrics table
+                if (upsertedMetric && metric.dailyData) {
                   const dailyEntries = Object.entries(metric.dailyData)
                     .filter(([date]) => /^\d{4}-\d{2}-\d{2}$/.test(date))
                     .map(([date, value]) => ({
-                      campaign_metric_id: insertedMetric.id,
+                      campaign_metric_id: upsertedMetric.id,
                       user_id: user.id,
                       date,
                       value: Number(value) || 0,
@@ -633,12 +639,15 @@ export default function UserSettings() {
                   if (dailyEntries.length > 0) {
                     const { error: dailyError } = await supabase
                       .from('daily_metrics' as any)
-                      .insert(dailyEntries);
+                      .upsert(dailyEntries, {
+                        onConflict: 'campaign_metric_id,date',
+                        ignoreDuplicates: false,
+                      });
 
                     if (dailyError) {
-                      console.error(`❌ Error inserting daily metrics:`, dailyError);
+                      console.error(`❌ Error upserting daily metrics:`, dailyError);
                     } else {
-                      console.log(`✅ Inserted ${dailyEntries.length} daily entries for ${metric.eventType}`);
+                      console.log(`✅ Upserted ${dailyEntries.length} daily entries for ${metric.eventType}`);
                     }
                   }
                 }
@@ -794,57 +803,63 @@ export default function UserSettings() {
             console.log(`✅ Profile (hybrid): ${profileName}`);
           }
 
-          // Create campaign
+          // Create campaign (upsert to avoid duplicate key errors)
           const { data: campaign, error: campaignError } = await supabase
             .from('campaigns')
-            .insert({
+            .upsert({
               user_id: user.id,
               profile_id: profile?.id,
               name: campaignName,
               profile_name: profileName,
+            }, {
+              onConflict: 'user_id,name',
+              ignoreDuplicates: false,
             })
             .select()
             .single();
 
           if (campaignError) {
-            console.error('❌ Error creating campaign for hybrid:', campaignError);
+            console.error('❌ Error upserting campaign for hybrid:', campaignError);
           } else {
             totalCampaigns++;
             console.log(`✅ Campaign (hybrid): ${campaignName}`);
           }
 
-          // Insert campaign metrics
+          // Upsert campaign metrics
           for (const metric of campaignMetrics) {
             if (Object.keys(metric.dailyData).length === 0) continue;
 
             const dailyValues = Object.values(metric.dailyData) as number[];
             const totalCount = dailyValues.reduce((a, b) => a + b, 0);
 
-            const { data: insertedMetric, error: metricError } = await supabase
+            const { data: upsertedMetric, error: metricError } = await supabase
               .from('campaign_metrics')
-              .insert([{
+              .upsert({
                 user_id: user.id,
                 campaign_name: campaignName,
                 profile_name: profileName,
                 event_type: metric.eventType,
                 total_count: totalCount,
                 daily_data: {},
-              }])
+              }, {
+                onConflict: 'user_id,campaign_name,event_type,profile_name',
+                ignoreDuplicates: false,
+              })
               .select()
               .single();
 
             if (metricError) {
-              console.error(`❌ Error inserting hybrid metric ${metric.eventType}:`, metricError);
+              console.error(`❌ Error upserting hybrid metric ${metric.eventType}:`, metricError);
             } else {
               totalMetrics++;
               console.log(`✅ Metric (hybrid): ${metric.eventType} = ${totalCount}`);
 
-              // Insert daily data
-              if (insertedMetric) {
+              // Upsert daily data
+              if (upsertedMetric) {
                 const dailyEntries = Object.entries(metric.dailyData)
                   .filter(([date]) => /^\d{4}-\d{2}-\d{2}$/.test(date))
                   .map(([date, value]) => ({
-                    campaign_metric_id: insertedMetric.id,
+                    campaign_metric_id: upsertedMetric.id,
                     user_id: user.id,
                     date,
                     value: Number(value) || 0,
@@ -853,12 +868,15 @@ export default function UserSettings() {
                 if (dailyEntries.length > 0) {
                   const { error: dailyError } = await supabase
                     .from('daily_metrics' as any)
-                    .insert(dailyEntries);
+                    .upsert(dailyEntries, {
+                      onConflict: 'campaign_metric_id,date',
+                      ignoreDuplicates: false,
+                    });
 
                   if (dailyError) {
-                    console.error(`❌ Error inserting hybrid daily metrics:`, dailyError);
+                    console.error(`❌ Error upserting hybrid daily metrics:`, dailyError);
                   } else {
-                    console.log(`✅ Inserted ${dailyEntries.length} daily entries for ${metric.eventType}`);
+                    console.log(`✅ Upserted ${dailyEntries.length} daily entries for ${metric.eventType}`);
                   }
                 }
               }

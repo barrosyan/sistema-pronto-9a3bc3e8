@@ -354,7 +354,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
       const { error } = await supabase
         .from('campaign_metrics')
         .upsert(metricsToUpsert, { 
-          onConflict: 'campaign_name,event_type,profile_name',
+          onConflict: 'user_id,campaign_name,event_type,profile_name',
           ignoreDuplicates: false 
         });
 
