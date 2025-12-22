@@ -654,88 +654,115 @@ export default function Campaigns() {
     }
   };
 
-  // Prepare data for CampaignPivotTable
+  // Prepare data for CampaignPivotTable - memoized to prevent repeated calculations
   const getCampaignPivotTableData = () => {
-    return allCampaigns.map(campaignName => {
-      const campaignData = campaignMetrics.filter(m => m.campaignName === campaignName);
-      const campaignLeads = getAllLeads().filter(l => leadBelongsToCampaign(l.campaign, campaignName));
-      const positiveLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'positive');
-      const negativeLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'negative');
-
-      let convites = 0, conexoes = 0, mensagens = 0, visitas = 0, likes = 0, comentarios = 0;
-      let followUps1 = 0, followUps2 = 0, followUps3 = 0;
+    try {
+      // Get all leads once, not for each campaign
+      const allLeadsData = getAllLeads();
       
-      // Use Set to track unique dates with activity (any metric > 0)
-      const datesWithActivity = new Set<string>();
-      // Track all dates to calculate period range properly
-      const allDatesMap = new Map<string, number>(); // date -> total activity
+      return allCampaigns.map(campaignName => {
+        try {
+          const campaignData = campaignMetrics.filter(m => m.campaignName === campaignName);
+          const campaignLeads = allLeadsData.filter(l => leadBelongsToCampaign(l.campaign, campaignName));
+          const positiveLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'positive');
+          const negativeLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'negative');
 
-      campaignData.forEach(metric => {
-        Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
-          // Validate date format
-          if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+          let convites = 0, conexoes = 0, mensagens = 0, visitas = 0, likes = 0, comentarios = 0;
+          let followUps1 = 0, followUps2 = 0, followUps3 = 0;
           
-          const numValue = Number(value) || 0;
+          // Use Set to track unique dates with activity (any metric > 0)
+          const datesWithActivity = new Set<string>();
+
+          campaignData.forEach(metric => {
+            Object.entries(metric.dailyData || {}).forEach(([date, value]) => {
+              // Validate date format
+              if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+              
+              const numValue = Number(value) || 0;
+              
+              // Track dates with activity (value > 0) for active days count
+              if (numValue > 0) {
+                datesWithActivity.add(date);
+              }
+              
+              if (['Connection Requests Sent', 'Convites Enviados'].includes(metric.eventType)) {
+                convites += numValue;
+              } else if (['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made'].includes(metric.eventType)) {
+                conexoes += numValue;
+              } else if (['Profile Visits', 'Visitas a Perfil'].includes(metric.eventType)) {
+                visitas += numValue;
+              } else if (['Post Likes', 'Curtidas'].includes(metric.eventType)) {
+                likes += numValue;
+              } else if (['Comments Done', 'Comentários'].includes(metric.eventType)) {
+                comentarios += numValue;
+              } else if (metric.eventType === 'Follow-Ups 1') {
+                followUps1 += numValue;
+              } else if (metric.eventType === 'Follow-Ups 2') {
+                followUps2 += numValue;
+              } else if (metric.eventType === 'Follow-Ups 3') {
+                followUps3 += numValue;
+              }
+            });
+          });
+
+          mensagens = followUps1 + followUps2 + followUps3;
           
-          // Track total activity per date
-          allDatesMap.set(date, (allDatesMap.get(date) || 0) + numValue);
+          // Start/End = first/last date where ANY metric value > 0
+          const sortedActiveDates = Array.from(datesWithActivity).sort();
+          const startDate = sortedActiveDates.length > 0 ? sortedActiveDates[0] : null;
+          const endDate = sortedActiveDates.length > 0 ? sortedActiveDates[sortedActiveDates.length - 1] : null;
           
-          // Track dates with activity (value > 0) for active days count
-          if (numValue > 0) {
-            datesWithActivity.add(date);
-          }
-          
-          if (['Connection Requests Sent', 'Convites Enviados'].includes(metric.eventType)) {
-            convites += numValue;
-          } else if (['Connection Requests Accepted', 'Conexões Realizadas', 'Connections Made'].includes(metric.eventType)) {
-            conexoes += numValue;
-          } else if (['Profile Visits', 'Visitas a Perfil'].includes(metric.eventType)) {
-            visitas += numValue;
-          } else if (['Post Likes', 'Curtidas'].includes(metric.eventType)) {
-            likes += numValue;
-          } else if (['Comments Done', 'Comentários'].includes(metric.eventType)) {
-            comentarios += numValue;
-          } else if (metric.eventType === 'Follow-Ups 1') {
-            followUps1 += numValue;
-          } else if (metric.eventType === 'Follow-Ups 2') {
-            followUps2 += numValue;
-          } else if (metric.eventType === 'Follow-Ups 3') {
-            followUps3 += numValue;
-          }
-        });
+          // Active days = count of unique dates where any metric > 0
+          const activeDays = sortedActiveDates.length;
+
+          return {
+            campaignName,
+            startDate,
+            endDate,
+            activeDays,
+            convitesEnviados: convites,
+            conexoesRealizadas: conexoes,
+            taxaAceite: convites > 0 ? ((conexoes / convites) * 100).toFixed(1) : '0.0',
+            mensagensEnviadas: mensagens,
+            visitas,
+            likes,
+            comentarios,
+            totalAtividades: convites + conexoes + mensagens + visitas + likes + comentarios,
+            respostasPositivas: positiveLeads.length,
+            respostasNegativas: negativeLeads.length,
+            leadsProcessados: campaignLeads.length,
+            reunioes: positiveLeads.filter(l => l.meetingDate).length,
+            propostas: positiveLeads.filter(l => l.proposalDate).length,
+            vendas: positiveLeads.filter(l => l.saleDate).length,
+          };
+        } catch (error) {
+          console.error(`Error processing campaign ${campaignName}:`, error);
+          return {
+            campaignName,
+            startDate: null,
+            endDate: null,
+            activeDays: 0,
+            convitesEnviados: 0,
+            conexoesRealizadas: 0,
+            taxaAceite: '0.0',
+            mensagensEnviadas: 0,
+            visitas: 0,
+            likes: 0,
+            comentarios: 0,
+            totalAtividades: 0,
+            respostasPositivas: 0,
+            respostasNegativas: 0,
+            leadsProcessados: 0,
+            reunioes: 0,
+            propostas: 0,
+            vendas: 0,
+          };
+        }
       });
-
-      mensagens = followUps1 + followUps2 + followUps3;
-      
-      // Start/End = first/last date where ANY metric value > 0
-      const sortedActiveDates = Array.from(datesWithActivity).sort();
-      const startDate = sortedActiveDates.length > 0 ? sortedActiveDates[0] : null;
-      const endDate = sortedActiveDates.length > 0 ? sortedActiveDates[sortedActiveDates.length - 1] : null;
-      
-      // Active days = count of unique dates where any metric > 0
-      const activeDays = sortedActiveDates.length;
-
-      return {
-        campaignName,
-        startDate,
-        endDate,
-        activeDays,
-        convitesEnviados: convites,
-        conexoesRealizadas: conexoes,
-        taxaAceite: convites > 0 ? ((conexoes / convites) * 100).toFixed(1) : '0.0',
-        mensagensEnviadas: mensagens,
-        visitas,
-        likes,
-        comentarios,
-        totalAtividades: convites + conexoes + mensagens + visitas + likes + comentarios,
-        respostasPositivas: positiveLeads.length,
-        respostasNegativas: negativeLeads.length,
-        leadsProcessados: campaignLeads.length,
-        reunioes: positiveLeads.filter(l => l.meetingDate).length,
-        propostas: positiveLeads.filter(l => l.proposalDate).length,
-        vendas: positiveLeads.filter(l => l.saleDate).length,
-      };
-    });
+    } catch (error) {
+      console.error('Error in getCampaignPivotTableData:', error);
+      return [];
+    }
   };
 
   const campaignPivotTableData = getCampaignPivotTableData();
