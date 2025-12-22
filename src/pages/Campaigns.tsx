@@ -12,7 +12,8 @@ import { format, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Info, Plus, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, Plus, Download, Trash2 } from 'lucide-react';
+import { DeleteCampaignDialog } from '@/components/DeleteCampaignDialog';
 import { CampaignDetailsDialog } from '@/components/CampaignDetailsDialog';
 import { CampaignDetailsCard } from '@/components/CampaignDetailsCard';
 import { CampaignDialog } from '@/components/CampaignDialog';
@@ -73,6 +74,8 @@ export default function Campaigns() {
   const [period1Range, setPeriod1Range] = useState<DateRange | undefined>(undefined);
   const [period2Range, setPeriod2Range] = useState<DateRange | undefined>(undefined);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [deleteCampaignDialogOpen, setDeleteCampaignDialogOpen] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
@@ -751,15 +754,28 @@ export default function Campaigns() {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {allCampaigns.map(campaign => (
-              <div key={campaign} className="flex items-center space-x-2">
-                <Checkbox
-                  id={campaign}
-                  checked={selectedCampaigns.includes(campaign)}
-                  onCheckedChange={() => toggleCampaign(campaign)}
-                />
-                <Label htmlFor={campaign} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  {campaign}
-                </Label>
+              <div key={campaign} className="flex items-center justify-between gap-2 p-2 rounded-md hover:bg-muted/50 group">
+                <div className="flex items-center space-x-2 flex-1">
+                  <Checkbox
+                    id={campaign}
+                    checked={selectedCampaigns.includes(campaign)}
+                    onCheckedChange={() => toggleCampaign(campaign)}
+                  />
+                  <Label htmlFor={campaign} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                    {campaign}
+                  </Label>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    setCampaignToDelete(campaign);
+                    setDeleteCampaignDialogOpen(true);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             ))}
           </div>
@@ -1439,6 +1455,20 @@ export default function Campaigns() {
         onOpenChange={setCreateDialogOpen}
         onSave={handleCreateCampaign}
       />
+
+      {campaignToDelete && (
+        <DeleteCampaignDialog
+          open={deleteCampaignDialogOpen}
+          onOpenChange={setDeleteCampaignDialogOpen}
+          campaignName={campaignToDelete}
+          onDeleted={() => {
+            loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
+            loadCampaignDetails();
+            setSelectedCampaigns(prev => prev.filter(c => c !== campaignToDelete));
+            setCampaignToDelete(null);
+          }}
+        />
+      )}
     </div>
   );
 }
