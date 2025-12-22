@@ -80,6 +80,7 @@ export default function Campaigns() {
   const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
   const [editingCampaign, setEditingCampaign] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [sortOrder, setSortOrder] = useState<'name-asc' | 'name-desc' | 'date-asc' | 'date-desc'>('name-asc');
   const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -141,7 +142,7 @@ export default function Campaigns() {
   };
 
   // Extract unique campaigns - filter by selected profiles
-  const allCampaigns = Array.from(
+  const allCampaignsUnsorted = Array.from(
     new Set(
       campaignMetrics
         .filter(m => selectedProfiles.length === 0 || selectedProfiles.includes(m.profileName))
@@ -149,6 +150,20 @@ export default function Campaigns() {
         .filter(Boolean)
     )
   );
+
+  // Sort campaigns based on sortOrder
+  const allCampaigns = [...allCampaignsUnsorted].sort((a, b) => {
+    if (sortOrder === 'name-asc') {
+      return a.localeCompare(b, 'pt-BR');
+    } else if (sortOrder === 'name-desc') {
+      return b.localeCompare(a, 'pt-BR');
+    } else {
+      // Sort by date using campaignsData
+      const dateA = campaignsData[a]?.startDate ? new Date(campaignsData[a].startDate).getTime() : 0;
+      const dateB = campaignsData[b]?.startDate ? new Date(campaignsData[b].startDate).getTime() : 0;
+      return sortOrder === 'date-asc' ? dateA - dateB : dateB - dateA;
+    }
+  });
 
   useEffect(() => {
     if (allCampaigns.length > 0 && selectedCampaigns.length === 0) {
@@ -825,8 +840,23 @@ export default function Campaigns() {
       {/* Campaign Selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Campanhas Ativas</CardTitle>
-          <CardDescription>Campanhas encontradas nos dados importados</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Campanhas Ativas</CardTitle>
+              <CardDescription>Campanhas encontradas nos dados importados</CardDescription>
+            </div>
+            <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as typeof sortOrder)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Ordenar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name-asc">Nome (A-Z)</SelectItem>
+                <SelectItem value="name-desc">Nome (Z-A)</SelectItem>
+                <SelectItem value="date-asc">Data (Antiga)</SelectItem>
+                <SelectItem value="date-desc">Data (Recente)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
