@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { useProfileFilter } from '@/contexts/ProfileFilterContext';
@@ -7,12 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Info, Plus, Download, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, Plus, Download, Trash2, Pencil, Check, X } from 'lucide-react';
 import { DeleteCampaignDialog } from '@/components/DeleteCampaignDialog';
 import { CampaignDetailsDialog } from '@/components/CampaignDetailsDialog';
 import { CampaignDetailsCard } from '@/components/CampaignDetailsCard';
@@ -26,6 +27,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ExportOptions } from '@/components/ExportOptions';
 import { CampaignPivotTable } from '@/components/CampaignPivotTable';
 import { leadBelongsToCampaign, getLeadResponseType } from '@/utils/metricsCalculator';
+import { toast } from 'sonner';
 
 interface DailyData {
   date: string;
@@ -76,6 +78,9 @@ export default function Campaigns() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [deleteCampaignDialogOpen, setDeleteCampaignDialogOpen] = useState(false);
   const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
+  const [editingCampaign, setEditingCampaign] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
@@ -167,6 +172,70 @@ export default function Campaigns() {
         : [...prev, campaign]
     );
     setCurrentPage(1); // Reset to first page when campaigns change
+  };
+
+  const startEditingCampaign = (campaign: string) => {
+    setEditingCampaign(campaign);
+    setEditingName(campaign);
+    setTimeout(() => editInputRef.current?.focus(), 0);
+  };
+
+  const cancelEditingCampaign = () => {
+    setEditingCampaign(null);
+    setEditingName('');
+  };
+
+  const saveCampaignName = async () => {
+    if (!editingCampaign || !editingName.trim() || editingName === editingCampaign) {
+      cancelEditingCampaign();
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      // Update campaign name in campaigns table
+      const { error: campaignError } = await supabase
+        .from('campaigns')
+        .update({ name: editingName.trim() })
+        .eq('user_id', user.id)
+        .eq('name', editingCampaign);
+
+      if (campaignError) throw campaignError;
+
+      // Update campaign_name in campaign_metrics table
+      const { error: metricsError } = await supabase
+        .from('campaign_metrics')
+        .update({ campaign_name: editingName.trim() })
+        .eq('user_id', user.id)
+        .eq('campaign_name', editingCampaign);
+
+      if (metricsError) throw metricsError;
+
+      // Update campaign in leads table
+      const { error: leadsError } = await supabase
+        .from('leads')
+        .update({ campaign: editingName.trim() })
+        .eq('user_id', user.id)
+        .eq('campaign', editingCampaign);
+
+      if (leadsError) throw leadsError;
+
+      // Update selected campaigns if needed
+      setSelectedCampaigns(prev => 
+        prev.map(c => c === editingCampaign ? editingName.trim() : c)
+      );
+
+      toast.success('Nome da campanha atualizado!');
+      await loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
+      await loadCampaignDetails();
+    } catch (error) {
+      console.error('Error updating campaign name:', error);
+      toast.error('Erro ao atualizar nome da campanha');
+    } finally {
+      cancelEditingCampaign();
+    }
   };
 
   const getDailyDataForCampaign = (campaignName: string): DailyData[] => {
@@ -755,27 +824,74 @@ export default function Campaigns() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {allCampaigns.map(campaign => (
               <div key={campaign} className="flex items-center justify-between gap-2 p-2 rounded-md hover:bg-muted/50 group">
-                <div className="flex items-center space-x-2 flex-1">
+                <div className="flex items-center space-x-2 flex-1 min-w-0">
                   <Checkbox
                     id={campaign}
                     checked={selectedCampaigns.includes(campaign)}
                     onCheckedChange={() => toggleCampaign(campaign)}
                   />
-                  <Label htmlFor={campaign} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
-                    {campaign}
-                  </Label>
+                  {editingCampaign === campaign ? (
+                    <div className="flex items-center gap-1 flex-1">
+                      <Input
+                        ref={editInputRef}
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveCampaignName();
+                          if (e.key === 'Escape') cancelEditingCampaign();
+                        }}
+                        className="h-7 text-sm"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-100"
+                        onClick={saveCampaignName}
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        onClick={cancelEditingCampaign}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Label 
+                      htmlFor={campaign} 
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer truncate"
+                      onDoubleClick={() => startEditingCampaign(campaign)}
+                    >
+                      {campaign}
+                    </Label>
+                  )}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => {
-                    setCampaignToDelete(campaign);
-                    setDeleteCampaignDialogOpen(true);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {editingCampaign !== campaign && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                      onClick={() => startEditingCampaign(campaign)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        setCampaignToDelete(campaign);
+                        setDeleteCampaignDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
