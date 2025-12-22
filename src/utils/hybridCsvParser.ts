@@ -71,11 +71,13 @@ const isYes = (value: string | null | undefined): boolean => {
 const getResponseType = (value: string | null | undefined): 'positive' | 'negative' | null => {
   if (!value) return null;
   const normalized = value.toLowerCase().trim();
-  if (!normalized || normalized === '-' || normalized === 'n/a') return null;
+  if (!normalized || normalized === '-' || normalized === 'n/a' || normalized === 'na') return null;
   
   // Check for positive indicators
+  // Handles: "positivo", "positiva", "positivos", "positivas", "positive"
+  // Also: "Resposta Positiva", "Respostas Positivas", etc.
   if (
-    normalized.includes('positiv') || // positivo, positiva, positive
+    normalized.includes('positiv') || // positivo, positiva, positive, positivas, positivos
     normalized.includes('interes') ||  // interessado, interesse, interested
     normalized === 'sim' ||
     normalized === 'yes' ||
@@ -88,9 +90,13 @@ const getResponseType = (value: string | null | undefined): 'positive' | 'negati
   }
   
   // Check for negative indicators
+  // Handles: "negativo", "negativa", "negativos", "negativas", "negative"
+  // Also: "Resposta Negativa", "Respostas Negativas", etc.
   if (
-    normalized.includes('negativ') || // negativo, negativa, negative
+    normalized.includes('negativ') || // negativo, negativa, negative, negativas, negativos
     normalized.includes('sem interesse') ||
+    normalized.includes('não interesse') ||
+    normalized.includes('nao interesse') ||
     normalized.includes('não') ||
     normalized.includes('nao') ||
     normalized === 'no' ||
@@ -102,6 +108,16 @@ const getResponseType = (value: string | null | undefined): 'positive' | 'negati
   }
   
   return null;
+};
+
+// Check if a column name is a response column
+const isResponseColumn = (normalized: string): boolean => {
+  return normalized === 'resposta' || 
+         normalized === 'respostas' || 
+         normalized === 'response' || 
+         normalized === 'responses' ||
+         normalized.startsWith('resposta_') ||
+         normalized.startsWith('respostas_');
 };
 
 export function detectHybridFormat(headers: string[]): boolean {
@@ -272,7 +288,7 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
         }
       }
       
-      if (normalized === 'resposta' || normalized === 'respostas' || normalized === 'response' || normalized === 'responses') {
+      if (isResponseColumn(normalized)) {
         respostaCount++;
         if (respostaCount === 1) {
           fu1Response = getResponseType(row[h]);
@@ -330,7 +346,7 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
         }
       }
       
-      if (normalized === 'resposta' || normalized === 'respostas' || normalized === 'response' || normalized === 'responses') {
+      if (isResponseColumn(normalized)) {
         respostaCount++;
         if (respostaCount === 1) {
           fu1Response = getResponseType(row[h]);
