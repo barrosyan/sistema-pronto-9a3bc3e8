@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ProfileFilterContextType {
@@ -20,10 +20,14 @@ export function ProfileFilterProvider({ children }: { children: React.ReactNode 
   const [selectedProfiles, setSelectedProfiles] = useState<string[]>([]);
   const [availableProfiles, setAvailableProfiles] = useState<string[]>([]);
 
-  const loadProfiles = async () => {
+  const loadProfiles = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setAvailableProfiles([]);
+        setSelectedProfiles([]);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('profiles_data')
@@ -31,19 +35,23 @@ export function ProfileFilterProvider({ children }: { children: React.ReactNode 
         .eq('user_id', user.id)
         .order('profile_name');
 
-      if (data && !error) {
-        const profiles = data.map(p => p.profile_name);
-        setAvailableProfiles(profiles);
-        
-        // Auto-select all profiles if none selected
-        if (selectedProfiles.length === 0 && profiles.length > 0) {
-          setSelectedProfiles(profiles);
-        }
+      if (error) {
+        console.error('Error loading profiles:', error);
+        return;
       }
+
+      const profiles = (data || []).map(p => p.profile_name);
+      setAvailableProfiles(profiles);
+
+      // Auto-select profiles after login (and keep selection valid if profiles changed)
+      setSelectedProfiles(prev => {
+        const kept = prev.filter(p => profiles.includes(p));
+        return kept.length > 0 ? kept : profiles;
+      });
     } catch (error) {
       console.error('Error loading profiles:', error);
     }
-  };
+  }, []);
 
   const toggleProfile = (profile: string) => {
     setSelectedProfiles(prev => {
@@ -74,8 +82,24 @@ export function ProfileFilterProvider({ children }: { children: React.ReactNode 
   };
 
   useEffect(() => {
+    // Initial load (for refresh) + reload when auth state changes (for login)
     loadProfiles();
-  }, []);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        loadProfiles();
+      }
+
+      if (event === 'SIGNED_OUT') {
+        setAvailableProfiles([]);
+        setSelectedProfiles([]);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [loadProfiles]);
 
   return (
     <ProfileFilterContext.Provider 

@@ -129,27 +129,30 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
       if (metricsError) throw metricsError;
 
       // Load daily metrics from daily_metrics table with pagination
-      const metricIds = metricsData?.map(m => m.id) || [];
       let dailyMetricsMap: Record<string, Record<string, number>> = {};
 
-      if (metricIds.length > 0) {
-        // Use pagination to load all daily metrics (bypass 1000 row limit)
+      // NOTE: Avoid huge "IN (metricIds...)" lists (can be slow / hang on some browsers)
+      // Instead, load by user_id with pagination and map by campaign_metric_id.
+      if ((metricsData?.length || 0) > 0) {
         let allDailyData: any[] = [];
         let dailyPage = 0;
         const dailyPageSize = 1000;
         let hasMoreDaily = true;
 
         while (hasMoreDaily) {
-          const { data: dailyData, error: dailyError } = await supabase
+          let dailyQuery = supabase
             .from('daily_metrics')
             .select('*')
-            .in('campaign_metric_id', metricIds)
             .range(dailyPage * dailyPageSize, (dailyPage + 1) * dailyPageSize - 1);
 
-          if (dailyError) {
-            console.error('Error loading daily metrics:', dailyError);
-            break;
+          if (effectiveUserIds.length === 1) {
+            dailyQuery = dailyQuery.eq('user_id', effectiveUserIds[0]);
+          } else {
+            dailyQuery = dailyQuery.in('user_id', effectiveUserIds);
           }
+
+          const { data: dailyData, error: dailyError } = await dailyQuery;
+          if (dailyError) throw dailyError;
 
           if (dailyData && dailyData.length > 0) {
             allDailyData = [...allDailyData, ...dailyData];
@@ -170,7 +173,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
           dailyMetricsMap[dm.campaign_metric_id][dm.date] = Number(dm.value);
         });
       }
-      
+
       // Load leads with pagination to bypass the 1000 row limit
       let allLeads: any[] = [];
       let page = 0;
