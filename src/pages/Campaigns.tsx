@@ -186,8 +186,16 @@ export default function Campaigns() {
   };
 
   const saveCampaignName = async () => {
-    if (!editingCampaign || !editingName.trim() || editingName === editingCampaign) {
+    const trimmedName = editingName.trim();
+    
+    if (!editingCampaign || !trimmedName || trimmedName === editingCampaign) {
       cancelEditingCampaign();
+      return;
+    }
+
+    // Check if name already exists
+    if (allCampaigns.some(c => c.toLowerCase() === trimmedName.toLowerCase() && c !== editingCampaign)) {
+      toast.error('Já existe uma campanha com esse nome');
       return;
     }
 
@@ -198,7 +206,7 @@ export default function Campaigns() {
       // Update campaign name in campaigns table
       const { error: campaignError } = await supabase
         .from('campaigns')
-        .update({ name: editingName.trim() })
+        .update({ name: trimmedName })
         .eq('user_id', user.id)
         .eq('name', editingCampaign);
 
@@ -207,7 +215,7 @@ export default function Campaigns() {
       // Update campaign_name in campaign_metrics table
       const { error: metricsError } = await supabase
         .from('campaign_metrics')
-        .update({ campaign_name: editingName.trim() })
+        .update({ campaign_name: trimmedName })
         .eq('user_id', user.id)
         .eq('campaign_name', editingCampaign);
 
@@ -216,7 +224,7 @@ export default function Campaigns() {
       // Update campaign in leads table
       const { error: leadsError } = await supabase
         .from('leads')
-        .update({ campaign: editingName.trim() })
+        .update({ campaign: trimmedName })
         .eq('user_id', user.id)
         .eq('campaign', editingCampaign);
 
@@ -224,7 +232,7 @@ export default function Campaigns() {
 
       // Update selected campaigns if needed
       setSelectedCampaigns(prev => 
-        prev.map(c => c === editingCampaign ? editingName.trim() : c)
+        prev.map(c => c === editingCampaign ? trimmedName : c)
       );
 
       toast.success('Nome da campanha atualizado!');
