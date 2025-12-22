@@ -272,7 +272,7 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
         }
       }
       
-      if (normalized === 'resposta' || normalized === 'response') {
+      if (normalized === 'resposta' || normalized === 'respostas' || normalized === 'response' || normalized === 'responses') {
         respostaCount++;
         if (respostaCount === 1) {
           fu1Response = getResponseType(row[h]);
@@ -330,7 +330,7 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
         }
       }
       
-      if (normalized === 'resposta' || normalized === 'response') {
+      if (normalized === 'resposta' || normalized === 'respostas' || normalized === 'response' || normalized === 'responses') {
         respostaCount++;
         if (respostaCount === 1) {
           fu1Response = getResponseType(row[h]);
