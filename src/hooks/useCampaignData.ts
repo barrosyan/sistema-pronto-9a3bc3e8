@@ -51,8 +51,15 @@ interface CampaignDataStore {
   isLoading: boolean;
   selectedUserIds: string[];
   isAdmin: boolean;
-  
+
+  // Cache (avoid reloading on every page navigation)
+  lastLoadedKey: string | null;
+  lastLoadedAt: number;
+
+  // Data loading
   loadFromDatabase: (userIds?: string[]) => Promise<void>;
+  ensureLoaded: (userIds?: string[]) => Promise<void>;
+
   setSelectedUserIds: (userIds: string[]) => void;
   checkAdminStatus: () => Promise<boolean>;
   setCampaignMetrics: (metrics: CampaignMetrics[]) => Promise<void>;
@@ -78,6 +85,8 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
   isLoading: false,
   selectedUserIds: [],
   isAdmin: false,
+  lastLoadedKey: null,
+  lastLoadedAt: 0,
 
   checkAdminStatus: async () => {
     try {
@@ -103,7 +112,23 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
   setSelectedUserIds: (userIds: string[]) => {
     set({ selectedUserIds: userIds });
   },
-  
+
+  ensureLoaded: async (userIds?: string[]) => {
+    const { isLoading, lastLoadedAt, lastLoadedKey, campaignMetrics, positiveLeads, negativeLeads, pendingLeads } = get();
+    if (isLoading) return;
+
+    const targetUserIds = userIds || get().selectedUserIds;
+    const key = (targetUserIds?.length ? [...targetUserIds].sort().join(',') : 'me');
+    const hasAnyData =
+      campaignMetrics.length > 0 || positiveLeads.length > 0 || negativeLeads.length > 0 || pendingLeads.length > 0;
+
+    // If we already loaded this dataset very recently, don't refetch on navigation
+    const CACHE_WINDOW_MS = 5 * 60 * 1000; // 5 min
+    if (hasAnyData && lastLoadedKey === key && Date.now() - lastLoadedAt < CACHE_WINDOW_MS) return;
+
+    await get().loadFromDatabase(userIds);
+  },
+
   loadFromDatabase: async (userIds?: string[]) => {
     set({ isLoading: true });
     try {
@@ -262,11 +287,15 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         importedAt: l.imported_at
       })) || [];
       
+      const loadedKey = [...effectiveUserIds].sort().join(',');
+
       set({
         campaignMetrics: metrics,
         positiveLeads: leads.filter(l => l.status === 'positive'),
         negativeLeads: leads.filter(l => l.status === 'negative'),
-        pendingLeads: leads.filter(l => !['positive', 'negative'].includes(l.status))
+        pendingLeads: leads.filter(l => !['positive', 'negative'].includes(l.status)),
+        lastLoadedKey: loadedKey,
+        lastLoadedAt: Date.now(),
       });
     } catch (error) {
       console.error('Error loading data from database:', error);
