@@ -30,22 +30,27 @@ import {
 import { toast } from 'sonner';
 
 const Events = () => {
-  const { campaignMetrics, positiveLeads, getAllLeads, loadFromDatabase } = useCampaignData();
+  const { campaignMetrics, positiveLeads, getAllLeads, ensureLoaded } = useCampaignData();
   const { getEventLeadsAnalysis, getRecurrentLeads, getRecommendedApproach } = useEventAnalysis();
   
-  const [selectedEvent, setSelectedEvent] = useState<string>('all');
+  const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
+  const [showRecurrentLeads, setShowRecurrentLeads] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [dbEvents, setDbEvents] = useState<Event[]>([]);
+  const [selectedDbEventId, setSelectedDbEventId] = useState<string | null>(null);
+  const [linkingEventType, setLinkingEventType] = useState<string | null>(null);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [availableCampaigns, setAvailableCampaigns] = useState<string[]>([]);
+  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showComparison, setShowComparison] = useState(false);
-  const [campaign1, setCampaign1] = useState<string>('_placeholder1');
-  const [campaign2, setCampaign2] = useState<string>('_placeholder2');
-  
-  // Advanced comparison states
-  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
-  const [availableCampaigns, setAvailableCampaigns] = useState<string[]>([]);
+  const [campaign1, setCampaign1] = useState('');
+  const [campaign2, setCampaign2] = useState('');
 
   useEffect(() => {
-    loadFromDatabase();
-  }, [loadFromDatabase]);
+    ensureLoaded();
+  }, [ensureLoaded]);
 
   useEffect(() => {
     const campaigns = [...new Set(campaignMetrics.map(m => m.campaignName).filter(Boolean))];

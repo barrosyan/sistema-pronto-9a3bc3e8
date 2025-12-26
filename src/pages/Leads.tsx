@@ -50,7 +50,7 @@ type SortField = 'name' | 'position' | 'company' | 'campaign' | 'status' | 'conn
 type SortOrder = 'asc' | 'desc';
 
 const Leads = () => {
-  const { positiveLeads, negativeLeads, pendingLeads, setPositiveLeads, setNegativeLeads, updateLead, addPositiveLead, loadFromDatabase } = useCampaignData();
+  const { positiveLeads, negativeLeads, pendingLeads, setPositiveLeads, setNegativeLeads, updateLead, addPositiveLead, ensureLoaded } = useCampaignData();
   const allLeads = [...positiveLeads, ...negativeLeads, ...pendingLeads];
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);

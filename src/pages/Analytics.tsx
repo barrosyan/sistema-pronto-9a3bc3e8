@@ -21,13 +21,13 @@ type DailyMetrics = {
 };
 
 export default function Analytics() {
-  const { campaignMetrics, getAllLeads, loadFromDatabase } = useCampaignData();
+  const { campaignMetrics, getAllLeads, ensureLoaded } = useCampaignData();
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('weekly');
 
   useEffect(() => {
-    loadFromDatabase();
-  }, [loadFromDatabase]);
+    ensureLoaded();
+  }, [ensureLoaded]);
 
   // Extract unique campaign names from database
   const allCampaigns = Array.from(new Set(campaignMetrics.map(m => m.campaignName).filter(Boolean)));
