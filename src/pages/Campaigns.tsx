@@ -60,7 +60,16 @@ interface WeeklyData {
 }
 
 export default function Campaigns() {
-  const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading, updateMetricValue, updateLead, updateCampaignDates } = useCampaignData();
+  const {
+    campaignMetrics,
+    getAllLeads,
+    loadFromDatabase,
+    ensureLoaded,
+    isLoading,
+    updateMetricValue,
+    updateLead,
+    updateCampaignDates,
+  } = useCampaignData();
   const { selectedProfiles } = useProfileFilter();
   const { selectedUserIds } = useAdminUser();
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
@@ -84,9 +93,9 @@ export default function Campaigns() {
   const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
+    ensureLoaded(selectedUserIds.length > 0 ? selectedUserIds : undefined);
     loadCampaignDetails();
-  }, [loadFromDatabase, selectedUserIds]);
+  }, [ensureLoaded, selectedUserIds]);
 
   const loadCampaignDetails = async () => {
     const { data: { user } } = await supabase.auth.getUser();
