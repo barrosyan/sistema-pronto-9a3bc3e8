@@ -27,23 +27,30 @@ import {
 } from '@/utils/metricsCalculator';
 
 export default function Profile() {
-  const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading, updateMetricValue, updateCampaignDates } = useCampaignData();
+  const { campaignMetrics, getAllLeads, loadFromDatabase, ensureLoaded, isLoading, updateMetricValue, updateCampaignDates } = useCampaignData();
   const { selectedProfiles, availableProfiles } = useProfileFilter();
   const { selectedUserIds } = useAdminUser();
   const { toast } = useToast();
-  const { weeklyDetails, loadWeeklyDetails, saveWeeklyDetail } = useWeeklyDetails();
-  const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
 
-  // Get the current profile name for weekly details
-  const currentProfileName = selectedProfiles.length > 0 ? selectedProfiles[0] : 'default';
+  const allLeads = getAllLeads();
+  const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
+  const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Record<string, boolean>>({});
+  const { weeklyDetails, loadWeeklyDetails, saveWeeklyDetail, getDetailForWeek } = useWeeklyDetails();
+  const [editingDetail, setEditingDetail] = useState<{weekStartDate: string; field: string; value: string} | null>(null);
+
+  // Get the current profile name from selected profiles
+  const currentProfileName = selectedProfiles.length > 0 ? selectedProfiles[0] : '';
 
   useEffect(() => {
-    loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
-  }, [loadFromDatabase, selectedUserIds]);
+    ensureLoaded(selectedUserIds.length > 0 ? selectedUserIds : undefined);
+  }, [ensureLoaded, selectedUserIds]);
 
   // Load weekly details when profile changes
   useEffect(() => {
-    loadWeeklyDetails(currentProfileName);
+    if (currentProfileName) {
+      loadWeeklyDetails(currentProfileName);
+    }
   }, [currentProfileName, loadWeeklyDetails]);
 
   // Extract unique campaigns from database - filter by selected profiles
@@ -63,7 +70,6 @@ export default function Profile() {
     return matchesProfile && matchesCampaign;
   });
   
-  const allLeads = getAllLeads();
   const filteredLeads = selectedCampaign === 'all'
     ? allLeads
     : allLeads.filter(l => leadBelongsToCampaign(l.campaign, selectedCampaign));
