@@ -22,7 +22,12 @@ export function ProfileFilterProvider({ children }: { children: React.ReactNode 
 
   const loadProfiles = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error('Error getting session:', sessionError);
+      }
+
+      const user = session?.user;
       if (!user) {
         setAvailableProfiles([]);
         setSelectedProfiles([]);
@@ -82,21 +87,47 @@ export function ProfileFilterProvider({ children }: { children: React.ReactNode 
   };
 
   useEffect(() => {
-    // Initial load (for refresh) + reload when auth state changes (for login)
-    loadProfiles();
+    let mounted = true;
+    let initialized = false;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        loadProfiles();
-      }
+    const handleSession = (session: any) => {
+      const user = session?.user;
 
-      if (event === 'SIGNED_OUT') {
+      if (!user) {
         setAvailableProfiles([]);
         setSelectedProfiles([]);
+        return;
+      }
+
+      // Defer any backend calls to avoid auth callback deadlocks
+      setTimeout(() => {
+        if (!mounted) return;
+        loadProfiles();
+      }, 0);
+    };
+
+    // Listen for auth state changes FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+
+      if (event === 'INITIAL_SESSION') {
+        initialized = true;
+      }
+
+      handleSession(session);
+    });
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      if (!initialized) {
+        initialized = true;
+        handleSession(session);
       }
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, [loadProfiles]);
