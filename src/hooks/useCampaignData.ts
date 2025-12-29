@@ -233,8 +233,13 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
       
       // Transform database data to app format
       const metrics: CampaignMetrics[] = metricsData?.map(m => {
-        // Use daily_metrics table data if available, fallback to daily_data column
-        const dailyData = dailyMetricsMap[m.id] || (m.daily_data as Record<string, number>) || {};
+        // Use daily_metrics table data if available and has data, 
+        // otherwise fallback to daily_data column
+        const dailyMetricsData = dailyMetricsMap[m.id];
+        const hasTableData = dailyMetricsData && Object.keys(dailyMetricsData).length > 0;
+        const dailyData = hasTableData 
+          ? dailyMetricsData 
+          : (m.daily_data as Record<string, number>) || {};
         
         return {
           campaignName: m.campaign_name,
