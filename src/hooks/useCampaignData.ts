@@ -289,7 +289,8 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
         negativeResponseDate: l.negative_response_date,
         hadFollowUp: l.had_follow_up,
         followUpReason: l.follow_up_reason,
-        importedAt: l.imported_at
+        importedAt: l.imported_at,
+        createdAt: l.created_at
       })) || [];
       
       const loadedKey = [...effectiveUserIds].sort().join(',');

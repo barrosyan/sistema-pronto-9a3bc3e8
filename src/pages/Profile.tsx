@@ -463,15 +463,21 @@ export default function Profile() {
       const weekStartDate = parseISO(week.startDate);
       const weekEndDate = parseISO(week.endDate);
       
-      // Leads processados = leads que têm importedAt (Imported At) nessa semana
-      // Fallback: usar connectionDate ou sequenceDate se importedAt não existir
+      // Leads processados = leads que têm uma data de referência nessa semana
+      // Prioridade: importedAt > connectionDate > created_at (do registro no banco)
       const weekLeads = filteredLeads.filter(lead => {
         // Primary: Use importedAt for leads processados (data de importação do LinkedIn)
         let dateToCheck = lead.importedAt;
         
-        // Fallback: If importedAt is not available, use connectionDate
+        // Fallback 1: If importedAt is not available, use connectionDate
         if (!dateToCheck) {
           dateToCheck = lead.connectionDate;
+        }
+        
+        // Fallback 2: If connectionDate is also not available, use createdAt
+        // which is the date the lead was added to the database (effectively the import date)
+        if (!dateToCheck && lead.createdAt) {
+          dateToCheck = lead.createdAt;
         }
         
         if (!dateToCheck) return false;
