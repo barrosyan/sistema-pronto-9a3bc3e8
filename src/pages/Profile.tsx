@@ -545,7 +545,7 @@ export default function Profile() {
         // Total de atividades NÃO inclui conexões (conexões são ações do lead, não do perfil)
         totalAtividades: week.convitesEnviados + mensagens + week.visitas + week.likes + week.comentarios,
         respostasPositivas: positiveLeadsInWeek.length,
-        leadsProcessados: weekLeads.length,
+        leadsProcessados: week.convitesEnviados,
         reunioes: positiveLeadsInWeek.filter(l => l.meetingDate).length,
         propostas: positiveLeadsInWeek.filter(l => l.proposalDate).length,
         vendas: positiveLeadsInWeek.filter(l => l.saleDate).length,
