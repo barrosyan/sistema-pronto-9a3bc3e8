@@ -8,18 +8,28 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
+    let initialized = false;
+
+    // Set up auth state listener FIRST (do not do async work inside the callback)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+
+      // INITIAL_SESSION can arrive before getSession() resolves
+      if (!initialized && event === 'INITIAL_SESSION') {
+        initialized = true;
         setLoading(false);
       }
-    );
+    });
 
-    // Check for existing session
+    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setLoading(false);
+      if (!initialized) {
+        initialized = true;
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();

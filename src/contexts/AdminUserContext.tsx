@@ -18,31 +18,51 @@ export function AdminUserProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    const checkInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        await checkAdminStatus(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    };
-    
-    checkInitialSession();
+    let mounted = true;
+    let initialized = false;
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        await checkAdminStatus(session.user.id);
-      } else {
+    const handleSession = (session: any) => {
+      if (!mounted) return;
+
+      const userId = session?.user?.id;
+      if (!userId) {
         setCurrentUserId(null);
         setIsAdmin(false);
         setSelectedUserIds([]);
         setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+
+      // Defer DB calls to avoid deadlocks in auth callbacks
+      setTimeout(() => {
+        if (!mounted) return;
+        checkAdminStatus(userId);
+      }, 0);
+    };
+
+    // Listen for auth state changes FIRST
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION') {
+        initialized = true;
+      }
+      handleSession(session);
+    });
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      if (!initialized) {
+        initialized = true;
+        handleSession(session);
       }
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
