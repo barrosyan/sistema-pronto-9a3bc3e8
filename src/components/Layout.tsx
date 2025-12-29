@@ -1,7 +1,7 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NavLink } from './NavLink';
-import { Merge, Users, Sparkles, LogOut, User, Settings, Target, Calendar, Check, ChevronsUpDown } from 'lucide-react';
+import { Merge, Users, Sparkles, LogOut, User, Settings, Target, Calendar, Check, ChevronsUpDown, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from './ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -9,6 +9,8 @@ import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
 import { useProfileFilter } from '@/contexts/ProfileFilterContext';
+import { useAdminUser } from '@/contexts/AdminUserContext';
+import { useCampaignData } from '@/hooks/useCampaignData';
 import { cn } from '@/lib/utils';
 
 interface LayoutProps {
@@ -17,7 +19,24 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
-  const { selectedProfiles, toggleProfile, selectAllProfiles, clearProfiles, availableProfiles } = useProfileFilter();
+  const { selectedProfiles, toggleProfile, selectAllProfiles, clearProfiles, availableProfiles, loadProfiles } = useProfileFilter();
+  const { selectedUserIds } = useAdminUser();
+  const { loadFromDatabase, isLoading } = useCampaignData();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleForceRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
+      await loadProfiles();
+      toast.success('Dados recarregados com sucesso!');
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      toast.error('Erro ao recarregar dados');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -112,6 +131,16 @@ export const Layout = ({ children }: LayoutProps) => {
               )}
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleForceRefresh}
+                disabled={isRefreshing || isLoading}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={cn("h-4 w-4", (isRefreshing || isLoading) && "animate-spin")} />
+                {isRefreshing ? 'Recarregando...' : 'Recarregar dados'}
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
