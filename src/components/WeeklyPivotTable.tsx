@@ -63,6 +63,7 @@ const WEEKLY_METRICS = [
 ] as const;
 
 const CONVERSION_RATES = [
+  { key: 'taxaRespostaPositiva', label: 'Taxa de Resposta Positiva (Respostas/Leads Processados)', calc: (w: WeeklyMetricsData) => w.leadsProcessados > 0 ? ((w.respostasPositivas / w.leadsProcessados) * 100).toFixed(1) : '-' },
   { key: 'respostasConvites', label: 'Respostas Positivas/Convites Enviados', calc: (w: WeeklyMetricsData) => w.convitesEnviados > 0 ? ((w.respostasPositivas / w.convitesEnviados) * 100).toFixed(1) : '-' },
   { key: 'respostasConexoes', label: 'Respostas Positivas/Conexões Realizadas', calc: (w: WeeklyMetricsData) => w.conexoesRealizadas > 0 ? ((w.respostasPositivas / w.conexoesRealizadas) * 100).toFixed(1) : '-' },
   { key: 'respostasMensagens', label: 'Respostas Positivas/Mensagens Enviadas', calc: (w: WeeklyMetricsData) => w.mensagensEnviadas > 0 ? ((w.respostasPositivas / w.mensagensEnviadas) * 100).toFixed(1) : '-' },
