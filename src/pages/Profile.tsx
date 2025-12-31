@@ -522,6 +522,20 @@ export default function Profile() {
         }
       });
       
+      // Debug logs
+      console.log(`[WEEK ${index + 1}] ${week.startDate} to ${week.endDate}`);
+      console.log(`  - Convites Enviados (from campaign_metrics): ${week.convitesEnviados}`);
+      console.log(`  - Leads Processados (leads importados na semana): ${weekLeads.length}`);
+      console.log(`  - Respostas Positivas: ${positiveLeadsInWeek.length}`);
+      if (weekLeads.length > 0) {
+        console.log(`  - Exemplos de leads processados:`, weekLeads.slice(0, 3).map(l => ({
+          name: l.name,
+          importedAt: l.importedAt,
+          connectionDate: l.connectionDate,
+          createdAt: l.createdAt
+        })));
+      }
+      
       const mensagens = week.followUps1 + week.followUps2 + week.followUps3;
       
       // Get weekly details from database
@@ -545,7 +559,7 @@ export default function Profile() {
         // Total de atividades NÃO inclui conexões (conexões são ações do lead, não do perfil)
         totalAtividades: week.convitesEnviados + mensagens + week.visitas + week.likes + week.comentarios,
         respostasPositivas: positiveLeadsInWeek.length,
-        leadsProcessados: week.convitesEnviados,
+        leadsProcessados: weekLeads.length,
         reunioes: positiveLeadsInWeek.filter(l => l.meetingDate).length,
         propostas: positiveLeadsInWeek.filter(l => l.proposalDate).length,
         vendas: positiveLeadsInWeek.filter(l => l.saleDate).length,
