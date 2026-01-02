@@ -78,11 +78,13 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
       }
     }
 
-    // Extract sequence generated date
-    const sequenceDate = row['Sequence Generated At'] || row['sequence_generated_at'] || null;
+    // Extract Sequence Generated date (when lead was added to the campaign sequence)
+    // This is the primary source for "Leads Processados" calculation
+    const sequenceGeneratedAt = row['Sequence Generated At'] || row['sequence_generated_at'] || null;
 
-    // Extract Imported At date (when lead was imported from LinkedIn to Kontax)
-    const importedAt = row['Imported At'] || row['imported_at'] || null;
+    // Extract Imported At date - prioritize Sequence Generated At, then fall back to Imported At
+    // "Sequence Generated At" is the date the lead was imported into the campaign sequence
+    const importedAt = sequenceGeneratedAt || row['Imported At'] || row['imported_at'] || null;
 
     const baseLead = {
       campaign,
@@ -92,7 +94,7 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
       company,
       source: 'Kontax',
       connectionDate,
-      sequenceDate,
+      sequenceDate: sequenceGeneratedAt,
       importedAt,
     };
 
