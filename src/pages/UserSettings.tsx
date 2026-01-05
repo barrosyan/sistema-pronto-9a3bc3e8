@@ -742,18 +742,144 @@ export default function UserSettings() {
           // Process leads CSV
           // Check if user selected a specific campaign for this file
           const selectedCampaign = campaignSelections[fileName];
-          const campaignNameToUse = selectedCampaign || null;
+          const allLeads = [...parsedData.positiveLeads, ...parsedData.negativeLeads];
+          
+          // Determine campaign name - use selected or derive from file/lead data
+          let campaignNameToUse = selectedCampaign;
+          if (!campaignNameToUse) {
+            // Try to get from first lead, otherwise use file name
+            campaignNameToUse = allLeads[0]?.campaign || fileName.replace(/\.(csv|xlsx|xls)$/i, '').replace(/_/g, ' ');
+          }
           
           console.log(`👥 Processando leads: ${parsedData.positiveLeads.length} positivos, ${parsedData.negativeLeads.length} negativos`);
-          if (campaignNameToUse) {
-            console.log(`📋 Usando campanha selecionada: ${campaignNameToUse}`);
+          console.log(`📋 Campanha: ${campaignNameToUse} (selecionada: ${!!selectedCampaign})`);
+          
+          // If no existing campaign was selected, create a new campaign and extract metrics
+          if (!selectedCampaign && allLeads.length > 0) {
+            const profileName = `Perfil ${campaignNameToUse}`;
+            
+            // Create profile
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles_data')
+              .upsert({
+                user_id: user.id,
+                profile_name: profileName,
+              }, {
+                onConflict: 'user_id,profile_name',
+                ignoreDuplicates: false,
+              })
+              .select()
+              .single();
+
+            if (profileError) {
+              console.error('❌ Error creating profile for leads:', profileError);
+            } else {
+              totalProfiles++;
+              console.log(`✅ Profile (leads): ${profileName}`);
+            }
+
+            // Create campaign
+            const { data: campaign, error: campaignError } = await supabase
+              .from('campaigns')
+              .upsert({
+                user_id: user.id,
+                profile_id: profile?.id,
+                name: campaignNameToUse,
+                profile_name: profileName,
+              }, {
+                onConflict: 'user_id,name',
+                ignoreDuplicates: false,
+              })
+              .select()
+              .single();
+
+            if (campaignError) {
+              console.error('❌ Error upserting campaign for leads:', campaignError);
+            } else {
+              totalCampaigns++;
+              console.log(`✅ Campaign (leads): ${campaignNameToUse}`);
+            }
+
+            // Extract metrics from leads - count by imported_at date (Sequence Generated At)
+            const leadsProcessadosMap = new Map<string, number>();
+            allLeads.forEach(lead => {
+              if (lead.importedAt) {
+                // Parse date to YYYY-MM-DD format
+                let dateKey = lead.importedAt;
+                // Try to parse various date formats
+                const parsed = new Date(lead.importedAt);
+                if (!isNaN(parsed.getTime())) {
+                  dateKey = parsed.toISOString().split('T')[0];
+                }
+                const current = leadsProcessadosMap.get(dateKey) || 0;
+                leadsProcessadosMap.set(dateKey, current + 1);
+              }
+            });
+
+            // Create "Leads Processados" metric from imported_at dates
+            if (leadsProcessadosMap.size > 0) {
+              const dailyData: Record<string, number> = {};
+              leadsProcessadosMap.forEach((count, date) => {
+                dailyData[date] = count;
+              });
+              
+              const totalCount = Array.from(leadsProcessadosMap.values()).reduce((a, b) => a + b, 0);
+              
+              const { data: upsertedMetric, error: metricError } = await supabase
+                .from('campaign_metrics')
+                .upsert({
+                  user_id: user.id,
+                  campaign_name: campaignNameToUse,
+                  profile_name: profileName,
+                  event_type: 'Leads Processados',
+                  total_count: totalCount,
+                  daily_data: dailyData,
+                }, {
+                  onConflict: 'user_id,campaign_name,event_type',
+                  ignoreDuplicates: false,
+                })
+                .select()
+                .single();
+
+              if (metricError) {
+                console.error('❌ Error upserting leads processados metric:', metricError);
+              } else {
+                totalMetrics++;
+                console.log(`✅ Leads Processados metric: ${totalCount} leads across ${leadsProcessadosMap.size} days`);
+                
+                // Insert daily metrics
+                if (upsertedMetric) {
+                  const dailyEntries = Object.entries(dailyData).map(([date, value]) => ({
+                    campaign_metric_id: upsertedMetric.id,
+                    user_id: user.id,
+                    date,
+                    value: Number(value) || 0,
+                  }));
+
+                  if (dailyEntries.length > 0) {
+                    const { error: dailyError } = await supabase
+                      .from('daily_metrics' as any)
+                      .upsert(dailyEntries, {
+                        onConflict: 'campaign_metric_id,date',
+                        ignoreDuplicates: false,
+                      });
+
+                    if (dailyError) {
+                      console.error(`❌ Error upserting daily metrics for leads:`, dailyError);
+                    } else {
+                      console.log(`✅ Upserted ${dailyEntries.length} daily entries for Leads Processados`);
+                    }
+                  }
+                }
+              }
+            }
           }
           
           // Insert positive leads
           if (parsedData.positiveLeads.length > 0) {
             const leadsToInsert = parsedData.positiveLeads.map(lead => ({
               user_id: user.id,
-              campaign: campaignNameToUse || lead.campaign,
+              campaign: campaignNameToUse,
               linkedin: lead.linkedin,
               name: lead.name,
               position: lead.position,
@@ -826,7 +952,7 @@ export default function UserSettings() {
           if (parsedData.negativeLeads.length > 0) {
             const leadsToInsert = parsedData.negativeLeads.map(lead => ({
               user_id: user.id,
-              campaign: campaignNameToUse || lead.campaign,
+              campaign: campaignNameToUse,
               linkedin: lead.linkedin,
               name: lead.name,
               position: lead.position,

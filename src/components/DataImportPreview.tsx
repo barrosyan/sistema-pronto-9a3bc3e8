@@ -195,33 +195,40 @@ export default function DataImportPreview({
                         
                         {/* Campaign Selection for Leads Import */}
                         {(file.selectedType === 'leads' || (file.detectedType === 'leads' && !file.selectedType)) && 
-                         onCampaignSelect && existingCampaigns.length > 0 && (
+                         onCampaignSelect && (
                           <div className="pb-2 border-b">
                             <p className="text-xs text-muted-foreground mb-2 font-semibold">
-                              Associar a campanha (opcional):
+                              Campanha para os leads:
                             </p>
                             <Select
-                              value={file.selectedCampaign || '__use_filename__'}
-                              onValueChange={(value) => onCampaignSelect(file.fileName, value === '__use_filename__' ? '' : value)}
+                              value={file.selectedCampaign || '__create_new__'}
+                              onValueChange={(value) => onCampaignSelect(file.fileName, value === '__create_new__' ? '' : value)}
                             >
                               <SelectTrigger className={`h-8 text-xs`}>
-                                <SelectValue placeholder="Usar nome do arquivo" />
+                                <SelectValue placeholder="Criar nova campanha" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="__use_filename__" className="text-xs">
-                                  Usar nome do arquivo
+                                <SelectItem value="__create_new__" className="text-xs font-medium text-primary">
+                                  ✨ Criar nova campanha (nome do arquivo)
                                 </SelectItem>
-                                {existingCampaigns.map((campaign) => (
-                                  <SelectItem key={campaign.id} value={campaign.name} className="text-xs">
-                                    {campaign.name}
-                                  </SelectItem>
-                                ))}
+                                {existingCampaigns.length > 0 && (
+                                  <>
+                                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-2">
+                                      Campanhas existentes
+                                    </div>
+                                    {existingCampaigns.map((campaign) => (
+                                      <SelectItem key={campaign.id} value={campaign.name} className="text-xs">
+                                        {campaign.name}
+                                      </SelectItem>
+                                    ))}
+                                  </>
+                                )}
                               </SelectContent>
                             </Select>
                             <p className="text-xs text-muted-foreground mt-1">
                               {file.selectedCampaign 
-                                ? `Leads serão importados para: ${file.selectedCampaign}` 
-                                : `Leads serão importados com a campanha: ${file.campaignNames[0] || file.fileName.replace(/\.(csv|xlsx|xls)$/i, '').replace(/_/g, ' ')}`
+                                ? `Leads serão adicionados à campanha: ${file.selectedCampaign}` 
+                                : `Nova campanha será criada: ${file.campaignNames[0] || file.fileName.replace(/\.(csv|xlsx|xls)$/i, '').replace(/_/g, ' ')}`
                               }
                             </p>
                           </div>
