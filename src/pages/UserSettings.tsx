@@ -947,50 +947,85 @@ export default function UserSettings() {
             }
           }
           
-          // Insert positive leads
+          // Insert positive leads with duplicate validation
           if (parsedData.positiveLeads.length > 0) {
-            const leadsToInsert = parsedData.positiveLeads.map(lead => ({
-              user_id: user.id,
-              campaign: campaignNameToUse,
-              linkedin: lead.linkedin,
-              name: lead.name,
-              position: lead.position,
-              company: lead.company,
-              status: lead.status,
-              source: lead.source,
-              connection_date: lead.connectionDate,
-              imported_at: lead.importedAt, // Use Sequence Generated At as imported_at
-              positive_response_date: lead.positiveResponseDate,
-              transfer_date: lead.transferDate,
-              status_details: lead.statusDetails,
-              comments: lead.comments,
-              follow_up_1_date: lead.followUp1Date,
-              follow_up_1_comments: lead.followUp1Comments,
-              follow_up_2_date: lead.followUp2Date,
-              follow_up_2_comments: lead.followUp2Comments,
-              follow_up_3_date: lead.followUp3Date,
-              follow_up_3_comments: lead.followUp3Comments,
-              follow_up_4_date: lead.followUp4Date,
-              follow_up_4_comments: lead.followUp4Comments,
-              observations: lead.observations,
-              meeting_schedule_date: lead.meetingScheduleDate,
-              meeting_date: lead.meetingDate,
-              proposal_date: lead.proposalDate,
-              proposal_value: lead.proposalValue,
-              sale_date: lead.saleDate,
-              sale_value: lead.saleValue,
-              profile: lead.profile,
-              classification: lead.classification,
-              attended_webinar: lead.attendedWebinar,
-              whatsapp: lead.whatsapp,
-              stand_day: lead.standDay,
-              pavilion: lead.pavilion,
-              stand: lead.stand,
-            }));
+            // First, fetch existing leads for this campaign to check for duplicates
+            const { data: existingLeads } = await supabase
+              .from('leads')
+              .select('name, linkedin, campaign')
+              .eq('user_id', user.id)
+              .eq('campaign', campaignNameToUse);
 
-            // Deduplicate leads by unique key (user_id, campaign, name)
+            const existingLeadsSet = new Set<string>();
+            const existingLinkedinSet = new Set<string>();
+            
+            if (existingLeads) {
+              existingLeads.forEach(lead => {
+                existingLeadsSet.add(`${lead.campaign}-${lead.name}`.toLowerCase());
+                if (lead.linkedin) {
+                  existingLinkedinSet.add(lead.linkedin.toLowerCase());
+                }
+              });
+            }
+
+            const leadsToInsert = parsedData.positiveLeads
+              .filter(lead => {
+                // Skip if lead already exists by name or linkedin
+                const nameKey = `${campaignNameToUse}-${lead.name}`.toLowerCase();
+                const linkedinExists = lead.linkedin && existingLinkedinSet.has(lead.linkedin.toLowerCase());
+                const nameExists = existingLeadsSet.has(nameKey);
+                
+                if (linkedinExists || nameExists) {
+                  console.log(`⏭️ Skipping duplicate lead: ${lead.name} (linkedin: ${linkedinExists}, name: ${nameExists})`);
+                  return false;
+                }
+                return true;
+              })
+              .map(lead => ({
+                user_id: user.id,
+                campaign: campaignNameToUse,
+                linkedin: lead.linkedin,
+                name: lead.name,
+                position: lead.position,
+                company: lead.company,
+                status: lead.status,
+                source: lead.source,
+                connection_date: lead.connectionDate,
+                imported_at: lead.importedAt,
+                positive_response_date: lead.positiveResponseDate,
+                transfer_date: lead.transferDate,
+                status_details: lead.statusDetails,
+                comments: lead.comments,
+                follow_up_1_date: lead.followUp1Date,
+                follow_up_1_comments: lead.followUp1Comments,
+                follow_up_2_date: lead.followUp2Date,
+                follow_up_2_comments: lead.followUp2Comments,
+                follow_up_3_date: lead.followUp3Date,
+                follow_up_3_comments: lead.followUp3Comments,
+                follow_up_4_date: lead.followUp4Date,
+                follow_up_4_comments: lead.followUp4Comments,
+                observations: lead.observations,
+                meeting_schedule_date: lead.meetingScheduleDate,
+                meeting_date: lead.meetingDate,
+                proposal_date: lead.proposalDate,
+                proposal_value: lead.proposalValue,
+                sale_date: lead.saleDate,
+                sale_value: lead.saleValue,
+                profile: lead.profile,
+                classification: lead.classification,
+                attended_webinar: lead.attendedWebinar,
+                whatsapp: lead.whatsapp,
+                stand_day: lead.standDay,
+                pavilion: lead.pavilion,
+                stand: lead.stand,
+              }));
+
+            // Deduplicate leads within the same import batch by unique key (campaign + name or linkedin)
             const uniqueLeads = leadsToInsert.reduce((acc, lead) => {
-              const key = `${lead.user_id}-${lead.campaign}-${lead.name}`;
+              // Prefer linkedin as unique key, fallback to name
+              const key = lead.linkedin 
+                ? `linkedin:${lead.linkedin.toLowerCase()}`
+                : `name:${lead.campaign}-${lead.name}`.toLowerCase();
               if (!acc.has(key)) {
                 acc.set(key, lead);
               }
@@ -998,50 +1033,88 @@ export default function UserSettings() {
             }, new Map<string, typeof leadsToInsert[0]>());
 
             const deduplicatedLeads = Array.from(uniqueLeads.values());
-            console.log(`📊 Deduplicated ${leadsToInsert.length} leads to ${deduplicatedLeads.length} unique leads`);
+            const skippedCount = parsedData.positiveLeads.length - deduplicatedLeads.length;
+            console.log(`📊 ${parsedData.positiveLeads.length} leads → ${deduplicatedLeads.length} novos (${skippedCount} duplicados ignorados)`);
 
-            const { error: leadsError } = await supabase
-              .from('leads')
-              .upsert(deduplicatedLeads as any[], {
-                onConflict: 'user_id,campaign,name',
-                ignoreDuplicates: false
-              });
+            if (deduplicatedLeads.length > 0) {
+              const { error: leadsError } = await supabase
+                .from('leads')
+                .upsert(deduplicatedLeads as any[], {
+                  onConflict: 'user_id,campaign,name',
+                  ignoreDuplicates: true
+                });
 
-            if (leadsError) {
-              console.error('❌ Error inserting positive leads:', leadsError);
+              if (leadsError) {
+                console.error('❌ Error inserting positive leads:', leadsError);
+              } else {
+                totalLeads += deduplicatedLeads.length;
+                setProgress(prev => prev ? {
+                  ...prev,
+                  currentStep: `Importando ${deduplicatedLeads.length} leads positivos (${skippedCount} duplicados ignorados)...`,
+                  processedItems: { ...prev.processedItems, leads: totalLeads }
+                } : null);
+                console.log(`✅ ${deduplicatedLeads.length} positive leads inserted`);
+              }
             } else {
-              totalLeads += deduplicatedLeads.length;
-              setProgress(prev => prev ? {
-                ...prev,
-                currentStep: `Importando ${deduplicatedLeads.length} leads positivos...`,
-                processedItems: { ...prev.processedItems, leads: totalLeads }
-              } : null);
-              console.log(`✅ ${deduplicatedLeads.length} positive leads inserted`);
+              console.log('⏭️ No new positive leads to insert (all duplicates)');
             }
           }
           
-          // Insert negative leads
+          // Insert negative leads with duplicate validation
           if (parsedData.negativeLeads.length > 0) {
-            const leadsToInsert = parsedData.negativeLeads.map(lead => ({
-              user_id: user.id,
-              campaign: campaignNameToUse,
-              linkedin: lead.linkedin,
-              name: lead.name,
-              position: lead.position,
-              company: lead.company,
-              status: lead.status,
-              source: lead.source,
-              connection_date: lead.connectionDate,
-              imported_at: lead.importedAt, // Use Sequence Generated At as imported_at
-              negative_response_date: lead.negativeResponseDate,
-              had_follow_up: lead.hadFollowUp,
-              follow_up_reason: lead.followUpReason,
-              observations: lead.observations,
-            }));
+            // Fetch existing leads if not already fetched (reuse from positive leads section)
+            const { data: existingNegLeads } = await supabase
+              .from('leads')
+              .select('name, linkedin, campaign')
+              .eq('user_id', user.id)
+              .eq('campaign', campaignNameToUse);
 
-            // Deduplicate leads by unique key (user_id, campaign, name)
+            const existingNegSet = new Set<string>();
+            const existingNegLinkedinSet = new Set<string>();
+            
+            if (existingNegLeads) {
+              existingNegLeads.forEach(lead => {
+                existingNegSet.add(`${lead.campaign}-${lead.name}`.toLowerCase());
+                if (lead.linkedin) {
+                  existingNegLinkedinSet.add(lead.linkedin.toLowerCase());
+                }
+              });
+            }
+
+            const leadsToInsert = parsedData.negativeLeads
+              .filter(lead => {
+                const nameKey = `${campaignNameToUse}-${lead.name}`.toLowerCase();
+                const linkedinExists = lead.linkedin && existingNegLinkedinSet.has(lead.linkedin.toLowerCase());
+                const nameExists = existingNegSet.has(nameKey);
+                
+                if (linkedinExists || nameExists) {
+                  console.log(`⏭️ Skipping duplicate negative lead: ${lead.name}`);
+                  return false;
+                }
+                return true;
+              })
+              .map(lead => ({
+                user_id: user.id,
+                campaign: campaignNameToUse,
+                linkedin: lead.linkedin,
+                name: lead.name,
+                position: lead.position,
+                company: lead.company,
+                status: lead.status,
+                source: lead.source,
+                connection_date: lead.connectionDate,
+                imported_at: lead.importedAt,
+                negative_response_date: lead.negativeResponseDate,
+                had_follow_up: lead.hadFollowUp,
+                follow_up_reason: lead.followUpReason,
+                observations: lead.observations,
+              }));
+
+            // Deduplicate within batch
             const uniqueLeads = leadsToInsert.reduce((acc, lead) => {
-              const key = `${lead.user_id}-${lead.campaign}-${lead.name}`;
+              const key = lead.linkedin 
+                ? `linkedin:${lead.linkedin.toLowerCase()}`
+                : `name:${lead.campaign}-${lead.name}`.toLowerCase();
               if (!acc.has(key)) {
                 acc.set(key, lead);
               }
@@ -1049,25 +1122,30 @@ export default function UserSettings() {
             }, new Map<string, typeof leadsToInsert[0]>());
 
             const deduplicatedLeads = Array.from(uniqueLeads.values());
-            console.log(`📊 Deduplicated ${leadsToInsert.length} negative leads to ${deduplicatedLeads.length} unique leads`);
+            const skippedCount = parsedData.negativeLeads.length - deduplicatedLeads.length;
+            console.log(`📊 ${parsedData.negativeLeads.length} leads negativos → ${deduplicatedLeads.length} novos (${skippedCount} duplicados)`);
 
-            const { error: leadsError } = await supabase
-              .from('leads')
-              .upsert(deduplicatedLeads as any[], {
-                onConflict: 'user_id,campaign,name',
-                ignoreDuplicates: false
-              });
+            if (deduplicatedLeads.length > 0) {
+              const { error: leadsError } = await supabase
+                .from('leads')
+                .upsert(deduplicatedLeads as any[], {
+                  onConflict: 'user_id,campaign,name',
+                  ignoreDuplicates: true
+                });
 
-            if (leadsError) {
-              console.error('❌ Error inserting negative leads:', leadsError);
+              if (leadsError) {
+                console.error('❌ Error inserting negative leads:', leadsError);
+              } else {
+                totalLeads += deduplicatedLeads.length;
+                setProgress(prev => prev ? {
+                  ...prev,
+                  currentStep: `Importando ${deduplicatedLeads.length} leads negativos (${skippedCount} duplicados ignorados)...`,
+                  processedItems: { ...prev.processedItems, leads: totalLeads }
+                } : null);
+                console.log(`✅ ${deduplicatedLeads.length} negative leads inserted`);
+              }
             } else {
-              totalLeads += deduplicatedLeads.length;
-              setProgress(prev => prev ? {
-                ...prev,
-                currentStep: `Importando ${deduplicatedLeads.length} leads negativos...`,
-                processedItems: { ...prev.processedItems, leads: totalLeads }
-              } : null);
-              console.log(`✅ ${deduplicatedLeads.length} negative leads inserted`);
+              console.log('⏭️ No new negative leads to insert (all duplicates)');
             }
           }
         } else if (type === 'hybrid') {
@@ -1184,8 +1262,27 @@ export default function UserSettings() {
             }
           }
 
-          // Insert leads from hybrid format
+          // Insert leads from hybrid format with duplicate validation
           if (leads.length > 0) {
+            // Fetch existing leads for this campaign
+            const { data: existingHybridLeads } = await supabase
+              .from('leads')
+              .select('name, linkedin, campaign')
+              .eq('user_id', user.id)
+              .eq('campaign', campaignName);
+
+            const existingHybridSet = new Set<string>();
+            const existingHybridLinkedinSet = new Set<string>();
+            
+            if (existingHybridLeads) {
+              existingHybridLeads.forEach(lead => {
+                existingHybridSet.add(`${lead.campaign}-${lead.name}`.toLowerCase());
+                if (lead.linkedin) {
+                  existingHybridLinkedinSet.add(lead.linkedin.toLowerCase());
+                }
+              });
+            }
+
             // Log lead statuses for debugging
             const statusCounts = leads.reduce((acc: any, lead: any) => {
               acc[lead.status] = (acc[lead.status] || 0) + 1;
@@ -1193,30 +1290,44 @@ export default function UserSettings() {
             }, {});
             console.log('📊 Lead status distribution:', statusCounts);
             
-            const leadsToInsert = leads.map((lead: any) => ({
-              user_id: user.id,
-              campaign: campaignName,
-              linkedin: lead.linkedin,
-              name: lead.name,
-              position: lead.position,
-              company: lead.company,
-              status: lead.status || 'pending', // Use lead's status from parser
-              source: lead.source,
-              connection_date: lead.connectionDate,
-              imported_at: lead.importedAt, // Use invite send date as imported_at
-              positive_response_date: lead.positiveResponseDate,
-              negative_response_date: lead.negativeResponseDate,
-              follow_up_1_date: lead.followUp1Date,
-              follow_up_1_comments: lead.followUp1Comments,
-              follow_up_2_date: lead.followUp2Date,
-              follow_up_2_comments: lead.followUp2Comments,
-              follow_up_3_date: lead.followUp3Date,
-              follow_up_3_comments: lead.followUp3Comments,
-            }));
+            const leadsToInsert = leads
+              .filter((lead: any) => {
+                const nameKey = `${campaignName}-${lead.name}`.toLowerCase();
+                const linkedinExists = lead.linkedin && existingHybridLinkedinSet.has(lead.linkedin.toLowerCase());
+                const nameExists = existingHybridSet.has(nameKey);
+                
+                if (linkedinExists || nameExists) {
+                  console.log(`⏭️ Skipping duplicate hybrid lead: ${lead.name}`);
+                  return false;
+                }
+                return true;
+              })
+              .map((lead: any) => ({
+                user_id: user.id,
+                campaign: campaignName,
+                linkedin: lead.linkedin,
+                name: lead.name,
+                position: lead.position,
+                company: lead.company,
+                status: lead.status || 'pending',
+                source: lead.source,
+                connection_date: lead.connectionDate,
+                imported_at: lead.importedAt,
+                positive_response_date: lead.positiveResponseDate,
+                negative_response_date: lead.negativeResponseDate,
+                follow_up_1_date: lead.followUp1Date,
+                follow_up_1_comments: lead.followUp1Comments,
+                follow_up_2_date: lead.followUp2Date,
+                follow_up_2_comments: lead.followUp2Comments,
+                follow_up_3_date: lead.followUp3Date,
+                follow_up_3_comments: lead.followUp3Comments,
+              }));
 
-            // Deduplicate leads
+            // Deduplicate within batch
             const uniqueLeads = leadsToInsert.reduce((acc: Map<string, any>, lead: any) => {
-              const key = `${lead.user_id}-${lead.campaign}-${lead.name}`;
+              const key = lead.linkedin 
+                ? `linkedin:${lead.linkedin.toLowerCase()}`
+                : `name:${lead.campaign}-${lead.name}`.toLowerCase();
               if (!acc.has(key)) {
                 acc.set(key, lead);
               }
@@ -1224,25 +1335,30 @@ export default function UserSettings() {
             }, new Map<string, any>());
 
             const deduplicatedLeads = Array.from(uniqueLeads.values());
-            console.log(`📊 Deduplicated ${leadsToInsert.length} hybrid leads to ${deduplicatedLeads.length} unique leads`);
+            const skippedCount = leads.length - deduplicatedLeads.length;
+            console.log(`📊 ${leads.length} hybrid leads → ${deduplicatedLeads.length} novos (${skippedCount} duplicados)`);
 
-            const { error: leadsError } = await supabase
-              .from('leads')
-              .upsert(deduplicatedLeads as any[], {
-                onConflict: 'user_id,campaign,name',
-                ignoreDuplicates: false
-              });
+            if (deduplicatedLeads.length > 0) {
+              const { error: leadsError } = await supabase
+                .from('leads')
+                .upsert(deduplicatedLeads as any[], {
+                  onConflict: 'user_id,campaign,name',
+                  ignoreDuplicates: true
+                });
 
-            if (leadsError) {
-              console.error('❌ Error inserting hybrid leads:', leadsError);
+              if (leadsError) {
+                console.error('❌ Error inserting hybrid leads:', leadsError);
+              } else {
+                totalLeads += deduplicatedLeads.length;
+                setProgress(prev => prev ? {
+                  ...prev,
+                  currentStep: `Importando ${deduplicatedLeads.length} leads (${skippedCount} duplicados ignorados)...`,
+                  processedItems: { ...prev.processedItems, leads: totalLeads }
+                } : null);
+                console.log(`✅ ${deduplicatedLeads.length} hybrid leads inserted`);
+              }
             } else {
-              totalLeads += deduplicatedLeads.length;
-              setProgress(prev => prev ? {
-                ...prev,
-                currentStep: `Importando ${deduplicatedLeads.length} leads...`,
-                processedItems: { ...prev.processedItems, leads: totalLeads }
-              } : null);
-              console.log(`✅ ${deduplicatedLeads.length} hybrid leads inserted`);
+              console.log('⏭️ No new hybrid leads to insert (all duplicates)');
             }
           }
         }
