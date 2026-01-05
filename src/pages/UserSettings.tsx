@@ -53,10 +53,30 @@ export default function UserSettings() {
   const [previewData, setPreviewData] = useState<FilePreviewData[]>([]);
   const [parsedFilesData, setParsedFilesData] = useState<any[]>([]);
   const [profileSelections, setProfileSelections] = useState<Record<string, string>>({});
+  const [existingCampaigns, setExistingCampaigns] = useState<{ id: string; name: string }[]>([]);
+  const [campaignSelections, setCampaignSelections] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadFiles();
+    loadExistingCampaigns();
   }, []);
+
+  const loadExistingCampaigns = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('campaigns')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setExistingCampaigns(data || []);
+    } catch (error) {
+      console.error('Error loading campaigns:', error);
+    }
+  };
 
   const loadFiles = async () => {
     try {
@@ -405,6 +425,20 @@ export default function UserSettings() {
     })));
   };
 
+  const handleCampaignSelect = (fileName: string, campaignName: string) => {
+    setCampaignSelections(prev => ({
+      ...prev,
+      [fileName]: campaignName
+    }));
+    
+    // Update preview data with selection
+    setPreviewData(prev => prev.map(file => 
+      file.fileName === fileName 
+        ? { ...file, selectedCampaign: campaignName }
+        : file
+    ));
+  };
+
   const handleTypeSelect = async (fileName: string, newType: 'campaign-input' | 'leads' | 'hybrid') => {
     console.log(`🔄 Mudando tipo de ${fileName} para ${newType}`);
     
@@ -706,13 +740,20 @@ export default function UserSettings() {
           }
         } else if (type === 'leads') {
           // Process leads CSV
+          // Check if user selected a specific campaign for this file
+          const selectedCampaign = campaignSelections[fileName];
+          const campaignNameToUse = selectedCampaign || null;
+          
           console.log(`👥 Processando leads: ${parsedData.positiveLeads.length} positivos, ${parsedData.negativeLeads.length} negativos`);
+          if (campaignNameToUse) {
+            console.log(`📋 Usando campanha selecionada: ${campaignNameToUse}`);
+          }
           
           // Insert positive leads
           if (parsedData.positiveLeads.length > 0) {
             const leadsToInsert = parsedData.positiveLeads.map(lead => ({
               user_id: user.id,
-              campaign: lead.campaign,
+              campaign: campaignNameToUse || lead.campaign,
               linkedin: lead.linkedin,
               name: lead.name,
               position: lead.position,
@@ -720,6 +761,7 @@ export default function UserSettings() {
               status: lead.status,
               source: lead.source,
               connection_date: lead.connectionDate,
+              imported_at: lead.importedAt, // Use Sequence Generated At as imported_at
               positive_response_date: lead.positiveResponseDate,
               transfer_date: lead.transferDate,
               status_details: lead.statusDetails,
@@ -784,7 +826,7 @@ export default function UserSettings() {
           if (parsedData.negativeLeads.length > 0) {
             const leadsToInsert = parsedData.negativeLeads.map(lead => ({
               user_id: user.id,
-              campaign: lead.campaign,
+              campaign: campaignNameToUse || lead.campaign,
               linkedin: lead.linkedin,
               name: lead.name,
               position: lead.position,
@@ -792,6 +834,7 @@ export default function UserSettings() {
               status: lead.status,
               source: lead.source,
               connection_date: lead.connectionDate,
+              imported_at: lead.importedAt, // Use Sequence Generated At as imported_at
               negative_response_date: lead.negativeResponseDate,
               had_follow_up: lead.hadFollowUp,
               follow_up_reason: lead.followUpReason,
@@ -962,6 +1005,7 @@ export default function UserSettings() {
               status: lead.status || 'pending', // Use lead's status from parser
               source: lead.source,
               connection_date: lead.connectionDate,
+              imported_at: lead.importedAt, // Use invite send date as imported_at
               positive_response_date: lead.positiveResponseDate,
               negative_response_date: lead.negativeResponseDate,
               follow_up_1_date: lead.followUp1Date,
@@ -1215,9 +1259,12 @@ export default function UserSettings() {
           setParsedFilesData([]);
           setPreviewData([]);
           setProfileSelections({});
+          setCampaignSelections({});
         }}
         onProfileSelect={handleProfileSelect}
         onTypeSelect={handleTypeSelect}
+        onCampaignSelect={handleCampaignSelect}
+        existingCampaigns={existingCampaigns}
         loading={processing}
       />
     </div>
