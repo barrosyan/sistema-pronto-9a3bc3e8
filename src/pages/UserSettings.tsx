@@ -292,11 +292,22 @@ export default function UserSettings() {
                 }
               });
               
+              // Calculate leads count from Connection Requests Sent for initial preview
+              let totalLeadsFromMetrics = 0;
+              parsedData.forEach((d) => {
+                const connectionRequestsMetric = d.metrics.find((m) => 
+                  m.eventType === 'Connection Requests Sent' || m.eventType === 'Convites Enviados'
+                );
+                if (connectionRequestsMetric) {
+                  totalLeadsFromMetrics += connectionRequestsMetric.totalCount;
+                }
+              });
+              
               previews.push({
                 fileName: fileRecord.file_name,
                 campaignsCount: campaignNames.length,
                 metricsCount: parsedData.reduce((sum, d) => sum + d.metrics.length, 0),
-                positiveLeadsCount: 0,
+                positiveLeadsCount: totalLeadsFromMetrics, // Show estimated leads from Connection Requests Sent
                 negativeLeadsCount: 0,
                 campaignNames,
                 campaignProfileMappings,
@@ -500,11 +511,22 @@ export default function UserSettings() {
           };
         });
         
+        // Calculate leads count from Connection Requests Sent for preview
+        let totalLeadsFromMetrics = 0;
+        newParsedData.forEach((d: any) => {
+          const connectionRequestsMetric = d.metrics.find((m: any) => 
+            m.eventType === 'Connection Requests Sent' || m.eventType === 'Convites Enviados'
+          );
+          if (connectionRequestsMetric) {
+            totalLeadsFromMetrics += connectionRequestsMetric.totalCount;
+          }
+        });
+        
         newPreview = {
           fileName: fileRecord.file_name,
           campaignsCount: campaignNames.length,
           metricsCount: newParsedData.reduce((sum: number, d: any) => sum + d.metrics.length, 0),
-          positiveLeadsCount: 0,
+          positiveLeadsCount: totalLeadsFromMetrics, // Show leads from Connection Requests Sent
           negativeLeadsCount: 0,
           campaignNames,
           campaignProfileMappings,
