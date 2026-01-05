@@ -748,7 +748,12 @@ export default function UserSettings() {
           let campaignNameToUse = selectedCampaign;
           if (!campaignNameToUse) {
             // Try to get from first lead, otherwise use file name
-            campaignNameToUse = allLeads[0]?.campaign || fileName.replace(/\.(csv|xlsx|xls)$/i, '').replace(/_/g, ' ');
+            // Remove " all leads" suffix from filename
+            campaignNameToUse = allLeads[0]?.campaign || fileName
+              .replace(/\.(csv|xlsx|xls)$/i, '')
+              .replace(/_/g, ' ')
+              .replace(/\s*all\s*leads\s*$/i, '')
+              .trim();
           }
           
           console.log(`👥 Processando leads: ${parsedData.positiveLeads.length} positivos, ${parsedData.negativeLeads.length} negativos`);
