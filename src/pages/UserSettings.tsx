@@ -737,6 +737,73 @@ export default function UserSettings() {
                 }
               }
             }
+
+            // Extract "Leads Processados" from "Connection Requests Sent" metric if available
+            // This allows campaign imports to also populate leads metrics
+            const connectionRequestsMetric = data.metrics.find((m: any) => 
+              m.eventType === 'Connection Requests Sent' || m.eventType === 'Convites Enviados'
+            );
+            
+            if (connectionRequestsMetric && connectionRequestsMetric.dailyData) {
+              const leadsProcessadosDailyData: Record<string, number> = {};
+              Object.entries(connectionRequestsMetric.dailyData).forEach(([date, value]) => {
+                if (/^\d{4}-\d{2}-\d{2}$/.test(date) && Number(value) > 0) {
+                  leadsProcessadosDailyData[date] = Number(value);
+                }
+              });
+
+              if (Object.keys(leadsProcessadosDailyData).length > 0) {
+                const totalLeadsProcessados = Object.values(leadsProcessadosDailyData).reduce((a, b) => a + b, 0);
+                
+                const { data: leadsMetric, error: leadsMetricError } = await supabase
+                  .from('campaign_metrics')
+                  .upsert({
+                    user_id: user.id,
+                    campaign_name: data.campaignName,
+                    profile_name: data.profileName,
+                    event_type: 'Leads Processados',
+                    total_count: totalLeadsProcessados,
+                    daily_data: {},
+                  }, {
+                    onConflict: 'user_id,campaign_name,event_type,profile_name',
+                    ignoreDuplicates: false,
+                  })
+                  .select()
+                  .single();
+
+                if (leadsMetricError) {
+                  console.error('❌ Error upserting Leads Processados metric:', leadsMetricError);
+                } else {
+                  totalMetrics++;
+                  console.log(`✅ Leads Processados extracted from campaign: ${totalLeadsProcessados} leads`);
+
+                  // Insert daily metrics for Leads Processados
+                  if (leadsMetric) {
+                    const dailyEntries = Object.entries(leadsProcessadosDailyData).map(([date, value]) => ({
+                      campaign_metric_id: leadsMetric.id,
+                      user_id: user.id,
+                      date,
+                      value: Number(value) || 0,
+                    }));
+
+                    if (dailyEntries.length > 0) {
+                      const { error: dailyError } = await supabase
+                        .from('daily_metrics' as any)
+                        .upsert(dailyEntries, {
+                          onConflict: 'campaign_metric_id,date',
+                          ignoreDuplicates: false,
+                        });
+
+                      if (dailyError) {
+                        console.error('❌ Error upserting daily metrics for Leads Processados:', dailyError);
+                      } else {
+                        console.log(`✅ Upserted ${dailyEntries.length} daily entries for Leads Processados`);
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         } else if (type === 'leads') {
           // Process leads CSV
