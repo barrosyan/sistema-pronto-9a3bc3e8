@@ -40,6 +40,7 @@ export interface FilePreviewData {
   detectedType?: 'campaign-input' | 'leads' | 'hybrid';
   selectedType?: 'campaign-input' | 'leads' | 'hybrid';
   acceptanceRate?: number;
+  selectedCampaign?: string; // Selected campaign for leads import
 }
 
 interface DataImportPreviewProps {
@@ -50,6 +51,8 @@ interface DataImportPreviewProps {
   onCancel: () => void;
   onProfileSelect: (campaignName: string, profileName: string) => void;
   onTypeSelect?: (fileName: string, type: 'campaign-input' | 'leads' | 'hybrid') => void;
+  onCampaignSelect?: (fileName: string, campaignName: string) => void;
+  existingCampaigns?: { id: string; name: string }[];
   loading?: boolean;
 }
 
@@ -61,6 +64,8 @@ export default function DataImportPreview({
   onCancel,
   onProfileSelect,
   onTypeSelect,
+  onCampaignSelect,
+  existingCampaigns = [],
   loading = false,
 }: DataImportPreviewProps) {
   const totalCampaigns = previewData.reduce((sum, f) => sum + f.campaignsCount, 0);
@@ -185,6 +190,40 @@ export default function DataImportPreview({
                                 Tipo detectado: {file.detectedType === 'hybrid' ? 'Misto' : file.detectedType === 'campaign-input' ? 'Campanhas' : 'Leads'}
                               </p>
                             )}
+                          </div>
+                        )}
+                        
+                        {/* Campaign Selection for Leads Import */}
+                        {(file.selectedType === 'leads' || (file.detectedType === 'leads' && !file.selectedType)) && 
+                         onCampaignSelect && existingCampaigns.length > 0 && (
+                          <div className="pb-2 border-b">
+                            <p className="text-xs text-muted-foreground mb-2 font-semibold">
+                              Associar a campanha (opcional):
+                            </p>
+                            <Select
+                              value={file.selectedCampaign || '__use_filename__'}
+                              onValueChange={(value) => onCampaignSelect(file.fileName, value === '__use_filename__' ? '' : value)}
+                            >
+                              <SelectTrigger className={`h-8 text-xs`}>
+                                <SelectValue placeholder="Usar nome do arquivo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__use_filename__" className="text-xs">
+                                  Usar nome do arquivo
+                                </SelectItem>
+                                {existingCampaigns.map((campaign) => (
+                                  <SelectItem key={campaign.id} value={campaign.name} className="text-xs">
+                                    {campaign.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {file.selectedCampaign 
+                                ? `Leads serão importados para: ${file.selectedCampaign}` 
+                                : `Leads serão importados com a campanha: ${file.campaignNames[0] || file.fileName.replace(/\.(csv|xlsx|xls)$/i, '').replace(/_/g, ' ')}`
+                              }
+                            </p>
                           </div>
                         )}
                         
