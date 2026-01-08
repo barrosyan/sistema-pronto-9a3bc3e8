@@ -897,31 +897,46 @@ export default function UserSettings() {
               console.log(`✅ Campaign (leads): ${campaignNameToUse}`);
             }
 
-            // Extract metrics from leads - count by imported_at date (Sequence Generated At)
-            const leadsProcessadosMap = new Map<string, number>();
-            allLeads.forEach(lead => {
-              if (lead.importedAt) {
-                // Parse date to YYYY-MM-DD format
-                let dateKey = lead.importedAt;
-                // Try to parse various date formats
-                const parsed = new Date(lead.importedAt);
-                if (!isNaN(parsed.getTime())) {
-                  dateKey = parsed.toISOString().split('T')[0];
-                }
-                const current = leadsProcessadosMap.get(dateKey) || 0;
-                leadsProcessadosMap.set(dateKey, current + 1);
-              }
-            });
+            // Extract metrics from leads - count by "Sequence Generated At" (imported_at)
+            // NOTE: We use parsedData.leadsProcessadosByDate to match the Python count even when
+            // some rows are skipped from lead insertion (e.g., missing name).
+            const leadsProcessadosDailyData: Record<string, number> = {
+              ...((parsedData.leadsProcessadosByDate as Record<string, number> | undefined) || {})
+            };
 
-            // Create "Leads Processados" metric from imported_at dates
-            if (leadsProcessadosMap.size > 0) {
-              const dailyData: Record<string, number> = {};
-              leadsProcessadosMap.forEach((count, date) => {
-                dailyData[date] = count;
+            // Backward compatibility: if older parsedData doesn't have leadsProcessadosByDate,
+            // fallback to building from importedAt on parsed leads.
+            if (Object.keys(leadsProcessadosDailyData).length === 0) {
+              const leadsProcessadosMap = new Map<string, number>();
+              allLeads.forEach(lead => {
+                if (lead.importedAt) {
+                  // Parse date to YYYY-MM-DD format
+                  let dateKey = lead.importedAt;
+                  const parsed = new Date(lead.importedAt);
+                  if (!isNaN(parsed.getTime())) {
+                    dateKey = parsed.toISOString().split('T')[0];
+                  }
+                  const current = leadsProcessadosMap.get(dateKey) || 0;
+                  leadsProcessadosMap.set(dateKey, current + 1);
+                }
               });
-              
-              const totalCount = Array.from(leadsProcessadosMap.values()).reduce((a, b) => a + b, 0);
-              
+
+              leadsProcessadosMap.forEach((count, date) => {
+                leadsProcessadosDailyData[date] = count;
+              });
+            }
+
+            // Create "Leads Processados" metric from Sequence Generated At dates
+            if (Object.keys(leadsProcessadosDailyData).length > 0) {
+              const dailyData: Record<string, number> = {};
+              Object.entries(leadsProcessadosDailyData).forEach(([date, count]) => {
+                dailyData[date] = Number(count) || 0;
+              });
+
+              const totalCount = (typeof parsedData.leadsProcessados === 'number' && parsedData.leadsProcessados > 0)
+                ? parsedData.leadsProcessados
+                : Object.values(dailyData).reduce((a, b) => a + (Number(b) || 0), 0);
+
               const { data: upsertedMetric, error: metricError } = await supabase
                 .from('campaign_metrics')
                 .upsert({
@@ -942,8 +957,8 @@ export default function UserSettings() {
                 console.error('❌ Error upserting leads processados metric:', metricError);
               } else {
                 totalMetrics++;
-                console.log(`✅ Leads Processados metric: ${totalCount} leads across ${leadsProcessadosMap.size} days`);
-                
+                console.log(`✅ Leads Processados metric: ${totalCount} leads across ${Object.keys(dailyData).length} days`);
+
                 // Insert daily metrics
                 if (upsertedMetric) {
                   const dailyEntries = Object.entries(dailyData).map(([date, value]) => ({

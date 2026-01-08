@@ -3,12 +3,13 @@ import Papa from 'papaparse';
 export interface ParsedLeadData {
   positiveLeads: any[];
   negativeLeads: any[];
-  leadsProcessados: number; // Count of leads with valid Sequence Generated At
+  leadsProcessados: number; // Count of rows with valid "Sequence Generated At" (non-empty)
+  leadsProcessadosByDate: Record<string, number>; // YYYY-MM-DD -> count (for metric generation)
 }
 
 export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLeadData {
   console.log('🔍 Starting leads CSV parsing...');
-  
+
   const parseResult = Papa.parse(csvContent, {
     header: true,
     skipEmptyLines: true,
@@ -26,6 +27,7 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
   const positiveLeads: any[] = [];
   const negativeLeads: any[] = [];
   let leadsProcessados = 0;
+  const leadsProcessadosByDate: Record<string, number> = {};
 
   // Try to extract campaign name from filename if available
   let campaignFromFile = '';
@@ -38,6 +40,25 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
   }
 
   rows.forEach((row, index) => {
+    // --- Leads Processados counting (matches Python logic) ---
+    // IMPORTANT: We count this even if the row is later skipped for missing required fields.
+    const sequenceGeneratedAtRaw = row['Sequence Generated At'] || row['sequence_generated_at'] || null;
+    const sequenceGeneratedAt = sequenceGeneratedAtRaw !== null && sequenceGeneratedAtRaw !== undefined
+      ? String(sequenceGeneratedAtRaw).trim()
+      : '';
+
+    if (sequenceGeneratedAt !== '') {
+      leadsProcessados++;
+
+      // Try to group by day (YYYY-MM-DD). If parsing fails, we still keep the total count,
+      // but we skip daily breakdown for that row.
+      const parsed = new Date(sequenceGeneratedAt);
+      if (!isNaN(parsed.getTime())) {
+        const dayKey = parsed.toISOString().split('T')[0];
+        leadsProcessadosByDate[dayKey] = (leadsProcessadosByDate[dayKey] || 0) + 1;
+      }
+    }
+
     // Detect if it's positive or negative lead based on columns
     const hasPositiveResponse = row['Data Resposta Positiva'] || row['Positive Response Date'] || row['Data resposta positiva'];
     const hasNegativeResponse = row['Data Resposta Negativa'] || row['Negative Response Date'] || row['Data resposta negativa'];
@@ -46,7 +67,7 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
     const firstName = row['First Name'] || '';
     const lastName = row['Last Name'] || '';
     const fullName = firstName && lastName ? `${firstName} ${lastName}`.trim() : '';
-    
+
     const campaign = row['Campanha'] || row['Campaign'] || campaignFromFile || '';
     const linkedin = row['LinkedIn'] || row['linkedin'] || row['linkedin_url'] || '';
     const name = row['Nome'] || row['Name'] || fullName || '';
@@ -60,17 +81,17 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
 
     // Extract connection date from "Connected At" field or Messages field
     let connectionDate = row['Connected At'] || row['connected_at'] || null;
-    
+
     // Filter out invalid date values
     if (connectionDate && (connectionDate === 'Never' || connectionDate === 'never' || connectionDate.trim() === '')) {
       connectionDate = null;
     }
-    
+
     // Fallback: try to extract from Messages field if present
     if (!connectionDate) {
-      const messagesField = row['Messages Sent: 1, Received: 4, Connected: Thu Apr 17 2025'] || 
-                           row['Messages'] || 
-                           row['messages'] || '';
+      const messagesField = row['Messages Sent: 1, Received: 4, Connected: Thu Apr 17 2025'] ||
+        row['Messages'] ||
+        row['messages'] || '';
       if (messagesField && typeof messagesField === 'string') {
         const connectedMatch = messagesField.match(/Connected:\s*(.+?)(?:\s|$)/i);
         if (connectedMatch) {
@@ -83,19 +104,11 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
       }
     }
 
-    // Extract Sequence Generated date (when lead was added to the campaign sequence)
-    // This is the primary source for "Leads Processados" calculation
-    // Based on Python logic: count rows where Sequence Generated At is not empty
-    const sequenceGeneratedAt = row['Sequence Generated At'] || row['sequence_generated_at'] || null;
-    
-    // Count as "Lead Processado" if Sequence Generated At is present and not empty
-    if (sequenceGeneratedAt && sequenceGeneratedAt.toString().trim() !== '') {
-      leadsProcessados++;
-    }
-
     // Extract Imported At date - prioritize Sequence Generated At, then fall back to Imported At
     // "Sequence Generated At" is the date the lead was imported into the campaign sequence
-    const importedAt = sequenceGeneratedAt || row['Imported At'] || row['imported_at'] || null;
+    const importedAt = sequenceGeneratedAt !== ''
+      ? sequenceGeneratedAt
+      : (row['Imported At'] || row['imported_at'] || null);
 
     const baseLead = {
       campaign,
@@ -105,7 +118,7 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
       company,
       source: 'Kontax',
       connectionDate,
-      sequenceDate: sequenceGeneratedAt,
+      sequenceDate: sequenceGeneratedAt !== '' ? sequenceGeneratedAt : null,
       importedAt,
     };
 
@@ -188,10 +201,12 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
 
   console.log(`✅ Parsed ${positiveLeads.length} positive leads and ${negativeLeads.length} negative leads`);
   console.log(`📊 Leads Processados (with Sequence Generated At): ${leadsProcessados}`);
-  
+
   return {
     positiveLeads,
     negativeLeads,
     leadsProcessados,
+    leadsProcessadosByDate,
   };
 }
+
