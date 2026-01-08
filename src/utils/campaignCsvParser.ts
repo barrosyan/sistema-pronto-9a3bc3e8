@@ -23,16 +23,21 @@ export interface ParsedCampaignData {
   };
 }
 
+// Event types to process from campaign CSV
 const EVENT_TYPES = [
   'Profile Visits',
   'Connection Requests Sent',
   'Messages Sent',
   'Connection Requests Accepted',
+  'Messages Replied',
   'Post Likes',
   'Comments Done',
   'Follow-Ups 1',
   'Follow-Ups 2',
   'Follow-Ups 3',
+  'Follow-Ups 4',
+  'Follow-Ups 5',
+  'Emails Sent',
 ];
 
 export function parseCampaignCsv(csvContent: string): ParsedCampaignData[] {
