@@ -18,6 +18,7 @@ export interface HybridParsedData {
     negativeResponses: number;
     pendingLeads: number;
     acceptanceRate: number; // Calculated as connectionsAccepted / invitesSent
+    leadsProcessados: number; // Count of leads with valid inviteSendDate (equivalent to Sequence Generated At)
   };
 }
 
@@ -205,6 +206,7 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
   let totalPositive = 0;
   let totalNegative = 0;
   let totalPending = 0;
+  let leadsProcessados = 0; // Count leads with valid inviteSendDate
   
   // Count "Sim" responses for acceptance rate calculation
   let totalInvitesSim = 0;
@@ -385,6 +387,8 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
     if (inviteSent && inviteSendDate) {
       const current = metricsMap.invitesSent.get(inviteSendDate) || 0;
       metricsMap.invitesSent.set(inviteSendDate, current + 1);
+      // Count as "Lead Processado" if inviteSendDate is present
+      leadsProcessados++;
     }
 
     if (connectionAccepted && acceptDate) {
@@ -533,6 +537,7 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
     negativeResponses: totalNegative,
     pendingLeads: totalPending,
     acceptanceRate: Math.round(acceptanceRate * 100) / 100, // Round to 2 decimal places
+    leadsProcessados, // Count of leads with valid inviteSendDate
   };
 
   console.log('✅ Hybrid CSV parsing complete:', summary);

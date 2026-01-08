@@ -333,7 +333,8 @@ export default function UserSettings() {
                 metricsCount: parsedData.campaignMetrics.filter(m => 
                   Object.keys(m.dailyData).length > 0
                 ).length,
-                positiveLeadsCount: parsedData.summary.positiveResponses,
+                // Use leadsProcessados for accurate count of leads with inviteSendDate
+                positiveLeadsCount: parsedData.summary.leadsProcessados || parsedData.summary.positiveResponses,
                 negativeLeadsCount: parsedData.summary.negativeResponses,
                 pendingLeadsCount: parsedData.summary.pendingLeads,
                 messagesSent: parsedData.summary.messagesSent,
@@ -366,7 +367,8 @@ export default function UserSettings() {
                 fileName: fileRecord.file_name,
                 campaignsCount: 0,
                 metricsCount: 0,
-                positiveLeadsCount: parsedData.positiveLeads.length,
+                // Use leadsProcessados (leads with Sequence Generated At) for preview count
+                positiveLeadsCount: parsedData.leadsProcessados || parsedData.positiveLeads.length,
                 negativeLeadsCount: parsedData.negativeLeads.length,
                 campaignNames,
                 detectedType: 'leads',
@@ -546,7 +548,8 @@ export default function UserSettings() {
           fileName: fileRecord.file_name,
           campaignsCount: 0,
           metricsCount: 0,
-          positiveLeadsCount: newParsedData.positiveLeads.length,
+          // Use leadsProcessados (leads with Sequence Generated At) for preview count
+          positiveLeadsCount: newParsedData.leadsProcessados || newParsedData.positiveLeads.length,
           negativeLeadsCount: newParsedData.negativeLeads.length,
           campaignNames,
           detectedType: fileData.type,

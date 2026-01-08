@@ -3,6 +3,7 @@ import Papa from 'papaparse';
 export interface ParsedLeadData {
   positiveLeads: any[];
   negativeLeads: any[];
+  leadsProcessados: number; // Count of leads with valid Sequence Generated At
 }
 
 export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLeadData {
@@ -24,12 +25,16 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
 
   const positiveLeads: any[] = [];
   const negativeLeads: any[] = [];
+  let leadsProcessados = 0;
 
   // Try to extract campaign name from filename if available
   let campaignFromFile = '';
   if (fileName) {
-    // Remove file extension and clean up
-    campaignFromFile = fileName.replace(/\.(csv|xlsx|xls)$/i, '').replace(/_/g, ' ');
+    // Remove file extension and clean up - extract just the campaign name
+    campaignFromFile = fileName
+      .replace(/\.(csv|xlsx|xls)$/i, '')
+      .replace(/_/g, ' ')
+      .trim();
   }
 
   rows.forEach((row, index) => {
@@ -80,7 +85,13 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
 
     // Extract Sequence Generated date (when lead was added to the campaign sequence)
     // This is the primary source for "Leads Processados" calculation
+    // Based on Python logic: count rows where Sequence Generated At is not empty
     const sequenceGeneratedAt = row['Sequence Generated At'] || row['sequence_generated_at'] || null;
+    
+    // Count as "Lead Processado" if Sequence Generated At is present and not empty
+    if (sequenceGeneratedAt && sequenceGeneratedAt.toString().trim() !== '') {
+      leadsProcessados++;
+    }
 
     // Extract Imported At date - prioritize Sequence Generated At, then fall back to Imported At
     // "Sequence Generated At" is the date the lead was imported into the campaign sequence
@@ -176,9 +187,11 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
   });
 
   console.log(`✅ Parsed ${positiveLeads.length} positive leads and ${negativeLeads.length} negative leads`);
+  console.log(`📊 Leads Processados (with Sequence Generated At): ${leadsProcessados}`);
   
   return {
     positiveLeads,
     negativeLeads,
+    leadsProcessados,
   };
 }
