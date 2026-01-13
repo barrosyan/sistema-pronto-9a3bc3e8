@@ -1626,6 +1626,10 @@ export default function Campaigns() {
                 activeDays,
               };
             })}
+            dailyDataByCampaign={selectedCampaigns.reduce((acc, campaign) => {
+              acc[campaign] = getDailyDataForCampaign(campaign);
+              return acc;
+            }, {} as Record<string, any[]>)}
           />
         </>
       )}

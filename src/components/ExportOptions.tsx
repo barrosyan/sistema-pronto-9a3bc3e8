@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Presentation, Loader2, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, subDays, parseISO, isAfter, isBefore, isEqual } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useState } from 'react';
 
@@ -10,6 +10,19 @@ interface ExportOptionsProps {
   data: Record<string, any>[];
   filename?: string;
   campaignSummaries?: CampaignSummary[];
+  dailyDataByCampaign?: Record<string, DailyData[]>;
+}
+
+interface DailyData {
+  date: string;
+  invitations: number;
+  connections: number;
+  messages: number;
+  visits: number;
+  likes: number;
+  comments: number;
+  positiveResponses: number;
+  meetings: number;
 }
 
 interface CampaignSummary {
@@ -27,7 +40,26 @@ interface CampaignSummary {
   activeDays?: number;
 }
 
-export function ExportOptions({ data, filename = 'campanhas', campaignSummaries = [] }: ExportOptionsProps) {
+interface CampaignSlideData {
+  name: string;
+  periodLabel: string;
+  activeDays: number;
+  invitations: number;
+  connections: number;
+  messages: number;
+  acceptanceRate: string;
+  positiveResponses: number;
+  meetings: number;
+  proposals: number;
+  sales: number;
+}
+
+export function ExportOptions({ 
+  data, 
+  filename = 'campanhas', 
+  campaignSummaries = [],
+  dailyDataByCampaign = {}
+}: ExportOptionsProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
 
@@ -39,14 +71,12 @@ export function ExportOptions({ data, filename = 'campanhas', campaignSummaries 
         return;
       }
 
-      // Get all unique keys from data
       const allKeys = new Set<string>();
       data.forEach(row => {
         Object.keys(row).forEach(key => allKeys.add(key));
       });
       const headers = Array.from(allKeys);
 
-      // Create CSV content
       const csvRows = [
         headers.join(','),
         ...data.map(row => 
@@ -54,7 +84,6 @@ export function ExportOptions({ data, filename = 'campanhas', campaignSummaries 
             const value = row[header];
             if (value === null || value === undefined) return '';
             const stringValue = String(value);
-            // Escape quotes and wrap in quotes if contains comma, newline, or quote
             if (stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('"')) {
               return `"${stringValue.replace(/"/g, '""')}"`;
             }
@@ -83,10 +112,282 @@ export function ExportOptions({ data, filename = 'campanhas', campaignSummaries 
     }
   };
 
+  // Calculate weekly data from daily data
+  const getWeeklyMetrics = (dailyData: DailyData[]): Omit<CampaignSlideData, 'name' | 'periodLabel' | 'acceptanceRate'> => {
+    const today = new Date();
+    const weekAgo = subDays(today, 7);
+    
+    const weeklyData = dailyData.filter(d => {
+      const date = parseISO(d.date);
+      return (isAfter(date, weekAgo) || isEqual(date, weekAgo)) && (isBefore(date, today) || isEqual(date, today));
+    });
+
+    const activeDays = weeklyData.filter(d => 
+      d.invitations > 0 || d.connections > 0 || d.messages > 0
+    ).length;
+
+    return {
+      activeDays,
+      invitations: weeklyData.reduce((sum, d) => sum + d.invitations, 0),
+      connections: weeklyData.reduce((sum, d) => sum + d.connections, 0),
+      messages: weeklyData.reduce((sum, d) => sum + d.messages, 0),
+      positiveResponses: weeklyData.reduce((sum, d) => sum + d.positiveResponses, 0),
+      meetings: weeklyData.reduce((sum, d) => sum + d.meetings, 0),
+      proposals: 0,
+      sales: 0,
+    };
+  };
+
+  // Add a campaign slide with proper formatting
+  const addCampaignSlide = (
+    pptx: any, 
+    slideData: CampaignSlideData, 
+    isWeekly: boolean,
+    primaryColor: string,
+    successColor: string,
+    mutedColor: string
+  ) => {
+    const slide = pptx.addSlide();
+    
+    // Title with view type indicator
+    const titleSuffix = isWeekly ? ' (Visão Semanal)' : ' (Visão Geral)';
+    slide.addText(slideData.name + titleSuffix, {
+      x: 0.5,
+      y: 0.3,
+      w: 9,
+      h: 0.7,
+      fontSize: 24,
+      bold: true,
+      color: primaryColor,
+    });
+
+    // Period info
+    slide.addText(`Período: ${slideData.periodLabel} | ${slideData.activeDays} dias ativos`, {
+      x: 0.5,
+      y: 0.9,
+      w: 9,
+      h: 0.35,
+      fontSize: 11,
+      color: mutedColor,
+    });
+
+    // Metrics Table - Left side
+    const tableData: any[][] = [
+      [
+        { text: 'Métrica', options: { bold: true, fill: { color: primaryColor }, color: 'FFFFFF', fontSize: 11 } },
+        { text: 'Valor', options: { bold: true, fill: { color: primaryColor }, color: 'FFFFFF', fontSize: 11 } },
+      ],
+      ['Convites Enviados', slideData.invitations.toLocaleString('pt-BR')],
+      ['Conexões Realizadas', slideData.connections.toLocaleString('pt-BR')],
+      ['Taxa de Aceite', slideData.acceptanceRate],
+      ['Mensagens Enviadas', slideData.messages.toLocaleString('pt-BR')],
+      ['Respostas Positivas', slideData.positiveResponses.toLocaleString('pt-BR')],
+      ['Reuniões Marcadas', slideData.meetings.toLocaleString('pt-BR')],
+      ['Propostas', slideData.proposals.toLocaleString('pt-BR')],
+      ['Vendas', slideData.sales.toLocaleString('pt-BR')],
+    ];
+
+    slide.addTable(tableData, {
+      x: 0.5,
+      y: 1.35,
+      w: 4.8,
+      colW: [2.8, 2],
+      fontSize: 10,
+      border: { pt: 0.5, color: 'E2E8F0' },
+      align: 'left',
+      valign: 'middle',
+      rowH: 0.38,
+    });
+
+    // Funnel visualization - Right side
+    slide.addText('Funil de Conversão', {
+      x: 5.6,
+      y: 1.35,
+      w: 4,
+      h: 0.4,
+      fontSize: 14,
+      bold: true,
+      color: primaryColor,
+    });
+
+    // Calculate max for funnel scaling
+    const funnelMax = Math.max(slideData.invitations, slideData.connections, slideData.messages, 1);
+    
+    const funnelData = [
+      { label: 'Convites', value: slideData.invitations, color: primaryColor },
+      { label: 'Conexões', value: slideData.connections, color: primaryColor },
+      { label: 'Mensagens', value: slideData.messages, color: successColor },
+      { label: 'Resp. +', value: slideData.positiveResponses, color: successColor },
+    ];
+
+    funnelData.forEach((item, idx) => {
+      const maxWidth = 2.8;
+      const barWidth = funnelMax > 0 ? (item.value / funnelMax) * maxWidth : 0;
+      const y = 1.85 + idx * 0.55;
+
+      // Label
+      slide.addText(item.label, {
+        x: 5.6,
+        y,
+        w: 1.1,
+        h: 0.4,
+        fontSize: 9,
+        color: mutedColor,
+        align: 'right',
+      });
+
+      // Bar
+      if (barWidth > 0) {
+        slide.addShape('rect', {
+          x: 6.8,
+          y: y + 0.08,
+          w: Math.max(barWidth, 0.15),
+          h: 0.28,
+          fill: { color: item.color },
+        });
+      }
+
+      // Value
+      slide.addText(item.value.toLocaleString('pt-BR'), {
+        x: 6.85 + Math.max(barWidth, 0.15),
+        y,
+        w: 0.8,
+        h: 0.4,
+        fontSize: 10,
+        bold: true,
+        color: '1F2937',
+      });
+    });
+
+    // Conversion rates section
+    slide.addText('Taxas de Conversão', {
+      x: 5.6,
+      y: 4.1,
+      w: 4,
+      h: 0.4,
+      fontSize: 14,
+      bold: true,
+      color: primaryColor,
+    });
+
+    // Parse acceptance rate
+    const acceptanceValue = parseFloat(slideData.acceptanceRate.replace('%', '').replace(',', '.')) || 0;
+    const respPerConnection = slideData.connections > 0 
+      ? ((slideData.positiveResponses / slideData.connections) * 100).toFixed(1)
+      : '0';
+    const meetingPerResp = slideData.positiveResponses > 0 
+      ? ((slideData.meetings / slideData.positiveResponses) * 100).toFixed(1)
+      : '0';
+
+    const conversionRates = [
+      { label: 'Conexão/Convite', value: acceptanceValue > 0 ? `${acceptanceValue.toFixed(1)}%` : 'N/A' },
+      { label: 'Resp+/Conexão', value: `${respPerConnection}%` },
+      { label: 'Reunião/Resp+', value: `${meetingPerResp}%` },
+    ];
+
+    conversionRates.forEach((rate, idx) => {
+      const x = 5.6 + idx * 1.35;
+      
+      slide.addText(rate.value, {
+        x,
+        y: 4.55,
+        w: 1.25,
+        h: 0.45,
+        fontSize: 16,
+        bold: true,
+        color: successColor,
+        align: 'center',
+      });
+      
+      slide.addText(rate.label, {
+        x,
+        y: 4.95,
+        w: 1.25,
+        h: 0.3,
+        fontSize: 8,
+        color: mutedColor,
+        align: 'center',
+      });
+    });
+  };
+
+  // Add overview slide with KPI cards
+  const addOverviewSlide = (
+    pptx: any,
+    title: string,
+    totals: { invitations: number; connections: number; messages: number; positiveResponses: number; meetings: number },
+    campaignCount: number,
+    primaryColor: string,
+    successColor: string,
+    mutedColor: string,
+    bgColor: string
+  ) => {
+    const slide = pptx.addSlide();
+    
+    slide.addText(title, {
+      x: 0.5,
+      y: 0.3,
+      w: 9,
+      h: 0.7,
+      fontSize: 32,
+      bold: true,
+      color: primaryColor,
+    });
+
+    const avgAcceptanceRate = totals.invitations > 0 
+      ? ((totals.connections / totals.invitations) * 100).toFixed(1) 
+      : '0';
+
+    const kpis = [
+      { label: 'Total Convites', value: totals.invitations.toLocaleString('pt-BR'), color: primaryColor },
+      { label: 'Total Conexões', value: totals.connections.toLocaleString('pt-BR'), color: primaryColor },
+      { label: 'Taxa Aceite Média', value: `${avgAcceptanceRate}%`, color: successColor },
+      { label: 'Respostas Positivas', value: totals.positiveResponses.toLocaleString('pt-BR'), color: successColor },
+      { label: 'Reuniões', value: totals.meetings.toLocaleString('pt-BR'), color: primaryColor },
+      { label: 'Campanhas Ativas', value: campaignCount.toString(), color: mutedColor },
+    ];
+
+    kpis.forEach((kpi, idx) => {
+      const col = idx % 3;
+      const row = Math.floor(idx / 3);
+      const x = 0.5 + col * 3.2;
+      const y = 1.3 + row * 2;
+
+      slide.addShape('rect', {
+        x,
+        y,
+        w: 3,
+        h: 1.6,
+        fill: { color: bgColor },
+        line: { color: 'E2E8F0', pt: 1 },
+      });
+      
+      slide.addText(kpi.value, {
+        x,
+        y: y + 0.3,
+        w: 3,
+        h: 0.7,
+        fontSize: 32,
+        bold: true,
+        color: kpi.color,
+        align: 'center',
+      });
+      
+      slide.addText(kpi.label, {
+        x,
+        y: y + 1,
+        w: 3,
+        h: 0.4,
+        fontSize: 12,
+        color: mutedColor,
+        align: 'center',
+      });
+    });
+  };
+
   const exportToPowerPoint = async () => {
     setIsExporting(true);
     try {
-      // Dynamic import to avoid React hooks conflict
       const PptxGenJS = (await import('pptxgenjs')).default;
       
       const pptx = new PptxGenJS();
@@ -101,13 +402,13 @@ export function ExportOptions({ data, filename = 'campanhas', campaignSummaries 
       const mutedColor = '6B7280';
       const bgColor = 'F8FAFC';
 
-      // Title Slide
+      // ===== 1. Title Slide =====
       const titleSlide = pptx.addSlide();
       titleSlide.addText('Relatório de Campanhas', {
         x: 0.5,
         y: 2,
-        w: '90%',
-        h: 1.5,
+        w: 9,
+        h: 1.2,
         fontSize: 44,
         bold: true,
         color: primaryColor,
@@ -115,8 +416,8 @@ export function ExportOptions({ data, filename = 'campanhas', campaignSummaries 
       });
       titleSlide.addText(`Gerado em ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}`, {
         x: 0.5,
-        y: 3.5,
-        w: '90%',
+        y: 3.3,
+        w: 9,
         h: 0.5,
         fontSize: 18,
         color: mutedColor,
@@ -124,268 +425,140 @@ export function ExportOptions({ data, filename = 'campanhas', campaignSummaries 
       });
       titleSlide.addText('Sistema Pronto - Análise de Performance', {
         x: 0.5,
-        y: 4.2,
-        w: '90%',
+        y: 3.9,
+        w: 9,
         h: 0.5,
         fontSize: 14,
         color: mutedColor,
         align: 'center',
       });
 
-      // Summary Slide - Overview
       if (campaignSummaries.length > 0) {
-        const overviewSlide = pptx.addSlide();
-        overviewSlide.addText('Visão Geral', {
-          x: 0.5,
-          y: 0.3,
-          w: '90%',
-          h: 0.8,
-          fontSize: 32,
-          bold: true,
-          color: primaryColor,
-        });
-
-        // Calculate totals
-        const totals = campaignSummaries.reduce(
+        // Calculate overall totals (all time)
+        const overallTotals = campaignSummaries.reduce(
           (acc, c) => ({
             invitations: acc.invitations + c.invitations,
             connections: acc.connections + c.connections,
             messages: acc.messages + c.messages,
             positiveResponses: acc.positiveResponses + c.positiveResponses,
             meetings: acc.meetings + c.meetings,
-            proposals: acc.proposals + (c.proposals || 0),
-            sales: acc.sales + (c.sales || 0),
           }),
-          { invitations: 0, connections: 0, messages: 0, positiveResponses: 0, meetings: 0, proposals: 0, sales: 0 }
+          { invitations: 0, connections: 0, messages: 0, positiveResponses: 0, meetings: 0 }
         );
 
-        const avgAcceptanceRate = totals.invitations > 0 
-          ? ((totals.connections / totals.invitations) * 100).toFixed(1) 
-          : '0';
-
-        // KPI Cards
-        const kpis = [
-          { label: 'Total Convites', value: totals.invitations.toLocaleString('pt-BR'), color: primaryColor },
-          { label: 'Total Conexões', value: totals.connections.toLocaleString('pt-BR'), color: primaryColor },
-          { label: 'Taxa Aceite Média', value: `${avgAcceptanceRate}%`, color: successColor },
-          { label: 'Respostas Positivas', value: totals.positiveResponses.toLocaleString('pt-BR'), color: successColor },
-          { label: 'Reuniões', value: totals.meetings.toLocaleString('pt-BR'), color: primaryColor },
-          { label: 'Campanhas Ativas', value: campaignSummaries.length.toString(), color: mutedColor },
-        ];
-
-        kpis.forEach((kpi, idx) => {
-          const col = idx % 3;
-          const row = Math.floor(idx / 3);
-          const x = 0.5 + col * 3.2;
-          const y = 1.3 + row * 1.8;
-
-          overviewSlide.addShape('rect', {
-            x,
-            y,
-            w: 3,
-            h: 1.5,
-            fill: { color: bgColor },
-            line: { color: 'E2E8F0', pt: 1 },
+        // Calculate weekly totals from daily data
+        let weeklyTotals = { invitations: 0, connections: 0, messages: 0, positiveResponses: 0, meetings: 0 };
+        
+        if (Object.keys(dailyDataByCampaign).length > 0) {
+          campaignSummaries.forEach(campaign => {
+            const dailyData = dailyDataByCampaign[campaign.name] || [];
+            const weeklyMetrics = getWeeklyMetrics(dailyData);
+            weeklyTotals.invitations += weeklyMetrics.invitations;
+            weeklyTotals.connections += weeklyMetrics.connections;
+            weeklyTotals.messages += weeklyMetrics.messages;
+            weeklyTotals.positiveResponses += weeklyMetrics.positiveResponses;
+            weeklyTotals.meetings += weeklyMetrics.meetings;
           });
-          overviewSlide.addText(kpi.value, {
-            x,
-            y: y + 0.2,
-            w: 3,
-            h: 0.8,
-            fontSize: 28,
-            bold: true,
-            color: kpi.color,
-            align: 'center',
-          });
-          overviewSlide.addText(kpi.label, {
-            x,
-            y: y + 0.9,
-            w: 3,
-            h: 0.4,
-            fontSize: 12,
-            color: mutedColor,
-            align: 'center',
-          });
-        });
+        } else {
+          // Fallback to overall totals if no daily data
+          weeklyTotals = { ...overallTotals };
+        }
 
-        // Individual Campaign Slides
-        campaignSummaries.forEach((campaign) => {
-          const slide = pptx.addSlide();
+        // ===== 2. Overall View Slide =====
+        addOverviewSlide(
+          pptx,
+          'Visão Geral',
+          overallTotals,
+          campaignSummaries.length,
+          primaryColor,
+          successColor,
+          mutedColor,
+          bgColor
+        );
+
+        // ===== 3. Weekly View Slide =====
+        addOverviewSlide(
+          pptx,
+          'Visão Semanal',
+          weeklyTotals,
+          campaignSummaries.length,
+          primaryColor,
+          successColor,
+          mutedColor,
+          bgColor
+        );
+
+        // ===== 4. Individual Campaign Slides (Weekly + General for each) =====
+        campaignSummaries.forEach(campaign => {
+          const dailyData = dailyDataByCampaign[campaign.name] || [];
+          const weeklyMetrics = getWeeklyMetrics(dailyData);
           
-          // Campaign Title
-          slide.addText(campaign.name, {
-            x: 0.5,
-            y: 0.3,
-            w: '90%',
-            h: 0.8,
-            fontSize: 28,
-            bold: true,
-            color: primaryColor,
-          });
+          // Get weekly period label
+          const today = new Date();
+          const weekAgo = subDays(today, 7);
+          const weeklyPeriodLabel = `${format(weekAgo, 'yyyy-MM-dd')} - ${format(today, 'yyyy-MM-dd')}`;
+          
+          // Weekly acceptance rate
+          const weeklyAcceptanceRate = weeklyMetrics.invitations > 0
+            ? `${((weeklyMetrics.connections / weeklyMetrics.invitations) * 100).toFixed(1)}%`
+            : 'N/A';
 
-          // Period info
-          if (campaign.startDate || campaign.endDate) {
-            const periodText = `Período: ${campaign.startDate || 'N/A'} - ${campaign.endDate || 'N/A'} | ${campaign.activeDays || 0} dias ativos`;
-            slide.addText(periodText, {
-              x: 0.5,
-              y: 1,
-              w: '90%',
-              h: 0.4,
-              fontSize: 12,
-              color: mutedColor,
-            });
-          }
-
-          // Metrics Table
-          const tableData: any[][] = [
-            [
-              { text: 'Métrica', options: { bold: true, fill: { color: primaryColor }, color: 'FFFFFF' } },
-              { text: 'Valor', options: { bold: true, fill: { color: primaryColor }, color: 'FFFFFF' } },
-            ],
-            ['Convites Enviados', campaign.invitations.toLocaleString('pt-BR')],
-            ['Conexões Realizadas', campaign.connections.toLocaleString('pt-BR')],
-            ['Taxa de Aceite', `${campaign.acceptanceRate}%`],
-            ['Mensagens Enviadas', campaign.messages.toLocaleString('pt-BR')],
-            ['Respostas Positivas', campaign.positiveResponses.toLocaleString('pt-BR')],
-            ['Reuniões Marcadas', campaign.meetings.toLocaleString('pt-BR')],
-          ];
-
-          if (campaign.proposals !== undefined) {
-            tableData.push(['Propostas', campaign.proposals.toLocaleString('pt-BR')]);
-          }
-          if (campaign.sales !== undefined) {
-            tableData.push(['Vendas', campaign.sales.toLocaleString('pt-BR')]);
-          }
-
-          slide.addTable(tableData, {
-            x: 0.5,
-            y: 1.5,
-            w: 5,
-            colW: [3, 2],
-            fontSize: 12,
-            border: { pt: 0.5, color: 'E2E8F0' },
-            align: 'left',
-            valign: 'middle',
-          });
-
-          // Funnel visualization
-          const funnelData = [
-            { label: 'Convites', value: campaign.invitations, max: campaign.invitations },
-            { label: 'Conexões', value: campaign.connections, max: campaign.invitations },
-            { label: 'Mensagens', value: campaign.messages, max: campaign.invitations },
-            { label: 'Resp. +', value: campaign.positiveResponses, max: campaign.invitations },
-            { label: 'Reuniões', value: campaign.meetings, max: campaign.invitations },
-          ];
-
-          slide.addText('Funil de Conversão', {
-            x: 6,
-            y: 1.5,
-            w: 3.5,
-            h: 0.5,
-            fontSize: 14,
-            bold: true,
-            color: primaryColor,
-          });
-
-          funnelData.forEach((item, idx) => {
-            const maxWidth = 3.2;
-            const barWidth = item.max > 0 ? (item.value / item.max) * maxWidth : 0;
-            const y = 2.1 + idx * 0.7;
-
-            slide.addText(item.label, {
-              x: 6,
-              y,
-              w: 1.2,
-              h: 0.5,
-              fontSize: 10,
-              color: mutedColor,
-              align: 'right',
-            });
-
-            if (barWidth > 0) {
-              slide.addShape('rect', {
-                x: 7.3,
-                y: y + 0.1,
-                w: Math.max(barWidth, 0.2),
-                h: 0.35,
-                fill: { color: idx < 2 ? primaryColor : successColor },
-              });
-            }
-
-            slide.addText(item.value.toLocaleString('pt-BR'), {
-              x: 7.3 + Math.max(barWidth, 0.2) + 0.1,
-              y,
-              w: 1,
-              h: 0.5,
-              fontSize: 10,
-              bold: true,
-              color: '1F2937',
-            });
-          });
-
-          // Conversion rates
-          const conversionRates = [
-            { 
-              label: 'Conexão/Convite', 
-              value: campaign.invitations > 0 
-                ? ((campaign.connections / campaign.invitations) * 100).toFixed(1) 
-                : '0' 
+          // ===== Campaign Weekly Slide =====
+          addCampaignSlide(
+            pptx,
+            {
+              name: campaign.name,
+              periodLabel: weeklyPeriodLabel,
+              activeDays: weeklyMetrics.activeDays,
+              invitations: weeklyMetrics.invitations,
+              connections: weeklyMetrics.connections,
+              messages: weeklyMetrics.messages,
+              acceptanceRate: weeklyAcceptanceRate,
+              positiveResponses: weeklyMetrics.positiveResponses,
+              meetings: weeklyMetrics.meetings,
+              proposals: weeklyMetrics.proposals,
+              sales: weeklyMetrics.sales,
             },
-            { 
-              label: 'Resp+/Conexão', 
-              value: campaign.connections > 0 
-                ? ((campaign.positiveResponses / campaign.connections) * 100).toFixed(1) 
-                : '0' 
-            },
-            { 
-              label: 'Reunião/Resp+', 
-              value: campaign.positiveResponses > 0 
-                ? ((campaign.meetings / campaign.positiveResponses) * 100).toFixed(1) 
-                : '0' 
-            },
-          ];
+            true,
+            primaryColor,
+            successColor,
+            mutedColor
+          );
 
-          slide.addText('Taxas de Conversão', {
-            x: 6,
-            y: 4.2,
-            w: 3.5,
-            h: 0.5,
-            fontSize: 14,
-            bold: true,
-            color: primaryColor,
-          });
+          // ===== Campaign General Slide =====
+          const generalPeriodLabel = campaign.startDate && campaign.endDate
+            ? `${campaign.startDate} - ${campaign.endDate}`
+            : 'N/A';
 
-          conversionRates.forEach((rate, idx) => {
-            const x = 6 + idx * 1.2;
-            slide.addText(`${rate.value}%`, {
-              x,
-              y: 4.7,
-              w: 1.1,
-              h: 0.5,
-              fontSize: 18,
-              bold: true,
-              color: successColor,
-              align: 'center',
-            });
-            slide.addText(rate.label, {
-              x,
-              y: 5.1,
-              w: 1.1,
-              h: 0.4,
-              fontSize: 8,
-              color: mutedColor,
-              align: 'center',
-            });
-          });
+          addCampaignSlide(
+            pptx,
+            {
+              name: campaign.name,
+              periodLabel: generalPeriodLabel,
+              activeDays: campaign.activeDays || 0,
+              invitations: campaign.invitations,
+              connections: campaign.connections,
+              messages: campaign.messages,
+              acceptanceRate: campaign.acceptanceRate ? `${campaign.acceptanceRate}%` : 'N/A',
+              positiveResponses: campaign.positiveResponses,
+              meetings: campaign.meetings,
+              proposals: campaign.proposals || 0,
+              sales: campaign.sales || 0,
+            },
+            false,
+            primaryColor,
+            successColor,
+            mutedColor
+          );
         });
       }
 
-      // Final Slide
+      // ===== 5. Final Slide =====
       const finalSlide = pptx.addSlide();
       finalSlide.addText('Obrigado!', {
         x: 0.5,
         y: 2,
-        w: '90%',
+        w: 9,
         h: 1,
         fontSize: 44,
         bold: true,
@@ -395,7 +568,7 @@ export function ExportOptions({ data, filename = 'campanhas', campaignSummaries 
       finalSlide.addText('Relatório gerado pelo Sistema Pronto', {
         x: 0.5,
         y: 3.2,
-        w: '90%',
+        w: 9,
         h: 0.5,
         fontSize: 16,
         color: mutedColor,
