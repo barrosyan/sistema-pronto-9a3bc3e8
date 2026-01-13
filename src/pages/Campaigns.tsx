@@ -1630,6 +1630,7 @@ export default function Campaigns() {
               acc[campaign] = getDailyDataForCampaign(campaign);
               return acc;
             }, {} as Record<string, any[]>)}
+            dateFilter={dateRange}
           />
         </>
       )}

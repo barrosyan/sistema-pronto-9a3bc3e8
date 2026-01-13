@@ -6,11 +6,17 @@ import { format, subDays, parseISO, isAfter, isBefore, isEqual } from 'date-fns'
 import { ptBR } from 'date-fns/locale';
 import { useState } from 'react';
 
+interface DateFilter {
+  from?: Date;
+  to?: Date;
+}
+
 interface ExportOptionsProps {
   data: Record<string, any>[];
   filename?: string;
   campaignSummaries?: CampaignSummary[];
   dailyDataByCampaign?: Record<string, DailyData[]>;
+  dateFilter?: DateFilter;
 }
 
 interface DailyData {
@@ -58,7 +64,8 @@ export function ExportOptions({
   data, 
   filename = 'campanhas', 
   campaignSummaries = [],
-  dailyDataByCampaign = {}
+  dailyDataByCampaign = {},
+  dateFilter
 }: ExportOptionsProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
@@ -112,30 +119,59 @@ export function ExportOptions({
     }
   };
 
-  // Calculate weekly data from daily data
-  const getWeeklyMetrics = (dailyData: DailyData[]): Omit<CampaignSlideData, 'name' | 'periodLabel' | 'acceptanceRate'> => {
-    const today = new Date();
-    const weekAgo = subDays(today, 7);
+  // Calculate filtered data based on dateFilter or fallback to last 7 days
+  const getFilteredMetrics = (dailyData: DailyData[]): Omit<CampaignSlideData, 'name' | 'periodLabel' | 'acceptanceRate'> => {
+    let filteredData: DailyData[];
     
-    const weeklyData = dailyData.filter(d => {
-      const date = parseISO(d.date);
-      return (isAfter(date, weekAgo) || isEqual(date, weekAgo)) && (isBefore(date, today) || isEqual(date, today));
-    });
+    if (dateFilter?.from) {
+      // Use the date filter from the application
+      filteredData = dailyData.filter(d => {
+        const date = parseISO(d.date);
+        if (dateFilter.to) {
+          return (isAfter(date, dateFilter.from!) || isEqual(date, dateFilter.from!)) && 
+                 (isBefore(date, dateFilter.to) || isEqual(date, dateFilter.to));
+        }
+        return isAfter(date, dateFilter.from!) || isEqual(date, dateFilter.from!);
+      });
+    } else {
+      // Fallback to last 7 days
+      const today = new Date();
+      const weekAgo = subDays(today, 7);
+      filteredData = dailyData.filter(d => {
+        const date = parseISO(d.date);
+        return (isAfter(date, weekAgo) || isEqual(date, weekAgo)) && (isBefore(date, today) || isEqual(date, today));
+      });
+    }
 
-    const activeDays = weeklyData.filter(d => 
+    const activeDays = filteredData.filter(d => 
       d.invitations > 0 || d.connections > 0 || d.messages > 0
     ).length;
 
     return {
       activeDays,
-      invitations: weeklyData.reduce((sum, d) => sum + d.invitations, 0),
-      connections: weeklyData.reduce((sum, d) => sum + d.connections, 0),
-      messages: weeklyData.reduce((sum, d) => sum + d.messages, 0),
-      positiveResponses: weeklyData.reduce((sum, d) => sum + d.positiveResponses, 0),
-      meetings: weeklyData.reduce((sum, d) => sum + d.meetings, 0),
+      invitations: filteredData.reduce((sum, d) => sum + d.invitations, 0),
+      connections: filteredData.reduce((sum, d) => sum + d.connections, 0),
+      messages: filteredData.reduce((sum, d) => sum + d.messages, 0),
+      positiveResponses: filteredData.reduce((sum, d) => sum + d.positiveResponses, 0),
+      meetings: filteredData.reduce((sum, d) => sum + (d.meetings || 0), 0),
       proposals: 0,
       sales: 0,
     };
+  };
+  
+  // Get period label based on date filter
+  const getFilteredPeriodLabel = (): string => {
+    if (dateFilter?.from) {
+      const fromStr = format(dateFilter.from, 'dd/MM/yyyy', { locale: ptBR });
+      const toStr = dateFilter.to 
+        ? format(dateFilter.to, 'dd/MM/yyyy', { locale: ptBR })
+        : format(new Date(), 'dd/MM/yyyy', { locale: ptBR });
+      return `${fromStr} a ${toStr}`;
+    }
+    // Fallback to last 7 days
+    const today = new Date();
+    const weekAgo = subDays(today, 7);
+    return `${format(weekAgo, 'dd/MM/yyyy', { locale: ptBR })} a ${format(today, 'dd/MM/yyyy', { locale: ptBR })}`;
   };
 
   // Add a campaign slide with proper formatting
@@ -446,23 +482,26 @@ export function ExportOptions({
           { invitations: 0, connections: 0, messages: 0, positiveResponses: 0, meetings: 0 }
         );
 
-        // Calculate weekly totals from daily data
-        let weeklyTotals = { invitations: 0, connections: 0, messages: 0, positiveResponses: 0, meetings: 0 };
+        // Calculate filtered totals from daily data (using selected period or last 7 days)
+        let filteredTotals = { invitations: 0, connections: 0, messages: 0, positiveResponses: 0, meetings: 0 };
         
         if (Object.keys(dailyDataByCampaign).length > 0) {
           campaignSummaries.forEach(campaign => {
             const dailyData = dailyDataByCampaign[campaign.name] || [];
-            const weeklyMetrics = getWeeklyMetrics(dailyData);
-            weeklyTotals.invitations += weeklyMetrics.invitations;
-            weeklyTotals.connections += weeklyMetrics.connections;
-            weeklyTotals.messages += weeklyMetrics.messages;
-            weeklyTotals.positiveResponses += weeklyMetrics.positiveResponses;
-            weeklyTotals.meetings += weeklyMetrics.meetings;
+            const filteredMetrics = getFilteredMetrics(dailyData);
+            filteredTotals.invitations += filteredMetrics.invitations;
+            filteredTotals.connections += filteredMetrics.connections;
+            filteredTotals.messages += filteredMetrics.messages;
+            filteredTotals.positiveResponses += filteredMetrics.positiveResponses;
+            filteredTotals.meetings += filteredMetrics.meetings;
           });
         } else {
           // Fallback to overall totals if no daily data
-          weeklyTotals = { ...overallTotals };
+          filteredTotals = { ...overallTotals };
         }
+
+        // Get period label for filtered view
+        const filteredPeriodLabel = getFilteredPeriodLabel();
 
         // ===== 2. Overall View Slide =====
         addOverviewSlide(
@@ -476,11 +515,11 @@ export function ExportOptions({
           bgColor
         );
 
-        // ===== 3. Weekly View Slide =====
+        // ===== 3. Filtered Period View Slide =====
         addOverviewSlide(
           pptx,
-          'Visão Semanal',
-          weeklyTotals,
+          `Visão do Período (${filteredPeriodLabel})`,
+          filteredTotals,
           campaignSummaries.length,
           primaryColor,
           successColor,
@@ -488,36 +527,31 @@ export function ExportOptions({
           bgColor
         );
 
-        // ===== 4. Individual Campaign Slides (Weekly + General for each) =====
+        // ===== 4. Individual Campaign Slides (Filtered + General for each) =====
         campaignSummaries.forEach(campaign => {
           const dailyData = dailyDataByCampaign[campaign.name] || [];
-          const weeklyMetrics = getWeeklyMetrics(dailyData);
+          const filteredMetrics = getFilteredMetrics(dailyData);
           
-          // Get weekly period label
-          const today = new Date();
-          const weekAgo = subDays(today, 7);
-          const weeklyPeriodLabel = `${format(weekAgo, 'yyyy-MM-dd')} - ${format(today, 'yyyy-MM-dd')}`;
-          
-          // Weekly acceptance rate
-          const weeklyAcceptanceRate = weeklyMetrics.invitations > 0
-            ? `${((weeklyMetrics.connections / weeklyMetrics.invitations) * 100).toFixed(1)}%`
-            : 'N/A';
+          // Filtered acceptance rate
+          const filteredAcceptanceRate = filteredMetrics.invitations > 0
+            ? `${((filteredMetrics.connections / filteredMetrics.invitations) * 100).toFixed(1)}%`
+            : '0.0%';
 
-          // ===== Campaign Weekly Slide =====
+          // ===== Campaign Filtered Period Slide =====
           addCampaignSlide(
             pptx,
             {
               name: campaign.name,
-              periodLabel: weeklyPeriodLabel,
-              activeDays: weeklyMetrics.activeDays,
-              invitations: weeklyMetrics.invitations,
-              connections: weeklyMetrics.connections,
-              messages: weeklyMetrics.messages,
-              acceptanceRate: weeklyAcceptanceRate,
-              positiveResponses: weeklyMetrics.positiveResponses,
-              meetings: weeklyMetrics.meetings,
-              proposals: weeklyMetrics.proposals,
-              sales: weeklyMetrics.sales,
+              periodLabel: filteredPeriodLabel,
+              activeDays: filteredMetrics.activeDays,
+              invitations: filteredMetrics.invitations,
+              connections: filteredMetrics.connections,
+              messages: filteredMetrics.messages,
+              acceptanceRate: filteredAcceptanceRate,
+              positiveResponses: filteredMetrics.positiveResponses,
+              meetings: filteredMetrics.meetings,
+              proposals: filteredMetrics.proposals,
+              sales: filteredMetrics.sales,
             },
             true,
             primaryColor,
@@ -528,7 +562,7 @@ export function ExportOptions({
           // ===== Campaign General Slide =====
           const generalPeriodLabel = campaign.startDate && campaign.endDate
             ? `${campaign.startDate} - ${campaign.endDate}`
-            : 'N/A';
+            : 'Período completo';
 
           addCampaignSlide(
             pptx,
@@ -539,7 +573,7 @@ export function ExportOptions({
               invitations: campaign.invitations,
               connections: campaign.connections,
               messages: campaign.messages,
-              acceptanceRate: campaign.acceptanceRate ? `${campaign.acceptanceRate}%` : 'N/A',
+              acceptanceRate: campaign.acceptanceRate ? `${campaign.acceptanceRate}%` : '0.0%',
               positiveResponses: campaign.positiveResponses,
               meetings: campaign.meetings,
               proposals: campaign.proposals || 0,
