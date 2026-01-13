@@ -280,7 +280,7 @@ export function ExportOptions({
       : '0';
 
     const conversionRates = [
-      { label: 'Conexão/Convite', value: acceptanceValue > 0 ? `${acceptanceValue.toFixed(1)}%` : 'N/A' },
+      { label: 'Conexão/Convite', value: `${acceptanceValue.toFixed(1)}%` },
       { label: 'Resp+/Conexão', value: `${respPerConnection}%` },
       { label: 'Reunião/Resp+', value: `${meetingPerResp}%` },
     ];
