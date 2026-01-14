@@ -270,7 +270,7 @@ export default function Campaigns() {
     }
   };
 
-  const getDailyDataForCampaign = (campaignName: string): DailyData[] => {
+  const getDailyDataForCampaign = (campaignName: string, dateFilter?: DateRange): DailyData[] => {
     const campaignData = campaignMetrics.filter(m => m.campaignName === campaignName);
     const allDates = new Set<string>();
     
@@ -278,7 +278,20 @@ export default function Campaigns() {
       Object.keys(metric.dailyData || {}).forEach(date => {
         // Filtrar apenas datas válidas no formato YYYY-MM-DD
         if (date && date.trim() !== '' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-          allDates.add(date);
+          // Aplicar filtro de período se existir
+          if (dateFilter?.from) {
+            try {
+              const metricDate = parseISO(date);
+              const isInRange = dateFilter.to
+                ? isWithinInterval(metricDate, { start: dateFilter.from, end: dateFilter.to })
+                : metricDate >= dateFilter.from;
+              if (isInRange) {
+                allDates.add(date);
+              }
+            } catch (e) {}
+          } else {
+            allDates.add(date);
+          }
         }
       });
     });
@@ -329,8 +342,8 @@ export default function Campaigns() {
     });
   };
 
-  const getWeeklyDataForCampaign = (campaignName: string): WeeklyData[] => {
-    const dailyData = getDailyDataForCampaign(campaignName);
+  const getWeeklyDataForCampaign = (campaignName: string, dateFilter?: DateRange): WeeklyData[] => {
+    const dailyData = getDailyDataForCampaign(campaignName, dateFilter);
     const weeklyMap = new Map<string, WeeklyData>();
 
     dailyData.forEach(day => {
@@ -416,13 +429,14 @@ export default function Campaigns() {
     if (granularity === 'daily') {
       const allDatesSet = new Set<string>();
       selectedCampaigns.forEach(campaign => {
-        getDailyDataForCampaign(campaign).forEach(d => allDatesSet.add(d.date));
+        getDailyDataForCampaign(campaign, dateRange).forEach(d => allDatesSet.add(d.date));
       });
 
+      // Ordenar datas no formato YYYY-MM-DD (ordenação correta)
       return Array.from(allDatesSet).sort().map(date => {
         const dataPoint: any = { date };
         selectedCampaigns.forEach(campaign => {
-          const campaignData = getDailyDataForCampaign(campaign).find(d => d.date === date);
+          const campaignData = getDailyDataForCampaign(campaign, dateRange).find(d => d.date === date);
           dataPoint[`${campaign}_invitations`] = campaignData?.invitations || 0;
           dataPoint[`${campaign}_connections`] = campaignData?.connections || 0;
           dataPoint[`${campaign}_messages`] = campaignData?.messages || 0;
@@ -436,15 +450,23 @@ export default function Campaigns() {
         return getWeekNumberComparisonData();
       }
       
-      const allWeeksSet = new Set<string>();
+      // Coletar dados semanais com startDate para ordenação correta
+      const allWeeksMap = new Map<string, { week: string; startDate: string }>();
       selectedCampaigns.forEach(campaign => {
-        getWeeklyDataForCampaign(campaign).forEach(w => allWeeksSet.add(w.week));
+        getWeeklyDataForCampaign(campaign, dateRange).forEach(w => {
+          if (!allWeeksMap.has(w.startDate)) {
+            allWeeksMap.set(w.startDate, { week: w.week, startDate: w.startDate });
+          }
+        });
       });
 
-      return Array.from(allWeeksSet).sort().map(week => {
-        const dataPoint: any = { week };
+      // Ordenar por startDate (YYYY-MM-DD) em vez de week (dd/MM/yyyy)
+      const sortedWeeks = Array.from(allWeeksMap.values()).sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+      return sortedWeeks.map(({ week, startDate }) => {
+        const dataPoint: any = { week, startDate };
         selectedCampaigns.forEach(campaign => {
-          const campaignData = getWeeklyDataForCampaign(campaign).find(w => w.week === week);
+          const campaignData = getWeeklyDataForCampaign(campaign, dateRange).find(w => w.startDate === startDate);
           dataPoint[`${campaign}_invitations`] = campaignData?.invitations || 0;
           dataPoint[`${campaign}_connections`] = campaignData?.connections || 0;
           dataPoint[`${campaign}_messages`] = campaignData?.messages || 0;
@@ -547,7 +569,7 @@ export default function Campaigns() {
     let maxWeeks = 0;
     
     selectedCampaigns.forEach(campaign => {
-      const weeks = getWeeklyDataForCampaign(campaign);
+      const weeks = getWeeklyDataForCampaign(campaign, dateRange);
       campaignWeekNumbers.set(campaign, weeks);
       maxWeeks = Math.max(maxWeeks, weeks.length);
     });
@@ -599,7 +621,7 @@ export default function Campaigns() {
     if (granularity === 'daily') {
       const allDatesSet = new Set<string>();
       selectedCampaigns.forEach(campaign => {
-        getDailyDataForCampaign(campaign).forEach(d => allDatesSet.add(d.date));
+        getDailyDataForCampaign(campaign, dateRange).forEach(d => allDatesSet.add(d.date));
       });
       
       return Array.from(allDatesSet).sort().map(date => {
@@ -619,7 +641,7 @@ export default function Campaigns() {
           originalDate: date // Keep original for sorting/filtering
         };
         selectedCampaigns.forEach(campaign => {
-          const dailyData = getDailyDataForCampaign(campaign);
+          const dailyData = getDailyDataForCampaign(campaign, dateRange);
           const campaignData = dailyData.find(d => d.date === date);
           row[`${campaign}_status`] = campaignData?.isActive ? 'Ativo' : 'Inativo';
           row[`${campaign}_invitations`] = campaignData?.invitations || 0;
@@ -635,7 +657,7 @@ export default function Campaigns() {
       const weekDataMap = new Map<string, { week: string; startDate: string }>();
       
       selectedCampaigns.forEach(campaign => {
-        getWeeklyDataForCampaign(campaign).forEach(w => {
+        getWeeklyDataForCampaign(campaign, dateRange).forEach(w => {
           allWeeksSet.add(w.week);
           if (!weekDataMap.has(w.week)) {
             weekDataMap.set(w.week, { week: w.week, startDate: w.startDate });
@@ -649,7 +671,7 @@ export default function Campaigns() {
         .map(({ week }) => {
           const row: any = { week };
           selectedCampaigns.forEach(campaign => {
-            const campaignData = getWeeklyDataForCampaign(campaign).find(w => w.week === week);
+            const campaignData = getWeeklyDataForCampaign(campaign, dateRange).find(w => w.week === week);
             // Mostrar apenas o número de dias ativos (0-7) como status
             row[`${campaign}_status`] = campaignData ? campaignData.activeDays : 0;
             row[`${campaign}_invitations`] = campaignData?.invitations || 0;
@@ -1147,7 +1169,7 @@ export default function Campaigns() {
           {/* Campaign Summaries */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {selectedCampaigns.map(campaign => {
-              const summary = getCampaignSummary(campaign);
+              const summary = getCampaignSummary(campaign, dateRange);
               const leads = getAllLeads().filter(l => leadBelongsToCampaign(l.campaign, campaign));
               const proposalsCount = leads.filter(l => l.proposalDate).length;
               const salesCount = leads.filter(l => l.saleDate).length;
@@ -1156,7 +1178,7 @@ export default function Campaigns() {
                 <Card key={campaign}>
                   <CardHeader>
                     <CardTitle className="text-lg">{campaign}</CardTitle>
-                    <CardDescription>Resumo Geral</CardDescription>
+                    <CardDescription>{dateRange?.from ? 'Período Selecionado' : 'Resumo Geral'}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div className="flex justify-between">
@@ -1201,7 +1223,7 @@ export default function Campaigns() {
           {selectedCampaigns.length === 1 && (
             <WeeklyPerformanceChart
               campaignName={selectedCampaigns[0]}
-              data={getWeeklyDataForCampaign(selectedCampaigns[0])}
+              data={getWeeklyDataForCampaign(selectedCampaigns[0], dateRange)}
             />
           )}
 
